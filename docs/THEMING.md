@@ -8,7 +8,7 @@ The studio ships with its own look: hardware-style devices and a blue sequencer 
 | 2. Device skins | One device, or all devices (casing, accent, screen colours) | Device tokens (`--dev-*`) |
 | 3. Components | The controls themselves (knob, fader, button, screen, keys) | Pass your own React components |
 
-You can try levels 1 and 2 live on the Phase 0 design sheet (`design/phase0/design-sheet.html`), using the skin buttons **Default / Flat / Host brand**.
+You can try levels 1 and 2 live on the Phase 0 design sheet (`design/kit/index.html`), using the skin buttons **Default / Flat / Host brand**.
 
 ---
 
@@ -68,6 +68,8 @@ Every device is drawn from the same template. Its skin is just these tokens:
 | `--dev-btn`, `--dev-btn2`, `--dev-btnink`, `--dev-btnedge` | Hardware buttons |
 | `--dev-sec`, `--dev-track` | Section panels, fader tracks |
 | `--dev-key`, `--dev-keyb` | White and black keys |
+
+Each device's skin lives in its own small file, `design/kit/skins/<device>.css` (the template defaults, all commented, are in `device-base.css`). Preview any skin in all three reference styles with `design/check-skin.sh <device>`.
 
 Built-in skins are declared with `:where(...)`, so they have **zero specificity**. Any rule you write wins, with no `!important` needed.
 

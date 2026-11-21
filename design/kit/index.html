@@ -6,6 +6,13 @@
 <title>Device Kit Sheet</title>
 <link rel="preconnect" href="https://fonts.googleapis.com">
 <link href="https://fonts.googleapis.com/css2?family=Michroma&family=Figtree:wght@400;600;800&family=VT323&family=Big+Shoulders+Display:wght@800;900&display=swap" rel="stylesheet">
+<!-- Theme: app tokens, device template, one file per device skin, host examples. See CLAUDE.md "Reskin a device". -->
+<link rel="stylesheet" href="skins/app.css">
+<link rel="stylesheet" href="skins/device-base.css">
+<link rel="stylesheet" href="skins/basalt.css">
+<link rel="stylesheet" href="skins/quartz.css">
+<link rel="stylesheet" href="skins/cobalt.css">
+<link rel="stylesheet" href="skins/host-examples.css">
 <style>
 /* VOICE everyday-studio: a hardware catalogue page for our own device family
    IDEA a manufacturer's spec sheet: one finished instrument on the bench, then its parts laid out
@@ -13,18 +20,6 @@
    COLOUR studio charcoal ground; each device owns its casing palette (stone/lava, porcelain/teal, cobalt/lime)
    TYPE Big Shoulders Display for nameplates, Michroma for silkscreen labels, VT323 for screens, Figtree for text
    LAYOUT title row, device full width, sequencer lane under it; below: anatomy, materials, components, editor colours */
-:root{color-scheme:dark;
- /* THEME CONTRACT, app level (see docs/THEMING.md). A host app overrides any of these. */
- --fwm-bg:#14161b;--fwm-panel:#1d2027;--fwm-line:#2c313b;--fwm-ink:#eef0f4;--fwm-mute:#a3a9b6;
- --fwm-me:#4fc3ff;--fwm-peer:#ff4fa3;--fwm-mod:#b48cff;
- --fwm-roll:#1d4fb8;--fwm-roll2:#173f94;--fwm-roll-btn:#2a5fcc;--fwm-roll-deep:#0b2a66;--fwm-roll-ink:#e6f1ff;--fwm-note:#3fe0ff;--fwm-rec:#ff3b4a;
- --fwm-font-display:"Big Shoulders Display",Impact,sans-serif;--fwm-font-label:Michroma,sans-serif;--fwm-font-screen:VT323,monospace;--fwm-font-ui:Figtree,system-ui,sans-serif;
- --fwm-depth:1;--fwm-glow:1;--fwm-round:1}
-/* example host skins, applied with data-fwm-theme on any ancestor */
-[data-fwm-theme=flat]{--fwm-depth:0;--fwm-glow:0;--fwm-round:.45}
-[data-fwm-theme=brand]{color-scheme:light;--fwm-bg:#f6f5ff;--fwm-panel:#fff;--fwm-line:#dcdaf5;--fwm-ink:#1b1840;--fwm-mute:#5d5a80;--fwm-me:#5b4dff;--fwm-roll:#3b2fb5;--fwm-roll2:#2e2590;--fwm-roll-btn:#4a3ed1;--fwm-roll-deep:#1d1766;--fwm-note:#ffd166;--fwm-font-display:Figtree,system-ui,sans-serif;--fwm-font-label:Figtree,system-ui,sans-serif;--fwm-depth:.35;--fwm-glow:0;--fwm-round:1.6}
-[data-fwm-theme=brand] .dev{--dev-acc:#5b4dff;--dev-lcd:#1d1766;--dev-lcdink:#c9c4ff}
-:root[data-theme=light]{--fwm-bg:#e9ebef;--fwm-panel:#ffffff;--fwm-line:#d3d7de;--fwm-ink:#15181e;--fwm-mute:#555c69}
 *{box-sizing:border-box;min-width:0}
 html,body{margin:0}
 body{background:var(--fwm-bg);color:var(--fwm-ink);font:16px/1.55 var(--fwm-font-ui);overflow-x:clip}
@@ -40,13 +35,7 @@ h2{font:800 30px/1.1 var(--fwm-font-display);margin:0 0 6px}
 .tools{display:flex;gap:8px;flex-wrap:wrap}
 
 /* ---------- device template ---------- */
-/* THEME CONTRACT, device level. Skins use :where() = zero specificity, so any host rule wins. */
-:where(.dev){--dev-case:#2b2d31;--dev-case2:#1e1f22;--dev-edge:#45484e;--dev-silk:#d9d6cf;--dev-acc:#ff5a1f;--dev-lcd:#2a0d05;--dev-lcdink:#ff8a4c;--dev-cap:#e8e2d6;--dev-capd:#9d968a;--dev-key:#f1ede6;--dev-keyb:#1b1b1d;
- --dev-btn:#4a4d53;--dev-btn2:#2a2c30;--dev-btnink:#eee;--dev-btnedge:#000;--dev-sec:rgba(0,0,0,.22);--dev-track:#0b0b0c;--dev-texture:none}
-:where(.basalt){--dev-case:#34363b;--dev-case2:#1c1d20;--dev-texture:radial-gradient(rgba(255,255,255,calc(.035*var(--fwm-depth))) 1px,transparent 1.4px)}
 .dev{position:relative;border-radius:calc(18px*var(--fwm-round));padding:14px;background:var(--dev-texture),linear-gradient(160deg,var(--dev-case),color-mix(in srgb,var(--dev-case2) calc(var(--fwm-depth)*100%),var(--dev-case)));background-size:7px 7px,auto;box-shadow:inset 0 1px 0 rgba(255,255,255,calc(.14*var(--fwm-depth))),inset 0 -2px 0 rgba(0,0,0,calc(.4*var(--fwm-depth))),0 calc(18px*var(--fwm-depth)) calc(40px*var(--fwm-depth)) rgba(0,0,0,calc(.45*var(--fwm-depth)));color:var(--dev-silk)}
-:where(.quartz){--dev-case:#f4f1ea;--dev-case2:#d9d4c8;--dev-edge:#bdb6a6;--dev-silk:#2d3a3a;--dev-acc:#0aa39a;--dev-lcd:#0d2b29;--dev-lcdink:#5ff2df;--dev-cap:#2f3b3b;--dev-capd:#141c1c;--dev-key:#fff;--dev-keyb:#2f3b3b;--dev-btn:#fff;--dev-btn2:#d6d0c2;--dev-btnink:#2d3a3a;--dev-btnedge:#9c9586;--dev-sec:rgba(255,255,255,.45);--dev-track:#8f897b}
-:where(.cobalt){--dev-case:#2156d9;--dev-case2:#13369a;--dev-edge:#5b86f0;--dev-silk:#e9f0ff;--dev-acc:#c8ff2e;--dev-lcd:#0a1640;--dev-lcdink:#c8ff2e;--dev-cap:#e9f0ff;--dev-capd:#8ea6e0;--dev-key:#e9f0ff;--dev-keyb:#0a1640;--dev-btn:#3a6ff0;--dev-btn2:#163c9f;--dev-btnink:#fff;--dev-btnedge:#0a1f5c}
 .zone{position:relative}
 .hdr{display:flex;flex-wrap:wrap;align-items:center;gap:12px 18px;padding:6px 8px 14px}
 .plate{display:flex;flex-direction:column;line-height:1}
@@ -161,6 +150,7 @@ h2{font:800 30px/1.1 var(--fwm-font-display);margin:0 0 6px}
 .ab.now{box-shadow:0 0 0 1px #fff}
 
 /* anatomy overlay */
+.solo .top,.solo .lane,.solo .band+.band{display:none}
 .anat .zone{outline:2px dashed #ffd84a;outline-offset:3px}
 .anat .zone::after{content:attr(data-zone);position:absolute;top:-12px;left:10px;background:#ffd84a;color:#1a1400;font:800 13px var(--fwm-font-ui);padding:1px 8px;border-radius:6px;z-index:5}
 
@@ -523,6 +513,11 @@ S.forEach((s,i)=>{const k=knob($('st'+i),'s'+i,'Cutoff',s[2],{f:'hz'});if(s[1])k
 /* piano roll swatch */
 const R=[[0,4,3],[4,2,5],[6,2,4],[8,4,3],[12,2,6],[14,2,7],[2,1,1,1],[9,3,8,1]];
 $('roll').innerHTML=R.map(r=>`<i class="${r[3]?'p':''}" style="left:calc(${r[0]}/16*100% + 2px);width:calc(${r[1]}/16*100% - 4px);top:${r[2]*18+2}px"></i>`).join('');
+/* URL options used by design/check-skin.sh: ?skin=quartz&theme=flat&solo=1 */
+{const q=new URLSearchParams(location.search),sk=q.get('skin'),th=q.get('theme');
+  if(th){document.body.dataset.fwmTheme=th;for(const x of $('skins').children)x.setAttribute('aria-pressed',x.dataset.skin===th)}
+  if(sk&&/^[a-z0-9-]+$/.test(sk)){const d=$('basalt'),n=sk.toUpperCase();d.className='dev';d.dataset.device=sk;d.querySelector('.plate b').innerHTML=n.slice(0,-1)+'<i>'+n.slice(-1)+'</i>';d.querySelector('.plate span').textContent='Skin check'}
+  if(q.has('solo')){document.body.classList.add('solo');peerOn=false;clearTimeout(timer);$('miraAv').style.display='none'}}
 }
 </script>
 </body>

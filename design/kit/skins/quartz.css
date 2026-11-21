@@ -1,0 +1,20 @@
+/* Quartz: porcelain casing, teal accent. */
+:where(.quartz, [data-device="quartz"]) {
+  --dev-case: #f4f1ea;
+  --dev-case2: #d9d4c8;
+  --dev-edge: #bdb6a6;
+  --dev-silk: #2d3a3a;
+  --dev-acc: #0aa39a;
+  --dev-lcd: #0d2b29;
+  --dev-lcdink: #5ff2df;
+  --dev-cap: #2f3b3b;
+  --dev-capd: #141c1c;
+  --dev-btn: #fff;
+  --dev-btn2: #d6d0c2;
+  --dev-btnink: #2d3a3a;
+  --dev-btnedge: #9c9586;
+  --dev-sec: rgba(255,255,255,.45);
+  --dev-track: #8f897b;
+  --dev-key: #fff;
+  --dev-keyb: #2f3b3b;
+}

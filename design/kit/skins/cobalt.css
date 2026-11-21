@@ -1,0 +1,18 @@
+/* Cobalt: anodised blue casing, lime accent. */
+:where(.cobalt, [data-device="cobalt"]) {
+  --dev-case: #2156d9;
+  --dev-case2: #13369a;
+  --dev-edge: #5b86f0;
+  --dev-silk: #e9f0ff;
+  --dev-acc: #c8ff2e;
+  --dev-lcd: #0a1640;
+  --dev-lcdink: #c8ff2e;
+  --dev-cap: #e9f0ff;
+  --dev-capd: #8ea6e0;
+  --dev-btn: #3a6ff0;
+  --dev-btn2: #163c9f;
+  --dev-btnink: #fff;
+  --dev-btnedge: #0a1f5c;
+  --dev-key: #e9f0ff;
+  --dev-keyb: #0a1640;
+}

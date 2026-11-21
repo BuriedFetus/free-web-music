@@ -98,11 +98,12 @@ The core does no networking. The host owns providers, persistence and storage.
 | Later | Tape/recorder output, global + per-track time/pitch, 3D/immersive view | Fits on the existing device/track chain |
 
 ### Phase 0 progress
-- [x] Device kit design sheet: Basalt, template anatomy, materials, presence states, editor colours (`design/phase0/design-sheet.html`)
+- [x] Device kit design sheet: Basalt, template anatomy, materials, presence states, editor colours (`design/kit/index.html`)
 - [x] Live scope + LFO/modulation assignment on Basalt
 - [x] Filter envelope (Amp/Filter tabs), LFO modes Free / Retrig / Poly
 - [x] Sequencer lens as piano roll: pitch, length, velocity editing; play, live record, loop, 1–2 bar length, automation lanes (Cutoff, Reso)
 - [x] Theming contract: tokens + skin examples (Default / Flat / Host brand), docs/THEMING.md
+- [x] Skins split into one file per device (`design/kit/skins/`), `design/check-skin.sh`, `CLAUDE.md` with reskin recipe
 - [ ] Clickable 4-panel workspace (scene grid, piano roll, mixer, device) + library drag-to-track + presence
 - [ ] Main sequencer window
 - [ ] Tech tests: WASM worklet latency, COOP/COEP in friend's app, peer clock sync

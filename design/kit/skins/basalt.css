@@ -1,0 +1,7 @@
+/* Basalt: mono bass synth. Volcanic stone casing, lava-orange accent. */
+:where(.basalt, [data-device="basalt"]) {
+  --dev-case: #34363b;
+  --dev-case2: #1c1d20;
+  --dev-texture: radial-gradient(rgba(255,255,255,calc(.035 * var(--fwm-depth))) 1px, transparent 1.4px);
+  /* everything else uses device-base.css */
+}

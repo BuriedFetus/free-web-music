@@ -1,0 +1,36 @@
+/* Example host-app skins. These are what a host app would write in ITS OWN stylesheet;
+   they live here only so the kit page and check-skin.sh can preview them.
+   Apply with data-fwm-theme="flat" or "brand" on any ancestor. */
+
+/* Flat: keep every device's colours, drop the hardware depth */
+[data-fwm-theme=flat] {
+  --fwm-depth: 0;
+  --fwm-glow: 0;
+  --fwm-round: .45;
+}
+
+/* Brand: a host app's own palette and fonts applied to everything */
+[data-fwm-theme=brand] {
+  color-scheme: light;
+  --fwm-bg: #f6f5ff;
+  --fwm-panel: #fff;
+  --fwm-line: #dcdaf5;
+  --fwm-ink: #1b1840;
+  --fwm-mute: #5d5a80;
+  --fwm-me: #5b4dff;
+  --fwm-roll: #3b2fb5;
+  --fwm-roll2: #2e2590;
+  --fwm-roll-btn: #4a3ed1;
+  --fwm-roll-deep: #1d1766;
+  --fwm-note: #ffd166;
+  --fwm-font-display: Figtree, system-ui, sans-serif;
+  --fwm-font-label: Figtree, system-ui, sans-serif;
+  --fwm-depth: .35;
+  --fwm-glow: 0;
+  --fwm-round: 1.6;
+}
+[data-fwm-theme=brand] .dev {
+  --dev-acc: #5b4dff;
+  --dev-lcd: #1d1766;
+  --dev-lcdink: #c9c4ff;
+}

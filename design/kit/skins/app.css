@@ -1,0 +1,46 @@
+/* App-level tokens: the studio shell, sequencer world, fonts and the three style dials.
+   Full reference: docs/THEMING.md. A host app overrides any of these on an ancestor element. */
+:root {
+  color-scheme: dark;
+
+  /* shell */
+  --fwm-bg: #14161b;
+  --fwm-panel: #1d2027;
+  --fwm-line: #2c313b;
+  --fwm-ink: #eef0f4;
+  --fwm-mute: #a3a9b6;
+
+  /* people + modulation */
+  --fwm-me: #4fc3ff;
+  --fwm-peer: #ff4fa3;
+  --fwm-mod: #b48cff;
+
+  /* sequencer / piano roll */
+  --fwm-roll: #1d4fb8;
+  --fwm-roll2: #173f94;
+  --fwm-roll-btn: #2a5fcc;
+  --fwm-roll-deep: #0b2a66;
+  --fwm-roll-ink: #e6f1ff;
+  --fwm-note: #3fe0ff;
+  --fwm-rec: #ff3b4a;
+
+  /* fonts */
+  --fwm-font-display: "Big Shoulders Display", Impact, sans-serif;
+  --fwm-font-label: Michroma, sans-serif;
+  --fwm-font-screen: VT323, monospace;
+  --fwm-font-ui: Figtree, system-ui, sans-serif;
+
+  /* style dials: depth 0 = flat .. 1 = hardware, glow 0/1, round = corner radius multiplier */
+  --fwm-depth: 1;
+  --fwm-glow: 1;
+  --fwm-round: 1;
+}
+
+/* the viewer's light theme (claude.ai sets data-theme on the root) */
+:root[data-theme=light] {
+  --fwm-bg: #e9ebef;
+  --fwm-panel: #ffffff;
+  --fwm-line: #d3d7de;
+  --fwm-ink: #15181e;
+  --fwm-mute: #555c69;
+}

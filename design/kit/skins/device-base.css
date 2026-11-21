@@ -1,0 +1,22 @@
+/* Device template defaults. Every device skin starts from these and overrides what it needs.
+   Declared with :where() = zero specificity, so any host rule wins without !important. */
+:where(.dev) {
+  --dev-case: #2b2d31;      /* casing gradient, top-left */
+  --dev-case2: #1e1f22;     /* casing gradient, bottom-right */
+  --dev-texture: none;      /* optional casing pattern (any CSS image) */
+  --dev-edge: #45484e;      /* casing edges */
+  --dev-silk: #d9d6cf;      /* printed labels */
+  --dev-acc: #ff5a1f;       /* accent: value arcs, active buttons, section titles */
+  --dev-lcd: #2a0d05;       /* screen background */
+  --dev-lcdink: #ff8a4c;    /* screen text / scope trace */
+  --dev-cap: #e8e2d6;       /* knob + fader cap, light side */
+  --dev-capd: #9d968a;      /* knob + fader cap, dark side */
+  --dev-btn: #4a4d53;       /* hardware button, top */
+  --dev-btn2: #2a2c30;      /* hardware button, bottom */
+  --dev-btnink: #eee;       /* hardware button text */
+  --dev-btnedge: #000;      /* hardware button lower edge */
+  --dev-sec: rgba(0,0,0,.22); /* section panel fill */
+  --dev-track: #0b0b0c;     /* fader track */
+  --dev-key: #f1ede6;       /* white keys */
+  --dev-keyb: #1b1b1d;      /* black keys */
+}
