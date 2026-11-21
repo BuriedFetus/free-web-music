@@ -112,11 +112,45 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
 .lane .lh{display:flex;flex-wrap:wrap;gap:6px 14px;align-items:center;margin-bottom:8px;font-size:15px}
 .lane .lh b{font-weight:800}
 .lane .lh span{opacity:.75}
-.steps{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:4px}
-.st{height:54px;border-radius:6px;background:var(--roll);border:0;cursor:pointer;display:flex;align-items:flex-end;justify-content:center;padding-bottom:4px;font:16px VT323,monospace;color:#bfe9ff;position:relative}
-.st:nth-child(4n+1){background:#2a5fcc}
-.st.on{background:var(--note);color:#032033;box-shadow:0 0 12px rgba(63,224,255,.5)}
-.st.ph::before{content:"";position:absolute;inset:-2px;border-radius:7px;border:2px solid #fff}
+.seg{display:flex;gap:4px;margin-bottom:8px}
+.seg button{flex:1;min-height:40px;padding:0 8px;white-space:nowrap;border:0;border-radius:7px;background:rgba(0,0,0,.35);color:var(--silk);font:12px Michroma,sans-serif;cursor:pointer}
+.seg button[aria-pressed=true]{background:var(--lcd);color:var(--lcdink);box-shadow:0 0 0 2px var(--acc)}
+.seg.dk{margin:0}
+.seg.dk button{background:#2a5fcc;color:#e6f1ff;font:600 14px Figtree,sans-serif}
+.seg.dk button[aria-pressed=true]{background:#fff;color:#0b2a66;box-shadow:none}
+.lhint{margin:0 0 6px;font-size:12px;text-align:center;min-height:2.4em}
+.envlcd{position:relative;height:76px;padding-top:20px}
+.envlcd small{position:absolute;top:2px;left:8px;font:15px VT323,monospace;opacity:.6}
+.tb{min-height:44px;min-width:44px;padding:0 12px;border-radius:8px;border:0;background:#2a5fcc;color:#e6f1ff;font:600 15px Figtree,sans-serif;cursor:pointer}
+.tb[aria-pressed=true]{background:#fff;color:#0b2a66}
+.tb.play[aria-pressed=true]{background:var(--note);color:#032033}
+.tb.rec[aria-pressed=true]{background:#ff3b4a;color:#fff}
+.bpmw{display:flex;gap:4px;align-items:center}
+.bpm{font:22px/1 VT323,monospace;background:#0b2a66;padding:10px 10px;border-radius:8px;color:var(--note);white-space:nowrap}
+.ninfo{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-bottom:8px}
+.hint{font-size:14px;opacity:.8;margin:6px 0 0}
+.ruler{display:grid;margin-left:44px;font:16px VT323,monospace;color:#bfe9ff;height:18px}
+.prw{scrollbar-width:thin;display:grid;grid-template-columns:44px minmax(0,1fr);height:280px;overflow-y:auto;border-radius:8px;background:var(--roll2)}
+.pkr{height:14px;font:13px/14px VT323,monospace;color:#333;background:#e9eef7;border-bottom:1px solid #b9c3d6;padding-left:4px}
+.pkr.b{background:#25324a;color:#fff}
+.grid{position:relative;touch-action:none;cursor:crosshair}
+.grid::after{content:"";position:absolute;inset:0;pointer-events:none;z-index:1;background-image:linear-gradient(90deg,rgba(255,255,255,.08) 1px,transparent 1px),linear-gradient(90deg,rgba(255,255,255,.28) 1px,transparent 1px);background-size:calc(100% / var(--st)) 100%,calc(400% / var(--st)) 100%}
+.gr{height:14px;background:var(--roll);border-bottom:1px solid rgba(0,0,0,.18)}
+.gr.b{background:var(--roll2)}
+.gr.c{border-bottom-color:rgba(255,255,255,.3)}
+.nt{position:absolute;height:12px;margin-top:1px;border-radius:3px;background:var(--note);box-shadow:0 0 8px rgba(63,224,255,.45);cursor:grab;z-index:2}
+.nt::after{content:"";position:absolute;right:0;top:0;bottom:0;width:7px;cursor:ew-resize;background:rgba(0,0,0,.25);border-radius:0 3px 3px 0}
+.nt.sel{outline:2px solid #fff;outline-offset:1px}
+.nt.hit{background:#fff}
+.nt.peer{outline:2px solid var(--peer);outline-offset:1px}
+.phd{position:absolute;top:0;bottom:0;width:2px;background:#fff;pointer-events:none;z-index:3;display:none}
+.ah{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;margin:10px 0 6px}
+.ah .hint{margin:0}
+.abars{margin-left:44px;height:76px;display:grid;gap:2px;background:var(--roll2);border-radius:6px;padding:4px;touch-action:none;cursor:ns-resize}
+.ab{position:relative;background:rgba(255,255,255,.05);border-radius:3px}
+.ab i{position:absolute;left:0;right:0;bottom:0;background:var(--mod);border-radius:3px}
+.ab.vel i{background:var(--note)}
+.ab.now{box-shadow:0 0 0 1px #fff}
 
 /* anatomy overlay */
 .anat .zone{outline:2px dashed #ffd84a;outline-offset:3px}
@@ -150,7 +184,7 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
   <div class="top">
     <div>
       <h1>Device kit, sheet 1: Basalt</h1>
-      <p>Every device in the library is built from one template. This is the first full device: drag knobs and faders, click or type keys (A W S E D F T G Y H U J K). The scope shows the wave as you play. LFO 1 moves the cutoff (purple ring): press "Assign to a knob", then click any knob to modulate it too. A simulated collaborator, Mira, is tweaking and playing it as well.</p>
+      <p>Every device in the library is built from one template. This is the first full device: drag knobs and faders, click or type keys (A W S E D F T G Y H U J K). The scope shows the wave as you play. Envelopes has Amp and Filter tabs. LFO 1 (Free / Retrig / Poly) moves the cutoff: press "Assign to a knob", then click any knob to modulate it too. Below, the sequencer lane is a full piano roll with live recording, loop and automation (Space = play/stop). A simulated collaborator, Mira, is tweaking and playing it as well.</p>
     </div>
     <div class="tools">
       <button class="btn" id="anatBtn" aria-pressed="false">Show template anatomy</button>
@@ -176,12 +210,15 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
         <div class="row" id="oscK"></div>
       </div>
       <div class="sec"><h4>Filter</h4><div class="row" id="filK"></div></div>
-      <div class="sec"><h4>Envelope</h4>
-        <div class="lcd envlcd"><svg id="envG" viewBox="0 0 200 50" preserveAspectRatio="none"></svg></div>
+      <div class="sec"><h4>Envelopes</h4>
+        <div class="seg" id="etabs"><button data-e="amp" aria-pressed="true">Amp</button><button data-e="filt" aria-pressed="false">Filter</button></div>
+        <div class="lcd envlcd"><small id="envLbl">Amp env</small><svg id="envG" viewBox="0 0 200 50" preserveAspectRatio="none"></svg></div>
         <div class="env" id="envF"></div>
       </div>
       <div class="sec"><h4>LFO 1<span class="led" id="led"></span></h4>
         <div class="waves" id="lwaves"></div>
+        <div class="seg" id="lmode"><button data-m="free" aria-pressed="true">Free</button><button data-m="retrig" aria-pressed="false">Retrig</button><button data-m="poly" aria-pressed="false">Poly</button></div>
+        <p class="silk lhint" id="lhint">Free: runs on its own, ignores notes</p>
         <div class="row" id="lfoK"></div>
         <button class="sbtn" id="assign">Assign to a knob</button>
         <ul class="mods" id="mods"></ul>
@@ -196,8 +233,20 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
   </div>
 
   <div class="lane zone" data-zone="Sequencer lens: not part of the device, it views the main sequencer's track">
-    <div class="lh"><b>Main sequencer · Track 2 · Pattern A</b><span>This lane lives in the sequencer. Basalt just shows it. Click steps to toggle.</span></div>
-    <div class="steps" id="steps"></div>
+    <div class="lh">
+      <b>Main sequencer · Track 2 · Pattern A</b>
+      <button class="tb play" id="tPlay" aria-pressed="false" aria-label="Play">▶ Play</button>
+      <button class="tb rec" id="tRec" aria-pressed="false">● Rec</button>
+      <button class="tb" id="tLoop" aria-pressed="true">⟲ Loop</button>
+      <div class="bpmw"><button class="tb" id="bDn" aria-label="Slower">−</button><span class="bpm" id="bpm">120 BPM</span><button class="tb" id="bUp" aria-label="Faster">+</button></div>
+      <div class="seg dk" id="len"><button data-n="16" aria-pressed="true">1 bar</button><button data-n="32" aria-pressed="false">2 bars</button></div>
+    </div>
+    <div class="ninfo"><span class="bpm" id="ninfo"></span><span class="hint">Click the grid to add a note, drag right for its length · drag a note to move it or change its pitch · drag its right edge to resize · double-click to delete · arrow keys nudge the selected note (Shift+←/→ = length)</span></div>
+    <div class="ruler" id="ruler"></div>
+    <div class="prw" id="prw"><div class="pk" id="pk"></div><div class="grid" id="grid"><div id="rows"></div><div id="nl"></div><div class="phd" id="phd"></div></div></div>
+    <div class="ah"><span class="hint">Lane below:</span><div class="seg dk" id="apar"><button data-p="vel" aria-pressed="true">Velocity</button><button data-p="cut" aria-pressed="false">Cutoff automation</button><button data-p="res" aria-pressed="false">Reso automation</button></div><button class="tb" id="aClr">Clear lane</button></div>
+    <div class="abars" id="abars"></div>
+    <p class="hint">Live recording: turn on Rec, press Play, then play keys (or turn Cutoff / Reso). Notes and knob moves are written into the pattern, and Loop lets you keep layering.</p>
   </div>
 </div></div>
 
@@ -271,18 +320,22 @@ knob($('oscK'),'tune','Tune',0.5,{f:'st'});knob($('oscK'),'shape','Shape',0.3);k
 knob($('filK'),'cut','Cutoff',0.42,{big:1,f:'hz'});knob($('filK'),'res','Reso',0.55);knob($('filK'),'envamt','Env amt',0.7);knob($('filK'),'drive','Drive',0.25);
 knob($('outK'),'glide','Glide',0.2,{f:'ms'});knob($('outK'),'lvl','Level',0.8);
 
-/* envelope faders */
-const env={A:0.05,D:0.35,S:0.55,R:0.3};
-function drawEnv(){const a=env.A*45+2,d=env.D*55+2,r=env.R*55+2,s=48-env.S*44,hold=196-a-d-r;
-  $('envG').innerHTML=`<path d="M2 48 L${2+a} 4 L${2+a+d} ${s} L${2+a+d+hold} ${s} L${2+a+d+hold+r} 48" fill="none" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`}
-$('envF').innerHTML=Object.keys(env).map(n=>`<div class="fd"><div class="tr" data-n="${n}" role="slider" tabindex="0" aria-label="${n}"><div class="cap"></div></div><span class="silk">${n}</span></div>`).join('');
-function placeCap(tr){const v=env[tr.dataset.n];tr.firstChild.style.top=(4+(1-v)*(110-28))+'px';tr.setAttribute('aria-valuenow',Math.round(v*100))}
-for(const tr of document.querySelectorAll('.tr')){placeCap(tr);
-  const move=e=>{const r=tr.getBoundingClientRect();env[tr.dataset.n]=Math.min(1,Math.max(0,1-(e.clientY-r.top-14)/(r.height-28)));placeCap(tr);drawEnv()};
+/* envelopes: amp + filter, one set of faders, tab picks which */
+const envs={amp:{A:0.05,D:0.35,S:0.55,R:0.3},filt:{A:0.02,D:0.3,S:0.2,R:0.25}};let ev='amp';
+function envPath(e){const a=e.A*45+2,d=e.D*55+2,r=e.R*55+2,s=48-e.S*40,hold=196-a-d-r;return`M2 48 L${2+a} 8 L${2+a+d} ${s} L${2+a+d+hold} ${s} L${2+a+d+hold+r} 48`}
+function drawEnv(){const o=ev==='amp'?'filt':'amp';
+  $('envG').innerHTML=`<path d="${envPath(envs[o])}" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".25" vector-effect="non-scaling-stroke"/><path d="${envPath(envs[ev])}" fill="none" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
+  $('envLbl').textContent=ev==='amp'?'Amp env':'Filter env → cutoff (Env amt)'}
+$('envF').innerHTML=['A','D','S','R'].map(n=>`<div class="fd"><div class="tr" data-n="${n}" role="slider" tabindex="0" aria-label="${n}"><div class="cap"></div></div><span class="silk">${n}</span></div>`).join('');
+function placeCap(tr){const v=envs[ev][tr.dataset.n];tr.firstChild.style.top=(4+(1-v)*(110-28))+'px';tr.setAttribute('aria-valuenow',Math.round(v*100))}
+const faders=[...document.querySelectorAll('.tr')];
+for(const tr of faders){placeCap(tr);
+  const move=e=>{const r=tr.getBoundingClientRect();envs[ev][tr.dataset.n]=cl(1-(e.clientY-r.top-14)/(r.height-28));placeCap(tr);drawEnv()};
   tr.addEventListener('pointerdown',e=>{tr.setPointerCapture(e.pointerId);move(e)});
   tr.addEventListener('pointermove',e=>{if(tr.hasPointerCapture(e.pointerId))move(e)});
-  tr.addEventListener('keydown',e=>{const n=tr.dataset.n;if(e.key==='ArrowUp')env[n]=Math.min(1,env[n]+0.05);else if(e.key==='ArrowDown')env[n]=Math.max(0,env[n]-0.05);else return;e.preventDefault();placeCap(tr);drawEnv()});
+  tr.addEventListener('keydown',e=>{const n=tr.dataset.n,E=envs[ev];if(e.key==='ArrowUp')E[n]=cl(E[n]+0.05);else if(e.key==='ArrowDown')E[n]=cl(E[n]-0.05);else return;e.preventDefault();placeCap(tr);drawEnv()});
 }
+$('etabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;ev=b.dataset.e;for(const x of $('etabs').children)x.setAttribute('aria-pressed',x===b);faders.forEach(placeCap);drawEnv()});
 drawEnv();
 
 /* presets */
@@ -301,18 +354,86 @@ function buildKeys(){const host=$('keys');let h='';const nW=15;
   $('oVal').textContent='C'+oct}
 buildKeys();
 const on=(s,c='on')=>keyEls[s]&&keyEls[s].classList.add(c),off=(s,c='on')=>keyEls[s]&&keyEls[s].classList.remove(c);
-$('keys').addEventListener('pointerdown',e=>{const k=e.target.closest('.wk,.bk');if(!k)return;on(k.dataset.s);noteOn(k.dataset.s);const u=()=>{off(k.dataset.s);noteOff(k.dataset.s);removeEventListener('pointerup',u)};addEventListener('pointerup',u)});
-const map='awsedftgyhujk';
-addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('assigning');if(e.repeat||e.target.closest('[role=slider]'))return;const i=map.indexOf(e.key.toLowerCase());if(i>=0){on(String(i));noteOn(i)}});
-addEventListener('keyup',e=>{const i=map.indexOf(e.key.toLowerCase());if(i>=0){off(String(i));noteOff(i)}});
+const base=()=>12*(oct+1);
+$('keys').addEventListener('pointerdown',e=>{const k=e.target.closest('.wk,.bk');if(!k)return;const s=k.dataset.s,m=+s+base();on(s);userOn(m);const u=()=>{off(s);userOff(m);removeEventListener('pointerup',u)};addEventListener('pointerup',u)});
+const map='awsedftgyhujk';const downM={};
+addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('assigning');if(e.repeat||e.ctrlKey||e.metaKey||e.target.closest('[role=slider]'))return;const i=map.indexOf(e.key.toLowerCase());if(i>=0){on(String(i));downM[i]=i+base();userOn(downM[i])}});
+addEventListener('keyup',e=>{const i=map.indexOf(e.key.toLowerCase());if(i>=0&&downM[i]!=null){off(String(i));userOff(downM[i]);delete downM[i]}});
 $('oDn').onclick=()=>{oct=Math.max(0,oct-1);buildKeys()};$('oUp').onclick=()=>{oct=Math.min(6,oct+1);buildKeys()};
 
-/* sequencer lane */
-const seq=[[0,'C2'],[3,'C2'],[6,'D#2'],[8,'C2'],[10,'G1'],[11,'A#1'],[14,'C2']];
-const notes={};for(const[s,n]of seq)notes[s]=n;
-function drawSteps(ph){$('steps').innerHTML=Array.from({length:16},(_,i)=>`<button class="st${notes[i]?' on':''}${i===ph?' ph':''}" data-i="${i}" aria-label="Step ${i+1}${notes[i]?' '+notes[i]:''}">${notes[i]||i+1}</button>`).join('')}
-let ph=-1;drawSteps(ph);
-$('steps').addEventListener('click',e=>{const b=e.target.closest('.st');if(!b)return;const i=+b.dataset.i;if(notes[i])delete notes[i];else notes[i]='C2';drawSteps(ph)});
+/* sequencer lens: piano roll on the main sequencer's track */
+const LO=24,ROWS=37,RH=14,NN=['C','C#','D','D#','E','F','F#','G','G#','A','A#','B'];
+const nname=m=>NN[m%12]+(Math.floor(m/12)-1),isB=m=>[1,3,6,8,10].includes(m%12),HI=LO+ROWS-1;
+let steps=16,bpm=120,playing=false,recArm=false,looping=true,pos=0,lastStep=-1,sel=null,drag=null,apar='vel',pv=null;
+let notes=[{s:0,l:2,m:36,v:.9},{s:3,l:1,m:36,v:.6},{s:6,l:2,m:39,v:.8},{s:8,l:1,m:36,v:.9},{s:10,l:1,m:31,v:.7},{s:11,l:1,m:34,v:.7},{s:12,l:3,m:36,v:1}];
+const autos={cut:Array(32).fill(null),res:Array(32).fill(null)};
+for(let i=0;i<16;i++)autos.cut[i]=+(0.25+0.4*Math.sin(i/15*Math.PI)).toFixed(3);
+const sounding=[],recHeld={},grid=$('grid'),prw=$('prw'),ab=$('abars');
+$('rows').innerHTML=Array.from({length:ROWS},(_,r)=>{const m=HI-r;return`<div class="gr${isB(m)?' b':''}${m%12===0?' c':''}"></div>`}).join('');
+$('pk').innerHTML=Array.from({length:ROWS},(_,r)=>{const m=HI-r;return`<div class="pkr${isB(m)?' b':''}">${m%12===0?nname(m):''}</div>`}).join('');
+grid.style.height=ROWS*RH+'px';
+function renderNotes(){
+  $('nl').innerHTML=notes.map((n,i)=>n.s>=steps?'':`<div class="nt${i===sel?' sel':''}" data-i="${i}" title="${nname(n.m)}" style="left:calc(${n.s/steps*100}% + 1px);width:calc(${Math.min(n.l,steps-n.s)/steps*100}% - 2px);top:${(HI-n.m)*RH}px;opacity:${(.45+.55*n.v).toFixed(2)}"></div>`).join('');
+  const n=notes[sel];$('ninfo').textContent=n?`${nname(n.m)} · step ${n.s+1} · ${n.l} step${n.l>1?'s':''} · vel ${Math.round(n.v*100)}%`:'No note selected'}
+function renderAuto(){ab.innerHTML=Array.from({length:steps},(_,i)=>{let v=null;if(apar==='vel'){const n=notes.find(n=>n.s===i);v=n?n.v:null}else v=autos[apar][i];return`<div class="ab${apar==='vel'?' vel':''}${playing&&i===lastStep?' now':''}"><i style="height:${v==null?0:Math.round(v*100)}%"></i></div>`}).join('')}
+function renderGrid(){grid.style.setProperty('--st',steps);const cols=`repeat(${steps},minmax(0,1fr))`;$('ruler').style.gridTemplateColumns=cols;ab.style.gridTemplateColumns=cols;
+  $('ruler').innerHTML=Array.from({length:steps},(_,i)=>`<span>${i%4===0?`${Math.floor(i/16)+1}.${(i%16)/4+1}`:''}</span>`).join('');renderNotes();renderAuto()}
+const hl=(m,c)=>{const s=String(m-base());c?on(s):off(s)};
+function cell(e){const r=grid.getBoundingClientRect();return{st:Math.max(0,Math.min(steps-1,Math.floor((e.clientX-r.left)/r.width*steps))),m:Math.max(LO,Math.min(HI,HI-Math.floor((e.clientY-r.top)/RH)))}}
+function preview(m){previewEnd();pv=m;noteOn(m);hl(m,1)}
+function previewEnd(){if(pv!==null){noteOff(pv);hl(pv,0);pv=null}}
+grid.addEventListener('pointerdown',e=>{if(e.button!==0)return;const c=cell(e),nt=e.target.closest('.nt');grid.setPointerCapture(e.pointerId);
+  if(nt){const i=+nt.dataset.i,n=notes[i],r=nt.getBoundingClientRect();sel=i;drag={i,mode:e.clientX>r.right-9?'len':'move',s0:n.s,m0:n.m,c0:c}}
+  else{notes.push({s:c.st,l:1,m:c.m,v:.8});sel=notes.length-1;drag={i:sel,mode:'len',s0:c.st,m0:c.m,c0:c}}
+  preview(notes[sel].m);renderNotes();renderAuto()});
+grid.addEventListener('pointermove',e=>{if(!drag)return;const c=cell(e),n=notes[drag.i];
+  if(drag.mode==='len')n.l=Math.max(1,Math.min(steps-n.s,c.st-n.s+1));
+  else{n.s=Math.max(0,Math.min(steps-n.l,drag.s0+c.st-drag.c0.st));const nm=Math.max(LO,Math.min(HI,drag.m0+c.m-drag.c0.m));if(nm!==n.m){n.m=nm;preview(nm)}}
+  renderNotes()});
+const endDrag=()=>{if(drag){drag=null;previewEnd();renderAuto()}};
+grid.addEventListener('pointerup',endDrag);grid.addEventListener('pointercancel',endDrag);
+function delNote(i){notes.splice(i,1);sel=null;renderNotes();renderAuto()}
+grid.addEventListener('dblclick',e=>{const nt=e.target.closest('.nt');if(nt)delNote(+nt.dataset.i)});
+grid.addEventListener('contextmenu',e=>{const nt=e.target.closest('.nt');if(nt){e.preventDefault();delNote(+nt.dataset.i)}});
+addEventListener('keydown',e=>{
+  if(e.code==='Space'&&!e.target.closest('button,[role=slider]')){e.preventDefault();setPlay(!playing);return}
+  const n=notes[sel];if(!n||e.target.closest('[role=slider]'))return;const k=e.key;
+  if(k==='ArrowUp')n.m=Math.min(HI,n.m+(e.shiftKey?12:1));else if(k==='ArrowDown')n.m=Math.max(LO,n.m-(e.shiftKey?12:1));
+  else if(k==='ArrowRight'){if(e.shiftKey)n.l=Math.min(steps-n.s,n.l+1);else n.s=Math.min(steps-n.l,n.s+1)}
+  else if(k==='ArrowLeft'){if(e.shiftKey)n.l=Math.max(1,n.l-1);else n.s=Math.max(0,n.s-1)}
+  else if(k==='Delete'||k==='Backspace'){e.preventDefault();delNote(sel);return}else return;
+  e.preventDefault();renderNotes();renderAuto();if(k==='ArrowUp'||k==='ArrowDown'){preview(n.m);setTimeout(previewEnd,250)}});
+/* lane under the roll: velocity or automation, drawn with the pointer */
+let adr=false;
+function aSet(e){const r=ab.getBoundingClientRect(),i=Math.max(0,Math.min(steps-1,Math.floor((e.clientX-r.left-4)/(r.width-8)*steps))),v=cl(1-(e.clientY-r.top-4)/(r.height-8));
+  if(apar==='vel'){const n=notes.find(n=>n.s===i);if(n)n.v=v;renderNotes()}else autos[apar][i]=+v.toFixed(3);renderAuto()}
+ab.addEventListener('pointerdown',e=>{ab.setPointerCapture(e.pointerId);adr=true;aSet(e)});ab.addEventListener('pointermove',e=>{if(adr)aSet(e)});ab.addEventListener('pointerup',()=>adr=false);
+$('apar').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;apar=b.dataset.p;for(const x of $('apar').children)x.setAttribute('aria-pressed',x===b);renderAuto()});
+$('aClr').onclick=()=>{if(apar==='vel')notes.forEach(n=>n.v=.8);else autos[apar].fill(null);renderNotes();renderAuto()};
+/* transport */
+function setPlay(p){playing=p;$('tPlay').setAttribute('aria-pressed',p);$('tPlay').textContent=p?'■ Stop':'▶ Play';$('phd').style.display=p?'block':'none';pos=0;lastStep=-1;
+  if(!p){for(const s of sounding.splice(0)){noteOff(s.m);hl(s.m,0)}for(const m in recHeld)delete recHeld[m];renderNotes();renderAuto()}}
+$('tPlay').onclick=()=>setPlay(!playing);
+$('tRec').onclick=e=>{recArm=!recArm;e.currentTarget.setAttribute('aria-pressed',recArm)};
+$('tLoop').onclick=e=>{looping=!looping;e.currentTarget.setAttribute('aria-pressed',looping)};
+const setBpm=v=>{bpm=Math.max(60,Math.min(200,v));$('bpm').textContent=bpm+' BPM'};
+$('bDn').onclick=()=>setBpm(bpm-5);$('bUp').onclick=()=>setBpm(bpm+5);
+$('len').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;steps=+b.dataset.n;for(const x of $('len').children)x.setAttribute('aria-pressed',x===b);if(notes[sel]&&notes[sel].s>=steps)sel=null;renderGrid()});
+function seqTick(dt){if(!playing)return;pos+=dt*bpm/60*4;
+  if(pos>=steps){if(looping){pos-=steps;lastStep=-1}else{setPlay(false);return}}
+  $('phd').style.left=(pos/steps*100)+'%';const st=Math.floor(pos);if(st!==lastStep){lastStep=st;onStep(st)}}
+function onStep(st){
+  for(let j=sounding.length-1;j>=0;j--){const s=sounding[j];if(--s.left<=0){noteOff(s.m);hl(s.m,0);sounding.splice(j,1)}}
+  const rec=Object.values(recHeld);for(const n of rec)if(st>n.s)n.l=Math.min(steps-n.s,st-n.s+1);
+  notes.forEach((n,i)=>{if(n.s!==st||rec.includes(n))return;noteOn(n.m);hl(n.m,1);sounding.push({m:n.m,left:n.l});const el=$('nl').querySelector(`[data-i="${i}"]`);if(el){el.classList.add('hit');setTimeout(()=>el.classList.remove('hit'),120)}});
+  for(const p in autos){const k=knobs[p],mine=k.el.classList.contains('mine');if(recArm&&mine)autos[p][st]=+k.v.toFixed(3);else if(!mine&&autos[p][st]!=null)set(k,autos[p][st])}
+  if(rec.length)renderNotes();renderAuto()}
+/* live recording from keys */
+function recOn(m){if(!(playing&&recArm)||m<LO||m>HI)return;const st=Math.round(pos)%steps;notes=notes.filter(n=>!(n.s===st&&n.m===m));sel=null;const n={s:st,l:1,m,v:.85};notes.push(n);recHeld[m]=n;renderNotes();renderAuto()}
+function recOff(m){const n=recHeld[m];if(!n)return;n.l=Math.max(1,Math.min(steps-n.s,Math.round(pos)-n.s));delete recHeld[m];renderNotes();renderAuto()}
+function userOn(m){noteOn(m);recOn(m)}
+function userOff(m){noteOff(m);recOff(m)}
+renderGrid();prw.scrollTop=(HI-48)*RH-40;
 
 /* anatomy toggle */
 $('anatBtn').onclick=e=>{const v=document.body.classList.toggle('anat');e.currentTarget.setAttribute('aria-pressed',v)};
@@ -325,7 +446,8 @@ function peerStep(){
   const ids=['cut','res','envamt','drive','shape'];const id=ids[Math.floor(Math.random()*ids.length)];const k=knobs[id];
   if(k.el.classList.contains('mine')){timer=setTimeout(peerStep,1500);return}
   pk=k;k.el.classList.add('peer');const from=k.v,to=Math.min(1,Math.max(0,from+(Math.random()-.5)*.6));const t0=performance.now(),dur=still?1:1400;
-  const s=Math.floor(Math.random()*24);on(String(s),'peer');noteOn(s);setTimeout(()=>{off(String(s),'peer');noteOff(s)},600);
+  const s=Math.floor(Math.random()*24),m=s+base();on(String(s),'peer');noteOn(m);setTimeout(()=>{off(String(s),'peer');noteOff(m)},600);
+  if(Math.random()<.4){const els=$('nl').children;if(els.length){const el=els[Math.floor(Math.random()*els.length)];el.classList.add('peer');setTimeout(()=>el.classList.remove('peer'),1500)}}
   const tick=t=>{const p=Math.min(1,(t-t0)/dur);if(!k.el.classList.contains('mine'))set(k,from+(to-from)*(1-Math.pow(1-p,3)));if(p<1&&peerOn)requestAnimationFrame(tick);else setTimeout(()=>{k.el.classList.remove('peer');timer=setTimeout(peerStep,1800)},500)};
   requestAnimationFrame(tick);
 }
@@ -335,8 +457,10 @@ $('peerBtn').onclick=e=>{peerOn=!peerOn;e.currentTarget.setAttribute('aria-press
 /* LFO + modulation routes */
 const LW=[['Sine','M2 9 C6 -2 10 -2 14 9 S22 20 26 9'],['Triangle','M2 16 L8 2 L20 16 L26 6'],['Square','M2 16 V3 H14 V16 H26 V3'],['Sample and hold','M2 12 H8 V4 H14 V14 H20 V7 H26']];
 $('lwaves').innerHTML=LW.map((w,i)=>`<button class="wv" aria-label="${w[0]}" aria-pressed="${i===0}"><svg viewBox="0 0 28 18"><path d="${w[1]}"/></svg></button>`).join('');
-const lfo={wave:0,ph:0,sh:0,val:0,rate:knob($('lfoK'),'lrate','Rate',0.45,{f:'lfo',cls:'lfo'}),amt:knob($('lfoK'),'lamt','Amount',0.6,{cls:'lfo'})};
+const lfo={wave:0,ph:0,sh:0,val:0,mode:'free',rate:knob($('lfoK'),'lrate','Rate',0.45,{f:'lfo',cls:'lfo'}),amt:knob($('lfoK'),'lamt','Amount',0.6,{cls:'lfo'})};
 $('lwaves').addEventListener('click',e=>{const b=e.target.closest('.wv');if(!b)return;[...$('lwaves').children].forEach((x,i)=>{x.setAttribute('aria-pressed',x===b);if(x===b)lfo.wave=i})});
+const LH={free:'Free: runs on its own, ignores notes',retrig:'Retrig: restarts at every new note',poly:'Poly: one LFO per voice, each starts with its note'};
+$('lmode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;lfo.mode=b.dataset.m;for(const x of $('lmode').children)x.setAttribute('aria-pressed',x===b);$('lhint').textContent=LH[lfo.mode]});
 let routes=[{t:'cut',a:0.45}];
 function drawRoutes(){$('mods').innerHTML=routes.map(r=>`<li><span>LFO 1 → ${knobs[r.t].svg.getAttribute('aria-label')}</span><button data-t="${r.t}" aria-label="Remove route">×</button></li>`).join('')}
 $('mods').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=knobs[b.dataset.t];routes=routes.filter(r=>r.t!==b.dataset.t);delete k.modd;delete k.mv;drawKnob(k);drawRoutes()});
@@ -353,24 +477,25 @@ function lfoTick(dt){
 /* scope: simulated voice so the wave reacts to wave, cutoff, reso, shape, drive, envelope and LFO */
 const sc=$('scope'),sx=sc.getContext('2d');let sw=0,sh=0;
 const sro=new ResizeObserver(()=>{const d=devicePixelRatio||1;sw=sc.clientWidth;sh=sc.clientHeight;sc.width=sw*d;sc.height=sh*d;sx.setTransform(d,0,0,d,0,0)});sro.observe(sc);
-let amp=0,stage='idle',cur=null;const held=new Set();
-function noteOn(s){s=+s;held.add(s);cur=s;stage='A'}
-function noteOff(s){held.delete(+s);if(held.size)cur=[...held].pop();else if(stage!=='idle')stage='R'}
-function envStep(dt){const A=0.004+env.A*1.2,D=0.02+env.D*1.2,S=env.S,R=0.03+env.R*1.6;
-  if(stage==='A'){amp+=dt/A;if(amp>=1){amp=1;stage='D'}}
-  else if(stage==='D'){amp-=dt/D*(1-S);if(amp<=S){amp=S;stage='S'}}
-  else if(stage==='R'){amp-=dt/R*Math.max(S,0.25);if(amp<=0){amp=0;stage='idle'}}}
+const vA={st:'idle',l:0,e:'amp'},vF={st:'idle',l:0,e:'filt'};let cur=null;const held=new Set();
+function noteOn(s){s=+s;held.add(s);cur=s;vA.st='A';vF.st='A';if(lfo.mode!=='free'){lfo.ph=0;lfo.sh=Math.random()*2-1}}
+function noteOff(s){held.delete(+s);if(held.size)cur=[...held].pop();else for(const v of[vA,vF])if(v.st!=='idle')v.st='R'}
+function eg(v,dt){const e=envs[v.e],A=0.004+e.A*1.2,D=0.02+e.D*1.2,S=e.S,R=0.03+e.R*1.6;
+  if(v.st==='A'){v.l+=dt/A;if(v.l>=1){v.l=1;v.st='D'}}
+  else if(v.st==='D'){v.l-=dt/D*(1-S);if(v.l<=S){v.l=S;v.st='S'}}
+  else if(v.st==='R'){v.l-=dt/R*Math.max(S,0.25);if(v.l<=0){v.l=0;v.st='idle'}}}
+function envStep(dt){eg(vA,dt);eg(vF,dt)}
 function harm(x,type,N,res){let y=0;for(let n=1;n<=N;n++){let a=type===0?1/n:type===1?(n%2?1/n:0):type===2?(n%2?(((n-1)/2)%2?-1:1)/(n*n):0):(n===1?1:0);if(!a)continue;if(Math.abs(n-N)<1.5)a*=1+res*4;y+=a*Math.sin(n*x)}return y}
 function drawScope(){if(!sw)return;sx.clearRect(0,0,sw,sh);const col=getComputedStyle(sc).color;
   sx.globalAlpha=.18;sx.strokeStyle=col;sx.lineWidth=1;sx.beginPath();sx.moveTo(0,sh/2);sx.lineTo(sw,sh/2);sx.stroke();sx.globalAlpha=1;
   const type=[...$('waves').children].findIndex(b=>b.getAttribute('aria-pressed')==='true');
-  const ck=knobs.cut,cut=cl((ck.mv??ck.v)+knobs.envamt.v*amp*0.35),N=Math.max(1,Math.round(1+cut*cut*46));
+  const ck=knobs.cut,cut=cl((ck.mv??ck.v)+knobs.envamt.v*vF.l*0.6),N=Math.max(1,Math.round(1+cut*cut*46));
   const shp=knobs.shape.mv??knobs.shape.v,g=1+(knobs.drive.mv??knobs.drive.v)*5,res=knobs.res.mv??knobs.res.v,cyc=cur==null?2:1.5+(cur%24)/5;
   const ys=[];let mx=1e-3;for(let i=0;i<=sw;i+=2){let x=i/sw*cyc*2*Math.PI;x+=shp*0.9*Math.sin(x);const y=Math.tanh(harm(x,type,N,res)*g);ys.push(y);mx=Math.max(mx,Math.abs(y))}
-  sx.beginPath();ys.forEach((y,j)=>{const X=j*2,Y=sh/2-(y/mx)*amp*(sh/2-5);j?sx.lineTo(X,Y):sx.moveTo(X,Y)});
+  sx.beginPath();ys.forEach((y,j)=>{const X=j*2,Y=sh/2-(y/mx)*vA.l*(sh/2-5);j?sx.lineTo(X,Y):sx.moveTo(X,Y)});
   sx.lineWidth=2;sx.shadowColor=col;sx.shadowBlur=8;sx.stroke();sx.shadowBlur=0}
 let lt=performance.now();
-function loop(t){const dt=Math.min(0.05,(t-lt)/1000);lt=t;envStep(dt);lfoTick(dt);drawScope();requestAnimationFrame(loop)}
+function loop(t){const dt=Math.min(0.05,(t-lt)/1000);lt=t;seqTick(dt);envStep(dt);lfoTick(dt);drawScope();requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 
 /* material cards */

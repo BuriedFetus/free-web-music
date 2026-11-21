@@ -53,6 +53,12 @@ What the user wants:
 - Every device header can show a **live scope** (waveform) of its own output; mixer strips get level meters.
 - Data comes from the audio thread via a cheap snapshot buffer, drawn at screen refresh.
 
+## Sequencer capabilities (required)
+- Note editing: pitch, start, **length**, velocity; draw/move/resize/delete; keyboard nudging.
+- **Live recording** from keys (quantised to steps), overdub while **looping**.
+- **Automation**: per-step parameter lanes, drawn by hand or recorded from knob moves during Rec.
+- LFO modes per modulator: **Free** (runs freely), **Retrig** (restarts per note), **Poly** (one per voice).
+
 ## Effects & routing
 - Effects (**reverb, delay**, chorus, EQ, compressor, distortion…) are devices of kind `effect`, in the same library.
 - Each track: **insert chain** (ordered effect slots) → fader/pan → **sends** to **return buses** (shared reverb/delay) → master.
@@ -90,6 +96,8 @@ The core does no networking. The host owns providers, persistence and storage.
 ### Phase 0 progress
 - [x] Device kit design sheet: Basalt, template anatomy, materials, presence states, editor colours (`design/phase0/design-sheet.html`)
 - [x] Live scope + LFO/modulation assignment on Basalt
+- [x] Filter envelope (Amp/Filter tabs), LFO modes Free / Retrig / Poly
+- [x] Sequencer lens as piano roll: pitch, length, velocity editing; play, live record, loop, 1–2 bar length, automation lanes (Cutoff, Reso)
 - [ ] Clickable 4-panel workspace (scene grid, piano roll, mixer, device) + library drag-to-track + presence
 - [ ] Main sequencer window
 - [ ] Tech tests: WASM worklet latency, COOP/COEP in friend's app, peer clock sync
