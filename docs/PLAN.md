@@ -65,9 +65,13 @@ What the user wants:
 - **Routing graph** in the project model: any audio out → any audio in (buses, group tracks, sidechain inputs), with cycle prevention. A routing view shows and edits it.
 - Tape/recorder devices later sit anywhere in that graph (one track or master).
 
+## Theming (host can restyle everything)
+- Full contract in [THEMING.md](THEMING.md). Three levels: app tokens (`--fwm-*`, incl. depth / glow / round dials), device skin tokens (`--dev-*`, declared at zero specificity), and replaceable React primitives (Knob, Fader, Button, Screen, Keys).
+- Devices only use those primitives and tokens, never hard-coded colours, fonts or shadows. Package styles are scoped (prefix / optional Shadow DOM), and font loading is optional.
+
 ## Public API (to the host app)
 ```tsx
-<Studio doc={ydoc} awareness={awareness} channel={ephemeralChannel} user={{ id, name, color }} />
+<Studio doc={ydoc} awareness={awareness} channel={ephemeralChannel} user={{ id, name, color }} theme={{ tokens, devices, components, loadFonts }} />
 ```
 The core does no networking. The host owns providers, persistence and storage.
 
@@ -98,6 +102,7 @@ The core does no networking. The host owns providers, persistence and storage.
 - [x] Live scope + LFO/modulation assignment on Basalt
 - [x] Filter envelope (Amp/Filter tabs), LFO modes Free / Retrig / Poly
 - [x] Sequencer lens as piano roll: pitch, length, velocity editing; play, live record, loop, 1–2 bar length, automation lanes (Cutoff, Reso)
+- [x] Theming contract: tokens + skin examples (Default / Flat / Host brand), docs/THEMING.md
 - [ ] Clickable 4-panel workspace (scene grid, piano roll, mixer, device) + library drag-to-track + presence
 - [ ] Main sequencer window
 - [ ] Tech tests: WASM worklet latency, COOP/COEP in friend's app, peer clock sync
