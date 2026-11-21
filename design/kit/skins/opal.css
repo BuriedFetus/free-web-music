@@ -1,0 +1,20 @@
+/* Opal: pad synth. Misty lilac casing, magenta accent, plum screen. */
+:where(.opal, [data-device="opal"]) {
+  --dev-case: #d9d2ee;
+  --dev-case2: #a99fd0;
+  --dev-edge: #8c81b8;
+  --dev-silk: #2a2142;
+  --dev-acc: #d6338a;
+  --dev-lcd: #24122b;
+  --dev-lcdink: #ff9bd2;
+  --dev-cap: #2a2142;
+  --dev-capd: #120d1f;
+  --dev-btn: #efeafc;
+  --dev-btn2: #c3b9e6;
+  --dev-btnink: #2a2142;
+  --dev-btnedge: #7d72aa;
+  --dev-sec: rgba(255,255,255,.3);
+  --dev-track: #7d72aa;
+  --dev-key: #faf7ff;
+  --dev-keyb: #2a2142;
+}

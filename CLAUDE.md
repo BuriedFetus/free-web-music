@@ -16,9 +16,10 @@ A collaborative, device-based music studio for the browser. This repo is the **c
 ## Layout
 ```
 design/kit/index.html        design kit: Basalt synth, sequencer lane, materials, knob states, skin switcher
+design/kit/workspace.html    clickable 4-panel workspace prototype (scenes, piano roll, mixer, device, library)
 design/kit/skins/app.css     app-level tokens (shell, sequencer, fonts, dials)
 design/kit/skins/device-base.css   device template defaults (every --dev-* token, commented)
-design/kit/skins/<device>.css      one file per device skin (basalt, quartz, cobalt)
+design/kit/skins/<device>.css      one file per device skin (basalt, quartz, cobalt, flint, opal)
 design/kit/skins/host-examples.css example host overrides: "flat" and "brand"
 design/check-skin.sh         screenshot a skin in default / flat / brand
 docs/                        PLAN.md, THEMING.md
@@ -32,8 +33,8 @@ docs/                        PLAN.md, THEMING.md
 
 ## New device skin
 1. Copy `design/kit/skins/quartz.css` to `design/kit/skins/<name>.css`, rename the selector and change the colours.
-2. Add `<link rel="stylesheet" href="skins/<name>.css">` in `design/kit/index.html`, next to the other skins.
+2. Add `<link rel="stylesheet" href="skins/<name>.css">` in `design/kit/index.html` and `design/kit/workspace.html`, next to the other skins.
 3. Run `design/check-skin.sh <name>`.
 
 ## Publishing the design kit
-The kit is published as a private claude.ai artifact with `index.html` plus `skins/*.css`, so the files keep the same relative paths. Republish all changed files together.
+Two private claude.ai artifacts, each published with its page as `index.html` plus `skins/*.css` (same relative paths): the **Device Kit Sheet** (`design/kit/index.html`) and the **Studio Workspace** (`design/kit/workspace.html`). When a skin changes, republish it to both.

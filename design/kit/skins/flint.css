@@ -1,0 +1,20 @@
+/* Flint: drum machine. Sandstone casing, signal-red accent. */
+:where(.flint, [data-device="flint"]) {
+  --dev-case: #ddd0b6;
+  --dev-case2: #b9a888;
+  --dev-edge: #a08f6f;
+  --dev-silk: #2b241a;
+  --dev-acc: #e23b2e;
+  --dev-lcd: #2a0b08;
+  --dev-lcdink: #ff7a66;
+  --dev-cap: #2b241a;
+  --dev-capd: #0f0c08;
+  --dev-btn: #f3ead8;
+  --dev-btn2: #cbbb9b;
+  --dev-btnink: #2b241a;
+  --dev-btnedge: #8e7d5d;
+  --dev-sec: rgba(255,255,255,.35);
+  --dev-track: #8e7d5d;
+  --dev-key: #f6efe2;
+  --dev-keyb: #2b241a;
+}

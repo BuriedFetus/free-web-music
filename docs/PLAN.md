@@ -104,7 +104,8 @@ The core does no networking. The host owns providers, persistence and storage.
 - [x] Sequencer lens as piano roll: pitch, length, velocity editing; play, live record, loop, 1–2 bar length, automation lanes (Cutoff, Reso)
 - [x] Theming contract: tokens + skin examples (Default / Flat / Host brand), docs/THEMING.md
 - [x] Skins split into one file per device (`design/kit/skins/`), `design/check-skin.sh`, `CLAUDE.md` with reskin recipe
-- [ ] Clickable 4-panel workspace (scene grid, piano roll, mixer, device) + library drag-to-track + presence
+- [x] Clickable 4-panel workspace (`design/kit/workspace.html`): scene grid, piano roll, mixer, device; any panel can show any view; resizable/maximisable panels and floating device windows (private layout); library drawer with drag-to-track (multiple copies); transport (scene loop / song, rec); simulated collaborator presence
+- [x] Two more device skins via the recipe: Flint (drums), Opal (pads)
 - [ ] Main sequencer window
 - [ ] Tech tests: WASM worklet latency, COOP/COEP in friend's app, peer clock sync
 

@@ -1,6 +1,6 @@
 /* Device template defaults. Every device skin starts from these and overrides what it needs.
    Declared with :where() = zero specificity, so any host rule wins without !important. */
-:where(.dev) {
+:where(.dev, [data-device]) {
   --dev-case: #2b2d31;      /* casing gradient, top-left */
   --dev-case2: #1e1f22;     /* casing gradient, bottom-right */
   --dev-texture: none;      /* optional casing pattern (any CSS image) */
