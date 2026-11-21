@@ -4,7 +4,8 @@ A collaborative, device-based music studio for the browser. This repo is the **c
 
 - Plan, phases, progress: `docs/PLAN.md`
 - Theming contract (tokens, skins, replaceable controls): `docs/THEMING.md`
-- Status: **Phase 0, design**. No engine code yet. The design kit is `design/kit/index.html` (open it in a browser, no build step).
+- Status: **Phase 0 complete, Phase 1 next** (engine + real sound). Start with `docs/HANDOFF.md`.
+- Prototypes (no build step): `design/kit/index.html` (device kit), `design/kit/workspace.html` (workspace). Tech tests: `spikes/` (`python3 spikes/serve.py`).
 
 ## Rules
 - **Our own designs only.** The visual reference is the *feel* of KORG Gadget, but device names, art and layouts are ours (devices are named after minerals: Basalt, Quartz, Cobalt…). Never copy KORG names, graphics or screens.
@@ -22,7 +23,8 @@ design/kit/skins/device-base.css   device template defaults (every --dev-* token
 design/kit/skins/<device>.css      one file per device skin (basalt, quartz, cobalt, flint, opal)
 design/kit/skins/host-examples.css example host overrides: "flat" and "brand"
 design/check-skin.sh         screenshot a skin in default / flat / brand
-docs/                        PLAN.md, THEMING.md
+spikes/                      Phase 0 tech tests: Rust/WASM voice (dsp/), test page, COOP/COEP server, RESULTS.md
+docs/                        PLAN.md, THEMING.md, HANDOFF.md
 ```
 
 ## Reskin a device

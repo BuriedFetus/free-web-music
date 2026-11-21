@@ -1,0 +1,145 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Phase 0 Tech Tests</title>
+<style>
+/* Plain test bench on purpose: system fonts only, so it also works under COEP: require-corp. */
+:root{color-scheme:dark;--bg:#14161b;--panel:#1d2027;--line:#2c313b;--ink:#eef0f4;--mute:#a3a9b6;--ok:#3ddc84;--warn:#ffcc4d;--bad:#ff5a5a;--acc:#4fc3ff}
+*{box-sizing:border-box}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+main{max-width:1000px;margin:0 auto;padding:24px 16px 48px}
+h1{font-size:30px;margin:0 0 4px}
+h2{font-size:20px;margin:0 0 6px}
+p{margin:6px 0;color:var(--mute)}
+section{background:var(--panel);border:1px solid var(--line);border-radius:12px;padding:16px;margin-top:16px}
+table{border-collapse:collapse;width:100%;margin-top:8px;font-variant-numeric:tabular-nums}
+th,td{text-align:right;padding:6px 8px;border-bottom:1px solid var(--line);white-space:nowrap}
+th:first-child,td:first-child{text-align:left}
+.tag{display:inline-block;padding:2px 10px;border-radius:999px;font-weight:700;font-size:14px;color:#0b0d10}
+.ok{background:var(--ok)}.warn{background:var(--warn)}.bad{background:var(--bad)}
+button{font:600 15px system-ui,sans-serif;min-height:44px;padding:0 16px;border-radius:10px;border:0;background:var(--acc);color:#04131c;cursor:pointer}
+pre{background:#0d0f13;border-radius:8px;padding:10px;overflow:auto;font-size:13px;color:#cfd6e4}
+.scroll{overflow-x:auto}
+kbd{background:#0d0f13;border:1px solid var(--line);border-radius:4px;padding:0 5px}
+</style>
+</head>
+<body>
+<main>
+  <h1>Phase 0 tech tests</h1>
+  <p>Three risks checked before building the engine: the audio thread (WASM speed and latency), cross-origin isolation (needed for the fast event path), and clock sync between players. Open via <code>python3 spikes/serve.py</code> for the isolated case, or as a plain file to see the fallback.</p>
+
+  <section>
+    <h2>1. Cross-origin isolation</h2>
+    <div id="iso"></div>
+  </section>
+
+  <section>
+    <h2>2. DSP cost: Rust/WASM vs plain JS</h2>
+    <p>Same voice in both (band-limited saw → zero-delay-feedback low-pass → envelope), 128-sample blocks at 48 kHz, 2 s of audio per run. Budget = real time; lower % is better.</p>
+    <div class="scroll" id="bench">Running…</div>
+  </section>
+
+  <section>
+    <h2>3. Clock sync and jitter buffer (simulated network)</h2>
+    <p>Peer clock offset 1234.567 ms, one-way delay 35 ms + random jitter (mean 12 ms) + 5% spikes of 80 ms, seeded so results repeat.</p>
+    <div class="scroll" id="clock">Running…</div>
+  </section>
+
+  <section>
+    <h2>4. Live audio latency (needs a click, plays sound)</h2>
+    <p>Starts an AudioWorklet running the WASM voice. Play with keys <kbd>A</kbd> <kbd>W</kbd> <kbd>S</kbd> <kbd>E</kbd> <kbd>D</kbd> <kbd>F</kbd> <kbd>T</kbd> <kbd>G</kbd> <kbd>Y</kbd> <kbd>H</kbd> <kbd>U</kbd> <kbd>J</kbd> <kbd>K</kbd>. Turn your volume down first.</p>
+    <button id="start">Start audio test</button>
+    <div id="live"></div>
+  </section>
+
+  <section>
+    <h2>Machine-readable results</h2>
+    <pre id="json">{}</pre>
+  </section>
+</main>
+<script src="dsp-wasm.js"></script>
+<script>
+{
+const $=id=>document.getElementById(id);
+const R={userAgent:navigator.userAgent};
+const show=()=>$('json').textContent=JSON.stringify(R,null,1);
+
+/* 1. isolation */
+R.isolation={crossOriginIsolated:!!self.crossOriginIsolated,sharedArrayBuffer:typeof SharedArrayBuffer==='function',protocol:location.protocol};
+$('iso').innerHTML=self.crossOriginIsolated
+ ?'<p><span class="tag ok">Isolated</span> SharedArrayBuffer is available, so note events can reach the audio thread through a lock-free ring buffer with no message hops.</p>'
+ :'<p><span class="tag warn">Not isolated</span> SharedArrayBuffer is unavailable here. The engine falls back to MessagePort (works, adds a small, variable delay). To enable the fast path the host page needs <code>Cross-Origin-Opener-Policy: same-origin</code> and <code>Cross-Origin-Embedder-Policy: require-corp</code> (or <code>credentialless</code>).</p>';
+
+/* 2. benchmark */
+const SR=48000,BLOCK=128,SECONDS=2,blocks=Math.ceil(SR*SECONDS/BLOCK);
+const fc=900,res=.5,G=Math.tan(Math.PI*fc/SR),K=2-2*res;
+const freqs=n=>Array.from({length:n},(_,i)=>55*Math.pow(2,(i%36)/12));
+function jsBank(){const MAX=64,ph=new Float32Array(MAX),inc=new Float32Array(MAX),i1=new Float32Array(MAX),i2=new Float32Array(MAX),env=new Float32Array(MAX),gate=new Uint8Array(MAX),out=new Float32Array(BLOCK);let g=.1,k=1;const atk=.02,rel=.0008;
+  const blep=(t,dt)=>t<dt?(t/=dt,t+t-t*t-1):t>1-dt?(t=(t-1)/dt,t*t+t+t+1):0;
+  return{out,setFilter(a,b){g=a;k=b},on(v,x){inc[v]=x;gate[v]=1},render(n,nv){const a1=1/(1+g*(g+k)),a2=g*a1,a3=g*a2;out.fill(0);
+    for(let v=0;v<nv;v++){if(!gate[v]&&env[v]<1e-5)continue;let p=ph[v],c1=i1[v],c2=i2[v],e=env[v];const d=inc[v],gt=gate[v];
+      for(let s=0;s<n;s++){e+=gt?(1-e)*atk:-e*rel;const saw=2*p-1-blep(p,d);p+=d;if(p>=1)p-=1;const v3=saw-c2,v1=a1*c1+a2*v3,v2=c2+a2*c1+a3*v3;c1=2*v1-c1;c2=2*v2-c2;out[s]+=v2*e*.15}
+      ph[v]=p;i1[v]=c1;i2[v]=c2;env[v]=e}}}}
+function wasmBank(){const bytes=Uint8Array.from(atob(window.DSP_WASM_B64),c=>c.charCodeAt(0)),x=new WebAssembly.Instance(new WebAssembly.Module(bytes),{}).exports;
+  return{x,out:new Float32Array(x.memory.buffer,x.out_ptr(),BLOCK),setFilter:(a,b)=>x.set_filter(a,b),on:(v,i)=>x.note_on(v,i),render:(n,nv)=>x.render(n,nv)}}
+function run(bank,nv){bank.setFilter(G,K);freqs(nv).forEach((f,v)=>bank.on(v,f/SR));for(let b=0;b<40;b++)bank.render(BLOCK,nv);const t0=performance.now();for(let b=0;b<blocks;b++)bank.render(BLOCK,nv);return performance.now()-t0}
+try{
+  /* correctness: both implementations produce the same signal */
+  const a=jsBank(),w=wasmBank();a.setFilter(G,K);w.setFilter(G,K);a.on(0,110/SR);w.on(0,110/SR);let maxd=0;for(let b=0;b<200;b++){a.render(BLOCK,1);w.render(BLOCK,1);for(let i=0;i<BLOCK;i++)maxd=Math.max(maxd,Math.abs(a.out[i]-w.out[i]))}
+  const rows=[1,8,16,32,64].map(nv=>{const js=run(jsBank(),nv),wa=run(wasmBank(),nv);return{voices:nv,jsPct:js/(SECONDS*1000)*100,wasmPct:wa/(SECONDS*1000)*100}});
+  const per=rows[rows.length-1].wasmPct/64;
+  R.bench={sampleRate:SR,block:BLOCK,maxDiffJsVsWasm:maxd,rows,wasmPctPerVoice:per,voicesAt50pctOneCore:Math.floor(50/per)};
+  $('bench').innerHTML=`<table><thead><tr><th>Voices</th><th>JS, % of real time</th><th>WASM, % of real time</th><th>WASM speed-up</th></tr></thead><tbody>${rows.map(r=>`<tr><td>${r.voices}</td><td>${r.jsPct.toFixed(2)}%</td><td>${r.wasmPct.toFixed(2)}%</td><td>${(r.jsPct/r.wasmPct).toFixed(2)}×</td></tr>`).join('')}</tbody></table>
+  <p>Max sample difference JS vs WASM: ${maxd.toExponential(2)} (same algorithm, so it should be tiny). One WASM voice costs about ${per.toFixed(3)}% of one core, so roughly <b>${R.bench.voicesAt50pctOneCore} voices</b> fit in half a core. Note: this runs on the main thread; the audio thread has the same speed but a hard deadline of ${(BLOCK/SR*1000).toFixed(2)} ms per block.</p>`;
+}catch(e){$('bench').innerHTML=`<p><span class="tag bad">Failed</span> ${e.message}</p>`;R.bench={error:String(e)}}
+
+/* 3. clock sync + jitter buffer */
+function rng(seed){return()=>{seed|=0;seed=seed+0x6D2B79F5|0;let t=Math.imul(seed^seed>>>15,1|seed);t=t+Math.imul(t^t>>>7,61|t)^t;return((t^t>>>14)>>>0)/4294967296}}
+const rnd=rng(42),OFF=1234.567,oneWay=()=>35+(-Math.log(1-rnd())*12)+(rnd()<.05?80:0);
+const ex=[];let tA=0;for(let i=0;i<40;i++){tA+=250;const d1=oneWay(),d2=oneWay(),t0=tA,t1=tA+d1+OFF,t2=t1+.5,t3=tA+d1+.5+d2;ex.push({off:((t1-t0)+(t2-t3))/2,rtt:(t3-t0)-(t2-t1)})}
+const med=a=>{const b=[...a].sort((x,y)=>x-y),m=b.length>>1;return b.length%2?b[m]:(b[m-1]+b[m])/2};
+const sync=[5,10,20,40].map(n=>{const s=ex.slice(0,n),naive=s.reduce((a,e)=>a+e.off,0)/n,best=[...s].sort((a,b)=>a.rtt-b.rtt).slice(0,Math.max(2,Math.ceil(n/4)));return{exchanges:n,naiveErrMs:Math.abs(naive-OFF),minRttErrMs:Math.abs(med(best.map(e=>e.off))-OFF)}});
+const sends=Array.from({length:4000},oneWay),p=q=>[...sends].sort((a,b)=>a-b)[Math.floor(q*sends.length)];
+const jb=[50,70,90,120,150].map(x=>({bufferMs:x,latePct:sends.filter(d=>d>x).length/sends.length*100}));
+R.clock={trueOffsetMs:OFF,sync,oneWayP50:p(.5),oneWayP95:p(.95),oneWayP99:p(.99),jitterBuffer:jb};
+$('clock').innerHTML=`<table><thead><tr><th>Exchanges</th><th>Naive average error</th><th>Min-RTT filter error</th></tr></thead><tbody>${sync.map(r=>`<tr><td>${r.exchanges}</td><td>${r.naiveErrMs.toFixed(2)} ms</td><td>${r.minRttErrMs.toFixed(2)} ms</td></tr>`).join('')}</tbody></table>
+<table><thead><tr><th>Jitter buffer (play remote notes this long after they were sent)</th><th>Notes arriving too late</th></tr></thead><tbody>${jb.map(r=>`<tr><td>${r.bufferMs} ms</td><td>${r.latePct.toFixed(1)}%</td></tr>`).join('')}</tbody></table>
+<p>One-way delay p50 ${p(.5).toFixed(1)} ms, p95 ${p(.95).toFixed(1)} ms, p99 ${p(.99).toFixed(1)} ms. Plan: estimate offset from the lowest-round-trip samples (a few exchanges at join, then every few seconds) and size the live-note buffer adaptively near the measured p95.</p>`;
+show();
+
+/* 4. live AudioWorklet test */
+const WORKLET=`
+class Voice extends AudioWorkletProcessor{
+  constructor(o){super();const x=new WebAssembly.Instance(new WebAssembly.Module(o.processorOptions.wasm),{}).exports;this.x=x;this.out=new Float32Array(x.memory.buffer,x.out_ptr(),128);
+    this.ring=o.processorOptions.sab?new Int32Array(o.processorOptions.sab):null;this.ringF=this.ring?new Float32Array(o.processorOptions.sab):null;
+    this.port.onmessage=e=>{const d=e.data;if(d.t==='ping')this.port.postMessage({t:'pong',id:d.id});else if(d.t==='on')x.note_on(d.v,d.inc);else if(d.t==='off')x.note_off(d.v);else if(d.t==='f')x.set_filter(d.g,d.k)}}
+  drain(){const r=this.ring;let rd=Atomics.load(r,1);const wr=Atomics.load(r,0);while(rd!==wr){const i=2+(rd%64)*3;if(r[i]===1)this.x.note_on(r[i+1],this.ringF[i+2]);else this.x.note_off(r[i+1]);rd++}Atomics.store(r,1,rd)}
+  process(_,outs){if(this.ring)this.drain();const o=outs[0];this.x.render(o[0].length,16);for(const ch of o)ch.set(this.out.subarray(0,ch.length));return true}}
+registerProcessor('fwm-voice',Voice);`;
+$('start').onclick=async()=>{
+  try{
+    const ctx=new AudioContext({latencyHint:'interactive'});await ctx.resume();
+    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([WORKLET],{type:'text/javascript'})));
+    const wasm=Uint8Array.from(atob(window.DSP_WASM_B64),c=>c.charCodeAt(0)).buffer;
+    const sab=self.crossOriginIsolated?new SharedArrayBuffer(4*(2+64*3)):null;
+    const node=new AudioWorkletNode(ctx,'fwm-voice',{numberOfOutputs:1,outputChannelCount:[2],processorOptions:{wasm,sab}});node.connect(ctx.destination);
+    node.port.postMessage({t:'f',g:Math.tan(Math.PI*1400/ctx.sampleRate),k:.9});
+    const ring=sab?new Int32Array(sab):null,ringF=sab?new Float32Array(sab):null;
+    const send=(type,v,inc)=>{if(ring){const w=Atomics.load(ring,0),i=2+(w%64)*3;ring[i]=type;ring[i+1]=v;ringF[i+2]=inc||0;Atomics.store(ring,0,w+1)}else node.port.postMessage(type===1?{t:'on',v,inc}:{t:'off',v})};
+    /* message round trip to the audio thread */
+    const rtts=[];await new Promise(res=>{let n=0,t0=0;node.port.onmessage=()=>{rtts.push(performance.now()-t0);if(++n<30){t0=performance.now();node.port.postMessage({t:'ping'})}else res()};t0=performance.now();node.port.postMessage({t:'ping'})});
+    const rtt=med(rtts),base=(ctx.baseLatency||0)*1000,outL=(ctx.outputLatency||0)*1000;
+    R.live={sampleRate:ctx.sampleRate,baseLatencyMs:base,outputLatencyMs:outL,portRoundTripMs:rtt,eventPath:ring?'SharedArrayBuffer ring':'MessagePort',estimatedKeyToSoundMs:base+outL+(ring?128/ctx.sampleRate*1000:rtt/2)};
+    $('live').innerHTML=`<table><tbody><tr><td>Sample rate</td><td>${ctx.sampleRate} Hz</td></tr><tr><td>Base latency (audio graph)</td><td>${base.toFixed(1)} ms</td></tr><tr><td>Output latency (device)</td><td>${outL?outL.toFixed(1)+' ms':'not reported'}</td></tr><tr><td>Main → audio thread → main round trip</td><td>${rtt.toFixed(2)} ms</td></tr><tr><td>Event path used</td><td>${R.live.eventPath}</td></tr><tr><td><b>Estimated key → sound</b></td><td><b>${R.live.estimatedKeyToSoundMs.toFixed(1)} ms</b></td></tr></tbody></table><p>Under about 20 ms feels instant to most players. Bluetooth headphones add 100+ ms that no software can remove.</p>`;
+    show();
+    const KM='awsedftgyhujk',down={};
+    addEventListener('keydown',e=>{const i=KM.indexOf(e.key.toLowerCase());if(i<0||e.repeat||down[i])return;down[i]=1;send(1,i%16,110*Math.pow(2,i/12)/ctx.sampleRate)});
+    addEventListener('keyup',e=>{const i=KM.indexOf(e.key.toLowerCase());if(i<0)return;down[i]=0;send(0,i%16)});
+    $('start').disabled=true;$('start').textContent='Audio running, play the keys';
+  }catch(e){$('live').innerHTML=`<p><span class="tag bad">Failed</span> ${e.message}</p>`}};
+}
+</script>
+</body>
+</html>

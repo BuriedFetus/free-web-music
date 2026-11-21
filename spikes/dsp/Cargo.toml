@@ -1,0 +1,16 @@
+[package]
+name = "fwm_dsp_spike"
+version = "0.1.0"
+edition = "2021"
+description = "Phase 0 spike: minimal WASM voice (PolyBLEP saw + TPT state-variable low-pass) for AudioWorklet latency/CPU tests"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib"]
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"

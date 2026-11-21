@@ -174,6 +174,30 @@ button,select,input{font:inherit;color:inherit}
 .pad.on{background:var(--dev-acc);color:#fff}
 .devnote{font-size:13px;margin:8px 2px 0;opacity:.85}
 
+/* main sequencer */
+.sq{padding:8px;display:flex;flex-direction:column;gap:6px;min-width:440px}
+.sqh{display:flex;flex-wrap:wrap;gap:8px 14px;align-items:center;font-weight:600;font-size:14px;padding:2px 2px 6px}
+.sqh input[type=range]{width:130px;accent-color:var(--fwm-note)}
+.sqr{display:grid;grid-template-columns:84px minmax(0,1fr);gap:8px;align-items:center;padding:6px;border-radius:8px;background:rgba(0,0,0,.16);position:relative}
+.sqr.sel{box-shadow:0 0 0 2px var(--fwm-me)}
+.sqr.mira{outline:2px solid var(--fwm-peer);outline-offset:1px}
+.thumb.sm{width:84px;height:34px;font-size:14px}
+.lane16{display:grid;grid-template-columns:repeat(16,minmax(0,1fr));gap:3px}
+.lane16 .c{height:30px;border-radius:4px;background:var(--fwm-roll);border:0;padding:0;cursor:pointer}
+.lane16 .c:nth-child(4n+1){background:var(--fwm-roll-btn)}
+.lane16 .c.on{background:var(--fwm-note)}
+.lane16 .c.off{opacity:.18}
+.lane16 .c.now{box-shadow:inset 0 0 0 2px #fff}
+.lane16.own .c{background:repeating-linear-gradient(45deg,var(--fwm-roll) 0 4px,var(--fwm-roll2) 4px 8px)}
+.lane16.own .c.now{background:var(--fwm-note)}
+.sqc{grid-column:2;display:flex;gap:6px;align-items:center;flex-wrap:wrap}
+.rtb{display:flex;flex-wrap:wrap;gap:6px 12px;align-items:center;margin-bottom:6px;font-size:13px;font-weight:600}
+.rtb select{background:var(--fwm-roll-deep);color:var(--fwm-roll-ink);border:1px solid rgba(255,255,255,.2);border-radius:6px;min-height:30px;margin-left:4px}
+.tb:disabled{opacity:.4;cursor:default}
+.sqc .lcdt{font-size:18px;padding:6px 8px;min-width:3.2ch;text-align:center}
+.tb.xs{min-height:30px;min-width:30px;padding:0 7px;font-size:13px}
+.sqnote{font-size:13px;opacity:.8;margin:4px 2px 0}
+
 /* library */
 .lib{position:fixed;top:0;right:0;bottom:0;width:min(400px,100%);background:var(--fwm-panel);border-left:1px solid var(--fwm-line);transform:translateX(105%);transition:transform .25s;z-index:60;display:flex;flex-direction:column;box-shadow:-20px 0 40px rgba(0,0,0,.35)}
 .lib.open{transform:none}
@@ -253,8 +277,9 @@ const plate=n=>{n=n.toUpperCase();return esc(n.slice(0,-1))+'<i>'+esc(n.slice(-1
 
 /* ---------- shared project (in the real app this is the Yjs doc) ---------- */
 let tc=0;const tracks=[];
-function addTrack(dev){const d=D(dev),n=tracks.filter(t=>t.dev===dev).length,t={id:'t'+(++tc),dev,name:d.name+(n?' '+(n+1):''),vol:.75,pan:.5,mute:false,solo:false,preset:0,p:Object.fromEntries(d.params.map(p=>[p[0],p[2]]))};tracks.push(t);return t}
+function addTrack(dev){const d=D(dev),n=tracks.filter(t=>t.dev===dev).length,t={id:'t'+(++tc),dev,name:d.name+(n?' '+(n+1):''),vol:.75,pan:.5,mute:false,solo:false,seq:{len:16,dir:'fwd',rate:1,own:false},lt:-1,idx:-1,preset:0,p:Object.fromEntries(d.params.map(p=>[p[0],p[2]]))};tracks.push(t);return t}
 ['flint','basalt','quartz','opal','cobalt'].forEach(addTrack);
+tracks[4].seq={len:12,dir:'pp',rate:1,own:false};tracks[3].seq.rate=.5;
 const T=id=>tracks.find(t=>t.id===id);
 const scenes=['Intro','Verse','Build','Drop'];
 const pats={},pk=(t,s)=>t+'|'+s;
@@ -270,14 +295,15 @@ let sel={t:tracks[1].id,s:1},selNote=null;
 const mira={on:true,t:tracks[2].id,s:2,view:'roll',touch:null};
 
 /* ---------- my workspace (private, per user) ---------- */
-const VIEWS={scenes:'Scenes',roll:'Piano roll',mixer:'Mixer',device:'Device',library:'Library'};
+const VIEWS={scenes:'Scenes',seq:'Main sequencer',roll:'Piano roll',mixer:'Mixer',device:'Device',library:'Library'};
 const DEF={views:['scenes','roll','mixer','device'],c1:46,r1:50,max:-1};
 let L=structuredClone(DEF);try{const j=JSON.parse(localStorage.getItem('fwm-ws')||'null');if(j&&Array.isArray(j.views))L=Object.assign(L,j)}catch(e){}
 const saveL=()=>{try{localStorage.setItem('fwm-ws',JSON.stringify(L))}catch(e){}};
 let floats=[],fc=0;
 
 /* ---------- transport ---------- */
-let playing=false,rec=false,mode='scene',bpm=118,pos=0,ps=sel.s,lastStep=-1,masterVol=.8;
+const QV={'1/4':4,'1/8':2,'1/16':1,'1/32':.5,'1/64':.25,'Off':0};let snap='1/16',rq='1/16',lastClear=null;
+let playing=false,rec=false,mode='scene',bpm=118,pos=0,gpos=0,lastBar=0,swing=.2,ps=sel.s,lastStep=-1,masterVol=.8;
 const levels={},held={};
 let busy=false,dirty=false;
 
@@ -302,13 +328,14 @@ V.scenes=()=>`<div class="sg" data-drop="1" style="grid-template-columns:96px re
 function rcfg(t){const d=D(t.dev);if(d.drums)return{dr:1,rows:d.drums.length,RH:24,lw:92,mAt:r=>r,rAt:m=>m,lab:r=>esc(d.drums[r]),b:()=>0,c:()=>0};const lo=t.dev==='basalt'?24:t.dev==='cobalt'?60:42,hi=lo+36;return{rows:37,RH:14,lw:44,mAt:r=>hi-r,rAt:m=>hi-m,lab:r=>(hi-r)%12===0?nname(hi-r):'',b:r=>isB(hi-r),c:r=>(hi-r)%12===0,lo,hi}}
 function notesHtml(key){const[tid]=key.split('|'),t=T(tid),c=rcfg(t),p=pats[key]||[];
   return p.map((n,i)=>`<div class="nt${selNote&&selNote.key===key&&selNote.i===i?' sel':''}${n.peer?' peer':''}" data-i="${i}" title="${c.dr?D(t.dev).drums[n.m]:nname(n.m)}" style="left:calc(${n.s/16*100}% + 1px);width:calc(${n.l/16*100}% - 2px);top:${c.rAt(n.m)*c.RH+1}px;height:${c.RH-3}px;opacity:${(.45+.55*n.v).toFixed(2)}"></div>`).join('')}
-function velHtml(key){const p=pats[key]||[];return Array.from({length:16},(_,i)=>{const n=p.find(n=>n.s===i);return`<div class="ab"><i style="height:${n?Math.round(n.v*100):0}%"></i></div>`}).join('')}
+function velHtml(key){const p=pats[key]||[];return Array.from({length:16},(_,i)=>{const n=p.find(n=>Math.floor(n.s)===i);return`<div class="ab"><i style="height:${n?Math.round(n.v*100):0}%"></i></div>`}).join('')}
 V.roll=()=>{const t=T(sel.t),c=rcfg(t),key=pk(t.id,sel.s);
-  return`<div class="rl"><div class="ruler" style="margin-left:${c.lw}px">${Array.from({length:16},(_,i)=>`<span>${i%4===0?'1.'+(i/4+1):''}</span>`).join('')}</div>
+  const opts=v=>Object.keys(QV).map(k=>`<option${k===v?' selected':''}>${k}</option>`).join('');
+  return`<div class="rl"><div class="rtb"><label>Snap<select data-act="snap" aria-label="Snap when editing">${opts(snap)}</select></label><label>Rec quantize<select data-act="rq" aria-label="Quantize when recording">${opts(rq)}</select></label><button class="tb xs" data-act="quant" data-key="${key}"${QV[snap]?'':' disabled'}>Quantize notes to ${snap}</button><button class="tb xs" data-act="clear" data-key="${key}">Clear pattern</button>${lastClear&&lastClear.key===key?`<button class="tb xs" data-act="undoclear">Undo clear</button>`:''}</div><div class="ruler" style="margin-left:${c.lw}px">${Array.from({length:16},(_,i)=>`<span>${i%4===0?'1.'+(i/4+1):''}</span>`).join('')}</div>
   <div class="prw" style="grid-template-columns:${c.lw}px minmax(0,1fr)"><div>${Array.from({length:c.rows},(_,r)=>`<div class="pkr${c.dr?' dr':c.b(r)?' b':''}" style="height:${c.RH}px;line-height:${c.RH}px">${c.lab(r)}</div>`).join('')}</div>
   <div class="grid" data-key="${key}" style="height:${c.rows*c.RH}px"><div>${Array.from({length:c.rows},(_,r)=>`<div class="gr${c.b(r)?' b':''}${c.c(r)?' c':''}" style="height:${c.RH}px"></div>`).join('')}</div><div class="nl" data-key="${key}">${notesHtml(key)}</div><div class="phd" data-key="${key}"></div></div></div>
   <div class="abars" data-key="${key}" style="margin-left:${c.lw}px" aria-label="Velocity lane">${velHtml(key)}</div>
-  <p class="hint">Click to add, drag right for length · drag to move or change pitch · drag the right edge to resize · double-click to delete · velocity lane below</p></div>`};
+  <p class="hint">Click to add, drag right for length · drag to move or change pitch · drag the right edge to resize · double-click to delete · Snap Off (or 1/32, 1/64) places notes between steps (micro-timing)</p></div>`};
 V.mixer=()=>`<div class="mx" data-drop="1"><div class="strip"><div class="mlabel">MASTER</div><div class="fz"><div class="meter" data-m="master"><i></i></div><div class="vf" data-f="master" role="slider" tabindex="0" aria-label="Master volume"><div class="cap"></div></div></div><span class="nm">Master</span></div>${tracks.map(t=>`<div class="strip${t.id===sel.t?' sel':''}${mira.on&&mira.t===t.id&&mira.view==='mixer'?' mira':''}"><button class="thumb" data-device="${t.dev}" data-act="seltrack" data-t="${t.id}" title="Select ${esc(t.name)}">${esc(D(t.dev).name.toUpperCase())}</button>${knobHtml(t.id+'|pan','Pan',1)}<div class="fz"><div class="meter" data-m="${t.id}"><i></i></div><div class="vf" data-f="${t.id}" role="slider" tabindex="0" aria-label="${esc(t.name)} volume"><div class="cap"></div></div></div><div class="ms"><button class="m${t.mute?' on':''}" data-act="mute" data-t="${t.id}" aria-pressed="${t.mute}" aria-label="Mute ${esc(t.name)}">M</button><button class="s${t.solo?' on':''}" data-act="solo" data-t="${t.id}" aria-pressed="${t.solo}" aria-label="Solo ${esc(t.name)}">S</button></div><span class="nm">${esc(t.name)}</span></div>`).join('')}<button class="strip add" data-act="lib"><b>+</b>Add device</button></div>`;
 function keysHtml(t){const base=t.dev==='basalt'?36:t.dev==='cobalt'?72:60,W=[0,2,4,5,7,9,11],BP={1:1,3:2,6:4,8:5,10:6};let h='';
   for(let i=0;i<15;i++){const o=Math.floor(i/7),s=W[i%7],m=base+o*12+s;h+=`<div class="wk" data-kt="${t.id}" data-m="${m}">${s===0?`<small>${nname(m)}</small>`:''}</div>`}
@@ -323,13 +350,22 @@ function devHtml(tid){const t=T(tid);if(!t)return'<p class="hint">This track was
 V.device=()=>devHtml(sel.t);
 function libHtml(q){q=(q||'').toLowerCase();const items=LIB.filter(d=>!q||(d.name+' '+d.kind+' '+d.cat).toLowerCase().includes(q));if(!items.length)return'<p class="libtip">No device matches that search.</p>';
   return[...new Set(items.map(d=>d.cat))].map(c=>`<h3>${c}</h3>${items.filter(d=>d.cat===c).map(d=>`<div class="card${d.soon?' soon':''}" draggable="${!d.soon}" data-dev="${d.id}"><div class="thumb" data-device="${d.id}">${esc(d.name.toUpperCase())}</div><div><b>${esc(d.name)}</b><span>${esc(d.kind)}</span>${d.soon?`<em><br>Coming in ${d.soon}</em>`:''}</div>${d.soon?'':`<button class="btn sm" data-act="add" data-dev="${d.id}">Add</button>`}</div>`).join('')}`).join('')}
+const DIRS=[['fwd','→','Forward'],['rev','←','Reverse'],['pp','↔','Ping-pong'],['rnd','?','Random']],RATES=[[.5,'½×'],[1,'1×'],[2,'2×']];
+V.seq=()=>{const sc=playing?ps:sel.s;return`<div class="sq"><div class="sqh">Clock: internal<span class="lcdt">${bpm} BPM</span><label>Swing <input type="range" min="0" max="60" value="${Math.round(swing*100)}" data-act="swing" aria-label="Swing"></label><span>${Math.round(swing*100)}%</span><span>Scene: ${scenes[sc]}</span></div>
+  ${tracks.map(t=>{const p=pats[pk(t.id,sc)]||[],q=t.seq;return`<div class="sqr${t.id===sel.t?' sel':''}${mira.on&&mira.touch==='seq|'+t.id?' mira':''}"><button class="thumb sm" data-device="${t.dev}" data-act="seltrack" data-t="${t.id}">${esc(D(t.dev).name.toUpperCase())}</button>
+  <div class="lane16${q.own?' own':''}" data-t="${t.id}">${Array.from({length:16},(_,i)=>`<button class="c${!q.own&&p.some(n=>Math.floor(n.s)===i)?' on':''}${i>=q.len?' off':''}${playing&&t.idx===i?' now':''}" data-act="cell" data-t="${t.id}" data-s="${sc}" aria-label="${esc(t.name)} step ${i+1}"></button>`).join('')}</div>
+  <div class="sqc"><button class="tb xs" data-act="len" data-t="${t.id}" data-d="-1" aria-label="Shorter">−</button><span class="lcdt" title="Track length in steps">${q.len}</span><button class="tb xs" data-act="len" data-t="${t.id}" data-d="1" aria-label="Longer">+</button>
+  <span class="grp">${DIRS.map(d=>`<button class="tb xs" data-act="dir" data-t="${t.id}" data-v="${d[0]}" aria-pressed="${q.dir===d[0]}" title="${d[2]}" aria-label="${d[2]}">${d[1]}</button>`).join('')}</span>
+  <span class="grp">${RATES.map(r=>`<button class="tb xs" data-act="rate" data-t="${t.id}" data-v="${r[0]}" aria-pressed="${q.rate===r[0]}" aria-label="Rate ${r[1]}">${r[1]}</button>`).join('')}</span>
+  <button class="tb xs" data-act="clear" data-key="${pk(t.id,sc)}" aria-label="Clear ${esc(t.name)} pattern in ${scenes[sc]}">Clear</button><button class="tb xs" data-act="own" data-t="${t.id}" aria-pressed="${q.own}" title="Let the device run its own built-in sequencer, synced to this clock">Own seq</button></div></div>`}).join('')}
+  <p class="sqnote">Every track follows this clock. Length, direction and rate are per track, so a 12-step ping-pong lead can run against a 16-step beat. "Own seq" hands the notes to the device's built-in sequencer (e.g. an arpeggiator) while it stays synced.</p></div>`};
 V.library=()=>`<div class="libs" data-drop="1">${libHtml('')}</div>`;
 
 /* ---------- render ---------- */
-function ctxOf(v){const t=T(sel.t);return v==='roll'||v==='device'?`${t.name} · ${scenes[sel.s]}`:v==='scenes'?`${tracks.length} tracks · ${scenes.length} scenes`:v==='mixer'?`${tracks.length} channels + master`:'Drag a device into the Mixer or Scenes'}
+function ctxOf(v){const t=T(sel.t);return v==='roll'||v==='device'?`${t.name} · ${scenes[sel.s]}`:v==='scenes'?`${tracks.length} tracks · ${scenes.length} scenes`:v==='mixer'?`${tracks.length} channels + master`:v==='seq'?'Clock, per-track length / direction / rate':'Drag a device into the Mixer or Scenes'}
 function renderPane(i){const el=document.querySelector(`.pane[data-i="${i}"]`),v=L.views[i],pb=el.querySelector('.pb'),prw=el.querySelector('.prw'),sk=pb?[pb.scrollTop,pb.scrollLeft]:null,ry=prw?prw.scrollTop:null,same=el.dataset.v===v&&(!(v==='roll'||v==='device')||el.dataset.t===sel.t);
-  const here=mira.on&&mira.view===v&&(!(v==='roll'||v==='device')||mira.t===sel.t);
-  el.innerHTML=`<div class="ph"><select data-act="view" data-i="${i}" aria-label="What this panel shows">${Object.entries(VIEWS).map(([k,n])=>`<option value="${k}"${k===v?' selected':''}>${n}</option>`).join('')}</select><span class="ctx">${esc(ctxOf(v))}</span>${here?'<span class="av sm" style="background:var(--fwm-peer)" title="Mira is on this view too">M</span>':''}${v==='device'?'<button class="ib" data-act="float" title="Open this device in a floating window" aria-label="Float">⧉</button>':''}<button class="ib" data-act="max" data-i="${i}" title="${L.max===i?'Restore':'Maximise'}" aria-label="${L.max===i?'Restore':'Maximise'}">${L.max===i?'⤡':'⤢'}</button></div><div class="pb${v==='roll'||v==='scenes'?' blue':''}">${V[v](i)}</div>`;
+  const here=mira.on&&mira.view===v&&(!(v==='roll'||v==='device')||mira.t===sel.t);const blue=v==='roll'||v==='scenes'||v==='seq';
+  el.innerHTML=`<div class="ph"><select data-act="view" data-i="${i}" aria-label="What this panel shows">${Object.entries(VIEWS).map(([k,n])=>`<option value="${k}"${k===v?' selected':''}>${n}</option>`).join('')}</select><span class="ctx">${esc(ctxOf(v))}</span>${here?'<span class="av sm" style="background:var(--fwm-peer)" title="Mira is on this view too">M</span>':''}${v==='device'?'<button class="ib" data-act="float" title="Open this device in a floating window" aria-label="Float">⧉</button>':''}<button class="ib" data-act="max" data-i="${i}" title="${L.max===i?'Restore':'Maximise'}" aria-label="${L.max===i?'Restore':'Maximise'}">${L.max===i?'⤡':'⤢'}</button></div><div class="pb${blue?' blue':''}">${V[v](i)}</div>`;
   el.dataset.v=v;el.dataset.t=sel.t;
   const npb=el.querySelector('.pb'),nprw=el.querySelector('.prw');
   if(sk&&same){npb.scrollTop=sk[0];npb.scrollLeft=sk[1]}
@@ -348,6 +384,13 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
   if(a==='seltrack'){sel.t=t;selNote=null}
   else if(a==='cell'){sel={t,s:+b.dataset.s};selNote=null;if(!pats[pk(t,sel.s)])pats[pk(t,sel.s)]=[];if(!playing)ps=sel.s}
   else if(a==='playscene'){ps=+b.dataset.s;sel.s=ps;pos=0;lastStep=-1;setPlay(true)}
+  else if(a==='len'){const q=T(t).seq;q.len=Math.max(1,Math.min(16,q.len+ +b.dataset.d))}
+  else if(a==='dir'){T(t).seq.dir=b.dataset.v}
+  else if(a==='rate'){T(t).seq.rate=+b.dataset.v;T(t).lt=-1}
+  else if(a==='own'){T(t).seq.own=!T(t).seq.own}
+  else if(a==='clear'){const k=b.dataset.key;lastClear={key:k,notes:pats[k]||[]};pats[k]=[];selNote=null;toast('Pattern cleared. Undo clear is in the Piano roll.')}
+  else if(a==='undoclear'){if(lastClear){pats[lastClear.key]=lastClear.notes;lastClear=null}}
+  else if(a==='quant'){const q=QV[snap];if(q)(pats[b.dataset.key]||[]).forEach(n=>{n.l=Math.max(q,Math.round(n.l/q)*q);n.s=Math.max(0,Math.min(16-n.l,Math.round(n.s/q)*q))})}
   else if(a==='mute'){T(t).mute=!T(t).mute}
   else if(a==='solo'){T(t).solo=!T(t).solo}
   else if(a==='preset'){const tr=T(t),n=D(tr.dev).presets.length;tr.preset=(tr.preset+ +b.dataset.d+n)%n}
@@ -361,7 +404,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
   else if(a==='mira'){mira.on=!mira.on;mira.touch=null;if(mira.on)schedMira()}
   else return;
   renderAll()});
-document.addEventListener('change',e=>{if(e.target.dataset.act==='view'){L.views[+e.target.dataset.i]=e.target.value;renderAll()}});
+document.addEventListener('change',e=>{if(e.target.dataset.act==='view'){L.views[+e.target.dataset.i]=e.target.value;renderAll()}if(e.target.dataset.act==='swing'){swing=e.target.value/100;renderAll()}if(e.target.dataset.act==='snap'){snap=e.target.value;renderAll()}if(e.target.dataset.act==='rq'){rq=e.target.value;renderAll()}});
 $('skins').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.body.dataset.fwmTheme=b.dataset.skin;for(const x of $('skins').children)x.setAttribute('aria-pressed',x===b)});
 $('libq').addEventListener('input',e=>$('libList').innerHTML=libHtml(e.target.value));
 $('libList').innerHTML=libHtml('');
@@ -374,14 +417,14 @@ document.addEventListener('drop',e=>{const z=e.target.closest&&e.target.closest(
 
 /* ---------- pointer interactions ---------- */
 let drag=null;
-function rollCell(g,e){const key=g.dataset.key,t=T(key.split('|')[0]),c=rcfg(t),r=g.getBoundingClientRect();return{st:Math.max(0,Math.min(15,Math.floor((e.clientX-r.left)/r.width*16))),m:c.mAt(Math.max(0,Math.min(c.rows-1,Math.floor((e.clientY-r.top)/c.RH))))}}
+function rollCell(g,e){const key=g.dataset.key,t=T(key.split('|')[0]),c=rcfg(t),r=g.getBoundingClientRect();return{x:Math.max(0,Math.min(16,(e.clientX-r.left)/r.width*16)),st:Math.max(0,Math.min(15,Math.floor((e.clientX-r.left)/r.width*16))),m:c.mAt(Math.max(0,Math.min(c.rows-1,Math.floor((e.clientY-r.top)/c.RH))))}}
 document.addEventListener('pointerdown',e=>{
   const kn=e.target.closest('.kn svg'),vf=e.target.closest('.vf'),g=e.target.closest('.grid[data-key]'),ab=e.target.closest('.abars[data-key]'),fl=e.target.closest('[data-drag]'),sp=e.target.closest('.split'),key=e.target.closest('[data-kt][data-m]');
   if(kn){const el=kn.parentNode;drag={type:'knob',k:el.dataset.k,y0:e.clientY,v0:getV(el.dataset.k)};document.querySelectorAll(`.kn[data-k="${drag.k}"]`).forEach(x=>x.classList.add('mine'))}
   else if(vf){drag={type:'fader',f:vf.dataset.f,el:vf};vf.classList.add('mine');faderMove(e)}
   else if(g){const key=g.dataset.key,c=rollCell(g,e),nt=e.target.closest('.nt');if(!pats[key])pats[key]=[];const P=pats[key];
     if(nt){const i=+nt.dataset.i,n=P[i],r=nt.getBoundingClientRect();selNote={key,i};drag={type:'note',key,i,mode:e.clientX>r.right-9?'len':'move',s0:n.s,m0:n.m,c0:c}}
-    else{P.push({s:c.st,l:1,m:c.m,v:.8});selNote={key,i:P.length-1};drag={type:'note',key,i:P.length-1,mode:'len',s0:c.st,m0:c.m,c0:c}}
+    else{const q=QV[snap],st=q?Math.min(16-q,Math.floor(c.x/q)*q):Math.min(15.75,+c.x.toFixed(3));P.push({s:st,l:q||.25,m:c.m,v:.8});selNote={key,i:P.length-1};drag={type:'note',key,i:P.length-1,mode:'len',s0:c.st,m0:c.m,c0:c}}
     noteOn(key.split('|')[0],P[selNote.i].m);drag.prev=P[selNote.i].m;refreshNotes(key)}
   else if(ab){drag={type:'vel',key:ab.dataset.key,el:ab};velMove(e)}
   else if(fl&&!e.target.closest('button')){const f=floats.find(f=>f.id===+fl.dataset.drag);drag={type:'float',f,x0:e.clientX-f.x,y0:e.clientY-f.y,el:fl.parentNode}}
@@ -390,13 +433,13 @@ document.addEventListener('pointerdown',e=>{
   else return;
   busy=true;const cap=kn||vf||g||ab||fl||sp||key;try{cap.setPointerCapture(e.pointerId)}catch(_){}if(drag.type!=='play')e.preventDefault()});
 function faderMove(e){const r=drag.el.getBoundingClientRect(),v=cl(1-(e.clientY-r.top-11)/(r.height-22));if(drag.f==='master')masterVol=v;else T(drag.f).vol=v;updFader(drag.f)}
-function velMove(e){const r=drag.el.getBoundingClientRect(),i=Math.max(0,Math.min(15,Math.floor((e.clientX-r.left-4)/(r.width-8)*16))),v=cl(1-(e.clientY-r.top-4)/(r.height-8)),n=(pats[drag.key]||[]).find(n=>n.s===i);if(n){n.v=v;refreshNotes(drag.key)}}
+function velMove(e){const r=drag.el.getBoundingClientRect(),i=Math.max(0,Math.min(15,Math.floor((e.clientX-r.left-4)/(r.width-8)*16))),v=cl(1-(e.clientY-r.top-4)/(r.height-8)),n=(pats[drag.key]||[]).find(n=>Math.floor(n.s)===i);if(n){n.v=v;refreshNotes(drag.key)}}
 document.addEventListener('pointermove',e=>{if(!drag)return;
   if(drag.type==='knob')setV(drag.k,drag.v0+(drag.y0-e.clientY)/(e.shiftKey?600:180));
   else if(drag.type==='fader')faderMove(e);
   else if(drag.type==='vel')velMove(e);
   else if(drag.type==='note'){const g=document.querySelector(`.grid[data-key="${drag.key}"]`);if(!g)return;const c=rollCell(g,e),n=pats[drag.key][drag.i];
-    if(drag.mode==='len')n.l=Math.max(1,Math.min(16-n.s,c.st-n.s+1));else{n.s=Math.max(0,Math.min(16-n.l,drag.s0+c.st-drag.c0.st));n.m=drag.m0+(c.m-drag.c0.m)*(rcfg(T(drag.key.split('|')[0])).dr?1:1);const cf=rcfg(T(drag.key.split('|')[0]));n.m=cf.dr?Math.max(0,Math.min(cf.rows-1,n.m)):Math.max(cf.lo,Math.min(cf.hi,n.m));if(n.m!==drag.prev){const tid=drag.key.split('|')[0];noteOff(tid,drag.prev);noteOn(tid,n.m);drag.prev=n.m}}
+    const q=QV[snap];if(drag.mode==='len'){const end=q?Math.ceil(c.x/q)*q:c.x;n.l=+Math.max(q||.25,Math.min(16-n.s,end-n.s)).toFixed(3)}else{const dx=c.x-drag.c0.x;n.s=+Math.max(0,Math.min(16-n.l,drag.s0+(q?Math.round(dx/q)*q:dx))).toFixed(3);n.m=drag.m0+(c.m-drag.c0.m)*(rcfg(T(drag.key.split('|')[0])).dr?1:1);const cf=rcfg(T(drag.key.split('|')[0]));n.m=cf.dr?Math.max(0,Math.min(cf.rows-1,n.m)):Math.max(cf.lo,Math.min(cf.hi,n.m));if(n.m!==drag.prev){const tid=drag.key.split('|')[0];noteOff(tid,drag.prev);noteOn(tid,n.m);drag.prev=n.m}}
     refreshNotes(drag.key)}
   else if(drag.type==='float'){drag.f.x=Math.max(0,Math.min(innerWidth-120,e.clientX-drag.x0));drag.f.y=Math.max(0,Math.min(innerHeight-60,e.clientY-drag.y0));drag.el.style.left=drag.f.x+'px';drag.el.style.top=drag.f.y+'px'}
   else if(drag.type==='vs'||drag.type==='hs'){const r=$('ws').getBoundingClientRect();if(drag.type==='vs')L.c1=Math.round(Math.max(22,Math.min(78,(e.clientX-r.left)/r.width*100)));else L.r1=Math.round(Math.max(22,Math.min(78,(e.clientY-r.top)/r.height*100)));$('ws').style.setProperty('--c1',L.c1+'%');$('ws').style.setProperty('--r1',L.r1+'%')}});
@@ -413,8 +456,8 @@ document.addEventListener('contextmenu',e=>{const nt=e.target.closest('.nt'),g=e
 function flash(tid,m,on,cls='on'){document.querySelectorAll(`[data-kt="${tid}"][data-m="${m}"]`).forEach(x=>x.classList.toggle(cls,on))}
 function noteOn(tid,m,v=.85){flash(tid,m,true);levels[tid]=Math.max(levels[tid]||0,v*(T(tid)?.vol??1))}
 function noteOff(tid,m){flash(tid,m,false)}
-function userOn(tid,m){noteOn(tid,m);const rc=rcfg(T(tid));if(playing&&rec&&(rc.dr||(m>=rc.lo&&m<=rc.hi))){const key=pk(tid,ps),st=Math.round(pos)%16;if(!pats[key])pats[key]=[];pats[key]=pats[key].filter(n=>!(n.s===st&&n.m===m));const n={s:st,l:1,m,v:.85};pats[key].push(n);held[tid+':'+m]={n,start:pos};refreshNotes(key)}}
-function userOff(tid,m){noteOff(tid,m);const h=held[tid+':'+m];if(h){h.n.l=Math.max(1,Math.min(16-h.n.s,Math.round(pos-h.start)||1));delete held[tid+':'+m];renderAll()}}
+function userOn(tid,m){noteOn(tid,m);const rc=rcfg(T(tid));if(playing&&rec&&(rc.dr||(m>=rc.lo&&m<=rc.hi))){const key=pk(tid,ps),tr=T(tid),raw=tr.idx>=0?tr.idx+(tr.frac||0):pos%16,q=QV[rq];let st=q?Math.round(raw/q)*q:raw;st=st>=16?0:+st.toFixed(3);if(!pats[key])pats[key]=[];pats[key]=pats[key].filter(n=>!(Math.abs(n.s-st)<.01&&n.m===m));const n={s:st,l:q||.25,m,v:.85};pats[key].push(n);held[tid+':'+m]={n,g0:gpos,t:tid};refreshNotes(key)}}
+function userOff(tid,m){noteOff(tid,m);const h=held[tid+':'+m];if(h){const el=(gpos-h.g0)*T(h.t).seq.rate,q=QV[rq],l=q?Math.max(q,Math.round(el/q)*q):Math.max(.25,el);h.n.l=+Math.min(16-h.n.s,l).toFixed(3);delete held[tid+':'+m];renderAll()}}
 const KM='awsedftgyhujk',down={};
 addEventListener('keydown',e=>{const tg=e.target;if(tg.closest('input,select,textarea'))return;
   if(e.key==='Escape'){$('lib').classList.remove('open');return}
@@ -425,20 +468,26 @@ addEventListener('keydown',e=>{const tg=e.target;if(tg.closest('input,select,tex
 addEventListener('keyup',e=>{const k=down[e.key.toLowerCase()];if(k){userOff(k.t,k.m);delete down[e.key.toLowerCase()]}});
 
 /* ---------- transport ---------- */
-function setPlay(p){playing=p;$('tPlay').setAttribute('aria-pressed',p);$('tPlay').textContent=p?'■ Stop':'▶ Play';if(!p){pos=0;lastStep=-1;document.querySelectorAll('.on[data-kt]').forEach(x=>x.classList.remove('on'))}else{pos=0;lastStep=-1;if(mode==='scene')ps=sel.s}renderAll()}
+function setPlay(p){playing=p;$('tPlay').setAttribute('aria-pressed',p);$('tPlay').textContent=p?'■ Stop':'▶ Play';pos=0;gpos=0;lastBar=0;lastStep=-1;tracks.forEach(t=>{t.lt=-1;t.idx=-1});if(!p)document.querySelectorAll('.on[data-kt]').forEach(x=>x.classList.remove('on'));else if(mode==='scene')ps=sel.s;renderAll()}
 $('tPlay').onclick=()=>setPlay(!playing);
 $('tRec').onclick=e=>{rec=!rec;e.currentTarget.setAttribute('aria-pressed',rec)};
 $('mode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;mode=b.dataset.m;for(const x of $('mode').children)x.setAttribute('aria-pressed',x===b)});
 const setBpm=v=>{bpm=Math.max(60,Math.min(200,v));$('bpm').textContent=bpm+' BPM'};
 $('bDn').onclick=()=>setBpm(bpm-2);$('bUp').onclick=()=>setBpm(bpm+2);
-function onStep(st){const solo=tracks.some(t=>t.solo),stepMs=60000/bpm/4;
-  for(const t of tracks){if(t.mute||(solo&&!t.solo))continue;(pats[pk(t.id,ps)]||[]).forEach((n,i)=>{if(n.s!==st||Object.values(held).some(h=>h.n===n))return;noteOn(t.id,n.m,n.v);setTimeout(()=>noteOff(t.id,n.m),n.l*stepMs*.9);document.querySelectorAll(`.nl[data-key="${pk(t.id,ps)}"] .nt[data-i="${i}"]`).forEach(x=>{x.classList.add('hit');setTimeout(()=>x.classList.remove('hit'),120)})})}
-  for(const h of Object.values(held))if(st>h.n.s)h.n.l=Math.min(16-h.n.s,st-h.n.s+1)}
+/* each track has its own step counter: rate scales the clock, direction maps ticks to steps, swing delays odd ticks */
+function hash(n,k){let h=(n*2654435761^k*40503)>>>0;h^=h>>>15;h=Math.imul(h,2246822519)>>>0;return h>>>0}
+function stepOf(t,n){const L=t.seq.len;if(t.seq.dir==='rev')return L-1-n%L;if(t.seq.dir==='pp'){if(L<2)return 0;const P=2*L-2,k=n%P;return k<L?k:P-k}if(t.seq.dir==='rnd')return hash(n,+t.id.slice(1))%L;return n%L}
+function trigger(t,idx){const stepMs=60000/bpm/4/t.seq.rate;document.querySelectorAll(`.lane16[data-t="${t.id}"]`).forEach(l=>[...l.children].forEach((c,i)=>c.classList.toggle('now',i===idx)));
+  for(const h of Object.values(held))if(h.t===t.id&&idx>h.n.s)h.n.l=Math.min(16-h.n.s,idx-h.n.s+1);
+  const solo=tracks.some(x=>x.solo);if(t.mute||(solo&&!t.solo))return;
+  if(t.seq.own){if(idx%2===0){const d=D(t.dev),m=d.drums?idx%3:(t.dev==='basalt'?36:t.dev==='cobalt'?72:60)+[0,7,12,7][(idx/2)%4];noteOn(t.id,m,.7);setTimeout(()=>noteOff(t.id,m),stepMs*.9)}return}
+  const key=pk(t.id,ps);(pats[key]||[]).forEach((n,i)=>{if(Math.floor(n.s)!==idx||Object.values(held).some(h=>h.n===n))return;setTimeout(()=>{noteOn(t.id,n.m,n.v);setTimeout(()=>noteOff(t.id,n.m),n.l*stepMs*.9);document.querySelectorAll(`.nl[data-key="${key}"] .nt[data-i="${i}"]`).forEach(x=>{x.classList.add('hit');setTimeout(()=>x.classList.remove('hit'),120)})},(n.s-idx)*stepMs)})}
 let lt=performance.now();
 function loop(t){const dt=Math.min(.05,(t-lt)/1000);lt=t;
-  if(playing){pos+=dt*bpm/60*4;if(pos>=16){pos-=16;lastStep=-1;if(mode==='song'){ps=(ps+1)%scenes.length;renderAll()}}const st=Math.floor(pos);if(st!==lastStep){lastStep=st;onStep(st)}
-    $('posL').textContent=`${scenes[ps]} 1.${Math.floor(st/4)+1}.${st%4+1}`;
-    document.querySelectorAll('.phd').forEach(x=>{const on=x.dataset.key.endsWith('|'+ps);x.style.display=on?'block':'none';if(on)x.style.left=(pos/16*100)+'%'})}
+  if(playing){gpos+=dt*bpm/60*4;const bar=Math.floor(gpos/16);if(bar!==lastBar){lastBar=bar;if(mode==='song'){ps=(ps+1)%scenes.length;renderAll()}}pos=gpos%16;const st=Math.floor(pos);
+    for(const t of tracks){const raw=gpos*t.seq.rate;let n=Math.floor(raw);if(n%2===1&&raw-n<swing*.5)n-=1;t.frac=Math.min(.999,raw-n);if(n!==t.lt){t.lt=n;t.idx=stepOf(t,n);trigger(t,t.idx)}}
+    $('posL').textContent=`${scenes[ps]} ${bar+1}.${Math.floor(st/4)+1}.${st%4+1}`;
+    document.querySelectorAll('.phd').forEach(x=>{const[tid,sc]=x.dataset.key.split('|'),t=T(tid),on=+sc===ps&&t&&t.idx>=0;x.style.display=on?'block':'none';if(on)x.style.left=(t.idx/16*100)+'%'})}
   else{$('posL').textContent=`${scenes[sel.s]} 1.1`;document.querySelectorAll('.phd').forEach(x=>x.style.display='none')}
   let mx=0;for(const tr of tracks){const l=(levels[tr.id]||0)*Math.pow(.86,dt*60);levels[tr.id]=l;mx=Math.max(mx,l);document.querySelectorAll(`.meter[data-m="${tr.id}"] i`).forEach(x=>x.style.height=(l*100).toFixed(1)+'%')}
   document.querySelectorAll('.meter[data-m="master"] i').forEach(x=>x.style.height=(mx*masterVol*100).toFixed(1)+'%');
@@ -450,7 +499,8 @@ let mt=null;
 function animate(dur,fn,done){const t0=performance.now(),f=t=>{const p=Math.min(1,(t-t0)/dur);fn(1-Math.pow(1-p,3));if(p<1&&mira.on)requestAnimationFrame(f);else done()};requestAnimationFrame(f)}
 function miraStep(){if(!mira.on)return;const r=Math.random(),t=T(mira.t)||tracks[0];
   if(r<.3){const nt=tracks[Math.floor(Math.random()*tracks.length)];mira.t=nt.id;mira.s=Math.floor(Math.random()*scenes.length);mira.view=['scenes','roll','device','mixer'][Math.floor(Math.random()*4)];renderAll();schedMira()}
-  else if(r<.5){mira.view='mixer';mira.touch='vol|'+t.id;renderAll();const a=t.vol,b=cl(a+(Math.random()-.5)*.5);animate(1100,p=>{t.vol=a+(b-a)*p;updFader(t.id)},()=>{mira.touch=null;updFader(t.id);schedMira()})}
+  else if(r<.4){mira.view='seq';mira.touch='seq|'+t.id;const q=t.seq;q.len=Math.max(4,Math.min(16,q.len+(Math.random()<.5?-2:2)));renderAll();setTimeout(()=>{if(mira.touch==='seq|'+t.id)mira.touch=null;renderAll();schedMira()},1500)}
+  else if(r<.55){mira.view='mixer';mira.touch='vol|'+t.id;renderAll();const a=t.vol,b=cl(a+(Math.random()-.5)*.5);animate(1100,p=>{t.vol=a+(b-a)*p;updFader(t.id)},()=>{mira.touch=null;updFader(t.id);schedMira()})}
   else if(r<.78){mira.view='device';const d=D(t.dev),p=d.params[Math.floor(Math.random()*d.params.length)][0],k=t.id+'|'+p;mira.touch=k;renderAll();const a=t.p[p],b=cl(a+(Math.random()-.5)*.6);
     const m=d.drums?Math.floor(Math.random()*4):(t.dev==='basalt'?36:t.dev==='cobalt'?72:60)+[0,3,7,12][Math.floor(Math.random()*4)];flash(t.id,m,true,'peer');setTimeout(()=>flash(t.id,m,false,'peer'),700);levels[t.id]=.7;
     animate(1300,q=>{t.p[p]=a+(b-a)*q;updKnob(k)},()=>{mira.touch=null;updKnob(k);schedMira()})}

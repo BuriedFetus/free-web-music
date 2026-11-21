@@ -107,8 +107,12 @@ The core does no networking. The host owns providers, persistence and storage.
 - [x] Skins split into one file per device (`design/kit/skins/`), `design/check-skin.sh`, `CLAUDE.md` with reskin recipe
 - [x] Clickable 4-panel workspace (`design/kit/workspace.html`): scene grid, piano roll, mixer, device; any panel can show any view; resizable/maximisable panels and floating device windows (private layout); library drawer with drag-to-track (multiple copies); transport (scene loop / song, rec); simulated collaborator presence
 - [x] Two more device skins via the recipe: Flint (drums), Opal (pads)
-- [ ] Main sequencer window
-- [ ] Tech tests: WASM worklet latency, COOP/COEP in friend's app, peer clock sync
+- [x] Main sequencer view in the workspace: clock, swing, per-track length / direction / rate, Own seq, clear
+- [x] Sequencer editing: micro-timing (float step positions, Snap 1/4–1/64 or Off), record quantize options, clear + undo clear
+- [x] Tech tests (`spikes/`, results in `spikes/RESULTS.md`): isolation detection + fallback, Rust/WASM DSP ≈2.2× JS, clock sync <1 ms after 10 exchanges, jitter-buffer sizing
+- [ ] Still needs people: live audio latency on real speakers; COOP/COEP inside the friend's app
+
+**Phase 0 complete.** Handoff notes for Phase 1: `docs/HANDOFF.md`.
 
 ## Verification
 - Unit tests (Vitest; Rust tests for DSP): model ops, concurrent-edit merging across two Y.Docs, scheduler timing, DSP output checks (aliasing, clicks).
