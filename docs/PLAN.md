@@ -103,6 +103,7 @@ The core does no networking. The host owns providers, persistence and storage.
 - [x] Filter envelope (Amp/Filter tabs), LFO modes Free / Retrig / Poly
 - [x] Sequencer lens as piano roll: pitch, length, velocity editing; play, live record, loop, 1–2 bar length, automation lanes (Cutoff, Reso)
 - [x] Theming contract: tokens + skin examples (Default / Flat / Host brand), docs/THEMING.md
+- [x] Modulation matrix on Basalt: sources LFO 1 / Amp env / Filter env → any knob or envelope fader, per-route depth, no self-modulation loops
 - [x] Skins split into one file per device (`design/kit/skins/`), `design/check-skin.sh`, `CLAUDE.md` with reskin recipe
 - [x] Clickable 4-panel workspace (`design/kit/workspace.html`): scene grid, piano roll, mixer, device; any panel can show any view; resizable/maximisable panels and floating device windows (private layout); library drawer with drag-to-track (multiple copies); transport (scene loop / song, rec); simulated collaborator presence
 - [x] Two more device skins via the recipe: Flint (drums), Opal (pads)

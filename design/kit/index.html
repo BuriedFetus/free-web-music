@@ -88,8 +88,13 @@ h2{font:800 30px/1.1 var(--fwm-font-display);margin:0 0 6px}
 .scope small{position:absolute;top:4px;left:8px;font:15px var(--fwm-font-screen);opacity:.6}
 .led{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--fwm-mod);margin-left:6px;box-shadow:0 0 8px var(--fwm-mod);vertical-align:1px}
 .sbtn{width:100%;min-height:44px;margin-top:8px;border-radius:8px;border:1px dashed var(--fwm-mod);background:rgba(180,140,255,.08);color:var(--dev-silk);font:13px var(--fwm-font-label);cursor:pointer}
-.assigning .sbtn{background:var(--fwm-mod);color:#160a2b;border-style:solid}
-.assigning #basalt .kn:not(.lfo) svg{cursor:copy;outline:2px dashed var(--fwm-mod);outline-offset:4px;border-radius:50%}
+.sbtn.on{background:var(--fwm-mod);color:#160a2b;border-style:solid}
+.assigning .kn.tgt svg{cursor:copy;outline:2px dashed var(--fwm-mod);outline-offset:4px;border-radius:50%}
+.assigning .tr.tgt{cursor:copy;outline:2px dashed var(--fwm-mod);outline-offset:2px;border-radius:6px}
+.fd .tr .mbar{position:absolute;right:3px;width:4px;border-radius:2px;background:var(--fwm-mod);opacity:.8;display:none}
+.fd .tr .mdot{position:absolute;right:0;width:10px;height:10px;margin-top:-5px;border-radius:50%;background:var(--fwm-mod);box-shadow:0 0 0 2px rgba(0,0,0,.45);display:none}
+.fd .tr.modded .mbar,.fd .tr.modded .mdot{display:block}
+.mods input[type=range]{width:76px;accent-color:var(--fwm-mod)}
 .mods{list-style:none;margin:8px 0 0;padding:0}
 .mods li{display:flex;align-items:center;justify-content:space-between;gap:6px;font:18px var(--fwm-font-screen);color:var(--fwm-mod);border-top:1px solid rgba(255,255,255,.08)}
 .mods button{width:40px;height:40px;border:0;background:none;color:var(--dev-silk);font:20px var(--fwm-font-ui);cursor:pointer}
@@ -184,7 +189,7 @@ h2{font:800 30px/1.1 var(--fwm-font-display);margin:0 0 6px}
   <div class="top">
     <div>
       <h1>Device kit, sheet 1: Basalt</h1>
-      <p>Every device in the library is built from one template. This is the first full device: drag knobs and faders, click or type keys (A W S E D F T G Y H U J K). The scope shows the wave as you play. Envelopes has Amp and Filter tabs. LFO 1 (Free / Retrig / Poly) moves the cutoff: press "Assign to a knob", then click any knob to modulate it too. Below, the sequencer lane is a full piano roll with live recording, loop and automation (Space = play/stop). A simulated collaborator, Mira, is tweaking and playing it as well. The skin buttons show how a host app can restyle everything through tokens alone (docs/THEMING.md).</p>
+      <p>Every device in the library is built from one template. This is the first full device: drag knobs and faders, click or type keys (A W S E D F T G Y H U J K). The scope shows the wave as you play. Envelopes has Amp and Filter tabs. LFO 1 (Free / Retrig / Poly) moves the cutoff. Modulation works both ways: "Assign LFO 1" or "Assign Amp/Filter env", then click any knob or envelope fader; each route gets its own depth slider. Below, the sequencer lane is a full piano roll with live recording, loop and automation (Space = play/stop). A simulated collaborator, Mira, is tweaking and playing it as well. The skin buttons show how a host app can restyle everything through tokens alone (docs/THEMING.md).</p>
     </div>
     <div class="tools">
       <button class="btn" id="anatBtn" aria-pressed="false">Show template anatomy</button>
@@ -215,13 +220,14 @@ h2{font:800 30px/1.1 var(--fwm-font-display);margin:0 0 6px}
         <div class="seg" id="etabs"><button data-e="amp" aria-pressed="true">Amp</button><button data-e="filt" aria-pressed="false">Filter</button></div>
         <div class="lcd envlcd"><small id="envLbl">Amp env</small><svg id="envG" viewBox="0 0 200 50" preserveAspectRatio="none"></svg></div>
         <div class="env" id="envF"></div>
+        <button class="sbtn" id="assignEnv">Assign Amp env</button>
       </div>
       <div class="sec"><h4>LFO 1<span class="led" id="led"></span></h4>
         <div class="waves" id="lwaves"></div>
         <div class="seg" id="lmode"><button data-m="free" aria-pressed="true">Free</button><button data-m="retrig" aria-pressed="false">Retrig</button><button data-m="poly" aria-pressed="false">Poly</button></div>
         <p class="silk lhint" id="lhint">Free: runs on its own, ignores notes</p>
         <div class="row" id="lfoK"></div>
-        <button class="sbtn" id="assign">Assign to a knob</button>
+        <button class="sbtn" id="assign">Assign LFO 1</button>
         <ul class="mods" id="mods"></ul>
       </div>
       <div class="sec"><h4>Output</h4><div class="row" id="outK"></div></div>
@@ -291,7 +297,7 @@ function drawKnob(k){
   <circle cx="50" cy="53" r="31" style="fill:rgba(0,0,0,calc(.45*var(--fwm-depth)))"/>
   <circle cx="50" cy="50" r="31" fill="url(#g${k.id})"/>
   <circle cx="50" cy="50" r="24" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="2"/>
-  ${k.modd?(()=>{const lo=A0+(A1-A0)*cl(k.v-k.modd),hi=A0+(A1-A0)*cl(k.v+k.modd),am=A0+(A1-A0)*k.mv;return`<path d="${arc(37,lo,hi)}" stroke="var(--fwm-mod)" stroke-width="3" fill="none"/><circle cx="${50+43*Math.cos(am)}" cy="${50+43*Math.sin(am)}" r="5" fill="var(--fwm-mod)" stroke="rgba(0,0,0,.5)"/>`})():''}
+  ${k.mlo!=null?(()=>{const lo=A0+(A1-A0)*k.mlo,hi=A0+(A1-A0)*k.mhi,am=A0+(A1-A0)*k.mv;return`<path d="${arc(37,lo,hi)}" stroke="var(--fwm-mod)" stroke-width="3" fill="none"/><circle cx="${50+43*Math.cos(am)}" cy="${50+43*Math.sin(am)}" r="5" fill="var(--fwm-mod)" stroke="rgba(0,0,0,.5)"/>`})():''}
   <line x1="${50+10*Math.cos(a)}" y1="${50+10*Math.sin(a)}" x2="${50+27*Math.cos(a)}" y2="${50+27*Math.sin(a)}" stroke="var(--dev-acc)" stroke-width="4" stroke-linecap="round"/>`;
   k.val.textContent=(fmt[k.f]||fmt.pct)(k.v);
   k.svg.setAttribute('aria-valuenow',Math.round(k.v*100));
@@ -327,7 +333,7 @@ function envPath(e){const a=e.A*45+2,d=e.D*55+2,r=e.R*55+2,s=48-e.S*40,hold=196-
 function drawEnv(){const o=ev==='amp'?'filt':'amp';
   $('envG').innerHTML=`<path d="${envPath(envs[o])}" fill="none" stroke="currentColor" stroke-width="1.5" opacity=".25" vector-effect="non-scaling-stroke"/><path d="${envPath(envs[ev])}" fill="none" stroke="currentColor" stroke-width="2.5" vector-effect="non-scaling-stroke"/>`;
   $('envLbl').textContent=ev==='amp'?'Amp env':'Filter env → cutoff (Env amt)'}
-$('envF').innerHTML=['A','D','S','R'].map(n=>`<div class="fd"><div class="tr" data-n="${n}" role="slider" tabindex="0" aria-label="${n}"><div class="cap"></div></div><span class="silk">${n}</span></div>`).join('');
+$('envF').innerHTML=['A','D','S','R'].map(n=>`<div class="fd"><div class="tr" data-n="${n}" role="slider" tabindex="0" aria-label="${n}"><div class="cap"></div><div class="mbar"></div><div class="mdot"></div></div><span class="silk">${n}</span></div>`).join('');
 function placeCap(tr){const v=envs[ev][tr.dataset.n];tr.firstChild.style.top=(4+(1-v)*(110-28))+'px';tr.setAttribute('aria-valuenow',Math.round(v*100))}
 const faders=[...document.querySelectorAll('.tr')];
 for(const tr of faders){placeCap(tr);
@@ -336,7 +342,7 @@ for(const tr of faders){placeCap(tr);
   tr.addEventListener('pointermove',e=>{if(tr.hasPointerCapture(e.pointerId))move(e)});
   tr.addEventListener('keydown',e=>{const n=tr.dataset.n,E=envs[ev];if(e.key==='ArrowUp')E[n]=cl(E[n]+0.05);else if(e.key==='ArrowDown')E[n]=cl(E[n]-0.05);else return;e.preventDefault();placeCap(tr);drawEnv()});
 }
-$('etabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;ev=b.dataset.e;for(const x of $('etabs').children)x.setAttribute('aria-pressed',x===b);faders.forEach(placeCap);drawEnv()});
+$('etabs').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;ev=b.dataset.e;for(const x of $('etabs').children)x.setAttribute('aria-pressed',x===b);faders.forEach(placeCap);faders.forEach(placeMod);drawEnv();$('assignEnv').textContent='Assign '+(ev==='amp'?'Amp env':'Filter env')});
 drawEnv();
 
 /* presets */
@@ -358,7 +364,7 @@ const on=(s,c='on')=>keyEls[s]&&keyEls[s].classList.add(c),off=(s,c='on')=>keyEl
 const base=()=>12*(oct+1);
 $('keys').addEventListener('pointerdown',e=>{const k=e.target.closest('.wk,.bk');if(!k)return;const s=k.dataset.s,m=+s+base();on(s);userOn(m);const u=()=>{off(s);userOff(m);removeEventListener('pointerup',u)};addEventListener('pointerup',u)});
 const map='awsedftgyhujk';const downM={};
-addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('assigning');if(e.repeat||e.ctrlKey||e.metaKey||e.target.closest('[role=slider]'))return;const i=map.indexOf(e.key.toLowerCase());if(i>=0){on(String(i));downM[i]=i+base();userOn(downM[i])}});
+addEventListener('keydown',e=>{if(e.key==='Escape')endAssign();if(e.repeat||e.ctrlKey||e.metaKey||e.target.closest('[role=slider]'))return;const i=map.indexOf(e.key.toLowerCase());if(i>=0){on(String(i));downM[i]=i+base();userOn(downM[i])}});
 addEventListener('keyup',e=>{const i=map.indexOf(e.key.toLowerCase());if(i>=0&&downM[i]!=null){off(String(i));userOff(downM[i]);delete downM[i]}});
 $('oDn').onclick=()=>{oct=Math.max(0,oct-1);buildKeys()};$('oUp').onclick=()=>{oct=Math.min(6,oct+1);buildKeys()};
 
@@ -465,17 +471,35 @@ const lfo={wave:0,ph:0,sh:0,val:0,mode:'free',rate:knob($('lfoK'),'lrate','Rate'
 $('lwaves').addEventListener('click',e=>{const b=e.target.closest('.wv');if(!b)return;[...$('lwaves').children].forEach((x,i)=>{x.setAttribute('aria-pressed',x===b);if(x===b)lfo.wave=i})});
 const LH={free:'Free: runs on its own, ignores notes',retrig:'Retrig: restarts at every new note',poly:'Poly: one LFO per voice, each starts with its note'};
 $('lmode').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;lfo.mode=b.dataset.m;for(const x of $('lmode').children)x.setAttribute('aria-pressed',x===b);$('lhint').textContent=LH[lfo.mode]});
-let routes=[{t:'cut',a:0.45}];
-function drawRoutes(){$('mods').innerHTML=routes.map(r=>`<li><span>LFO 1 → ${knobs[r.t].svg.getAttribute('aria-label')}</span><button data-t="${r.t}" aria-label="Remove route">×</button></li>`).join('')}
-$('mods').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=knobs[b.dataset.t];routes=routes.filter(r=>r.t!==b.dataset.t);delete k.modd;delete k.mv;drawKnob(k);drawRoutes()});
-$('assign').onclick=()=>document.body.classList.add('assigning');
-document.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('assigning')||e.target.closest('#assign'))return;const kn=e.target.closest('#basalt .kn');if(kn&&!kn.classList.contains('lfo')){e.stopPropagation();e.preventDefault();if(!routes.some(r=>r.t===kn.dataset.k))routes.push({t:kn.dataset.k,a:0.35});drawRoutes()}document.body.classList.remove('assigning')},true);
-drawRoutes();lfo.val=0;for(const r of routes){const k=knobs[r.t];k.modd=r.a*lfo.amt.v;k.mv=k.v;drawKnob(k)}
+/* modulation matrix: sources (LFO 1, Amp env, Filter env) -> any knob or envelope fader */
+let routes=[{src:'lfo',t:'cut',a:0.45}],assignSrc=null;
+const SRC={lfo:'LFO 1',amp:'Amp env',filt:'Filter env'},envMod={};
+const tLabel=t=>t.includes('.')?SRC[t.split('.')[0]]+' '+t.split('.')[1]:knobs[t].svg.getAttribute('aria-label');
+function drawRoutes(){$('mods').innerHTML=routes.length?routes.map((r,i)=>`<li><span>${SRC[r.src]} → ${tLabel(r.t)}</span><input type="range" min="-100" max="100" value="${Math.round(r.a*100)}" data-i="${i}" aria-label="Depth of ${SRC[r.src]} to ${tLabel(r.t)}"><button data-i="${i}" aria-label="Remove route">×</button></li>`).join(''):'<li><span>No routes yet</span></li>'}
+$('mods').addEventListener('input',e=>{if(e.target.type==='range')routes[+e.target.dataset.i].a=e.target.value/100});
+$('mods').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;routes.splice(+b.dataset.i,1);drawRoutes()});
+/* a source may not modulate its own controls (no feedback loops) */
+function allowed(src,el){if(el.classList.contains('kn'))return!!el.closest('#basalt')&&!(src==='lfo'&&el.classList.contains('lfo'));if(el.classList.contains('tr'))return src!==ev;return false}
+function startAssign(src){assignSrc=src;document.body.classList.add('assigning');$('assign').classList.toggle('on',src==='lfo');$('assignEnv').classList.toggle('on',src!=='lfo');document.querySelectorAll('#basalt .kn,#basalt .tr').forEach(el=>el.classList.toggle('tgt',allowed(src,el)))}
+function endAssign(){assignSrc=null;document.body.classList.remove('assigning');document.querySelectorAll('.tgt').forEach(el=>el.classList.remove('tgt'));$('assign').classList.remove('on');$('assignEnv').classList.remove('on')}
+$('assign').onclick=()=>assignSrc==='lfo'?endAssign():startAssign('lfo');
+$('assignEnv').onclick=()=>assignSrc&&assignSrc!=='lfo'?endAssign():startAssign(ev);
+document.addEventListener('pointerdown',e=>{if(!assignSrc||e.target.closest('#assign,#assignEnv'))return;const el=e.target.closest('#basalt .kn,#basalt .tr');
+  if(el&&el.classList.contains('tgt')){e.stopPropagation();e.preventDefault();const t=el.classList.contains('kn')?el.dataset.k:ev+'.'+el.dataset.n;if(!routes.some(r=>r.src===assignSrc&&r.t===t))routes.push({src:assignSrc,t,a:assignSrc==='lfo'?0.35:0.4});drawRoutes()}
+  endAssign()},true);
+drawRoutes();
+const srcVal=s=>s==='lfo'?lfo.val:s==='amp'?vA.l:vF.l;
+function placeMod(tr){const m=envMod[ev+'.'+tr.dataset.n];tr.classList.toggle('modded',!!m);if(!m)return;const y=v=>14+(1-v)*(110-28);tr.querySelector('.mbar').style.cssText=`top:${y(m.hi)}px;height:${Math.max(2,y(m.lo)-y(m.hi))}px`;tr.querySelector('.mdot').style.top=y(m.cur)+'px'}
+function modTick(){const acc={};
+  for(const r of routes){const d=r.a*(r.src==='lfo'?(lfo.amt.mv??lfo.amt.v):1),o=acc[r.t]||(acc[r.t]={lo:0,hi:0,cur:0});if(r.src==='lfo'){o.lo-=Math.abs(d);o.hi+=Math.abs(d)}else if(d>0)o.hi+=d;else o.lo+=d;o.cur+=d*srcVal(r.src)}
+  for(const k of Object.values(knobs)){const o=acc[k.id];if(o){k.mlo=cl(k.v+o.lo);k.mhi=cl(k.v+o.hi);k.mv=cl(k.v+o.cur);drawKnob(k)}else if(k.mlo!=null){delete k.mlo;delete k.mhi;delete k.mv;drawKnob(k)}}
+  for(const e of['amp','filt'])for(const n of['A','D','S','R']){const key=e+'.'+n,o=acc[key],b=envs[e][n];if(o)envMod[key]={lo:cl(b+o.lo),hi:cl(b+o.hi),cur:cl(b+o.cur)};else delete envMod[key]}
+  faders.forEach(placeMod)}
 function lfoTick(dt){
-  lfo.ph+=0.1*Math.pow(200,lfo.rate.v)*dt;if(lfo.ph>=1){lfo.ph%=1;lfo.sh=Math.random()*2-1}
+  lfo.ph+=0.1*Math.pow(200,lfo.rate.mv??lfo.rate.v)*dt;if(lfo.ph>=1){lfo.ph%=1;lfo.sh=Math.random()*2-1}
   const p=lfo.ph;lfo.val=[Math.sin(p*2*Math.PI),4*Math.abs(p-0.5)-1,p<0.5?1:-1,lfo.sh][lfo.wave];
   $('led').style.opacity=0.25+0.75*(lfo.val+1)/2;
-  for(const r of routes){const k=knobs[r.t];k.modd=r.a*lfo.amt.v;k.mv=cl(k.v+k.modd*lfo.val);drawKnob(k)}
+  modTick()
 }
 
 /* scope: simulated voice so the wave reacts to wave, cutoff, reso, shape, drive, envelope and LFO */
@@ -484,11 +508,12 @@ const sro=new ResizeObserver(()=>{const d=devicePixelRatio||1;sw=sc.clientWidth;
 const vA={st:'idle',l:0,e:'amp'},vF={st:'idle',l:0,e:'filt'};let cur=null;const held=new Set();
 function noteOn(s){s=+s;held.add(s);cur=s;vA.st='A';vF.st='A';if(lfo.mode!=='free'){lfo.ph=0;lfo.sh=Math.random()*2-1}}
 function noteOff(s){held.delete(+s);if(held.size)cur=[...held].pop();else for(const v of[vA,vF])if(v.st!=='idle')v.st='R'}
-function eg(v,dt){const e=envs[v.e],A=0.004+e.A*1.2,D=0.02+e.D*1.2,S=e.S,R=0.03+e.R*1.6;
+function eg(v,dt){const E=n=>envMod[v.e+'.'+n]?.cur??envs[v.e][n],A=0.004+E('A')*1.2,D=0.02+E('D')*1.2,S=E('S'),R=0.03+E('R')*1.6;
   if(v.st==='A'){v.l+=dt/A;if(v.l>=1){v.l=1;v.st='D'}}
   else if(v.st==='D'){v.l-=dt/D*(1-S);if(v.l<=S){v.l=S;v.st='S'}}
   else if(v.st==='R'){v.l-=dt/R*Math.max(S,0.25);if(v.l<=0){v.l=0;v.st='idle'}}}
 function envStep(dt){eg(vA,dt);eg(vF,dt)}
+modTick();
 function harm(x,type,N,res){let y=0;for(let n=1;n<=N;n++){let a=type===0?1/n:type===1?(n%2?1/n:0):type===2?(n%2?(((n-1)/2)%2?-1:1)/(n*n):0):(n===1?1:0);if(!a)continue;if(Math.abs(n-N)<1.5)a*=1+res*4;y+=a*Math.sin(n*x)}return y}
 function drawScope(){if(!sw)return;sx.clearRect(0,0,sw,sh);const col=getComputedStyle(sc).color;
   sx.globalAlpha=.18;sx.strokeStyle=col;sx.lineWidth=1;sx.beginPath();sx.moveTo(0,sh/2);sx.lineTo(sw,sh/2);sx.stroke();sx.globalAlpha=1;
