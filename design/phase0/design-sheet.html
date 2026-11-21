@@ -13,7 +13,7 @@
    COLOUR studio charcoal ground; each device owns its casing palette (stone/lava, porcelain/teal, cobalt/lime)
    TYPE Big Shoulders Display for nameplates, Michroma for silkscreen labels, VT323 for screens, Figtree for text
    LAYOUT title row, device full width, sequencer lane under it; below: anatomy, materials, components, editor colours */
-:root{color-scheme:dark;--bg:#14161b;--panel:#1d2027;--line:#2c313b;--ink:#eef0f4;--mute:#a3a9b6;--me:#4fc3ff;--peer:#ff4fa3;--roll:#1d4fb8;--roll2:#173f94;--note:#3fe0ff}
+:root{color-scheme:dark;--bg:#14161b;--panel:#1d2027;--line:#2c313b;--ink:#eef0f4;--mute:#a3a9b6;--me:#4fc3ff;--peer:#ff4fa3;--roll:#1d4fb8;--roll2:#173f94;--note:#3fe0ff;--mod:#b48cff}
 :root[data-theme=light]{--bg:#e9ebef;--panel:#ffffff;--line:#d3d7de;--ink:#15181e;--mute:#555c69}
 *{box-sizing:border-box;min-width:0}
 html,body{margin:0}
@@ -50,7 +50,7 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
 .hw:active{transform:translateY(2px);box-shadow:none}
 .who{display:flex;gap:6px}
 .av{width:30px;height:30px;border-radius:50%;display:grid;place-items:center;font:800 13px Figtree,sans-serif;color:#081018;border:2px solid rgba(0,0,0,.4)}
-.secs{display:grid;grid-template-columns:1fr 1.35fr 1.25fr .8fr;gap:10px}
+.secs{display:grid;grid-template-columns:1fr 1.3fr 1.15fr 1.05fr .75fr;gap:10px}
 .sec{border-radius:12px;padding:10px 12px 12px;background:rgba(0,0,0,.22);box-shadow:inset 0 1px 0 rgba(255,255,255,.06),inset 0 0 0 1px rgba(0,0,0,.25)}
 .quartz .sec{background:rgba(255,255,255,.45);box-shadow:inset 0 0 0 1px rgba(0,0,0,.08)}
 .sec h4{margin:0 0 8px;font:13px Michroma,sans-serif;color:var(--acc);letter-spacing:.04em}
@@ -84,6 +84,16 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
 .fd .cap::after{content:"";position:absolute;left:6px;right:6px;top:9px;height:2px;background:var(--acc)}
 .envlcd{height:64px;padding:4px 8px;margin-bottom:10px}
 .envlcd svg{width:100%;height:100%;display:block}
+.scope{flex:1 1 240px;height:66px;padding:4px 6px;position:relative}
+.scope canvas{width:100%;height:100%;display:block}
+.scope small{position:absolute;top:4px;left:8px;font:15px VT323,monospace;opacity:.6}
+.led{display:inline-block;width:9px;height:9px;border-radius:50%;background:var(--mod);margin-left:6px;box-shadow:0 0 8px var(--mod);vertical-align:1px}
+.sbtn{width:100%;min-height:44px;margin-top:8px;border-radius:8px;border:1px dashed var(--mod);background:rgba(180,140,255,.08);color:var(--silk);font:13px Michroma,sans-serif;cursor:pointer}
+.assigning .sbtn{background:var(--mod);color:#160a2b;border-style:solid}
+.assigning #basalt .kn:not(.lfo) svg{cursor:copy;outline:2px dashed var(--mod);outline-offset:4px;border-radius:50%}
+.mods{list-style:none;margin:8px 0 0;padding:0}
+.mods li{display:flex;align-items:center;justify-content:space-between;gap:6px;font:18px VT323,monospace;color:var(--mod);border-top:1px solid rgba(255,255,255,.08)}
+.mods button{width:40px;height:40px;border:0;background:none;color:var(--silk);font:20px Figtree,sans-serif;cursor:pointer}
 
 /* performance strip */
 .perf{display:flex;gap:10px;margin-top:12px;align-items:stretch}
@@ -140,7 +150,7 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
   <div class="top">
     <div>
       <h1>Device kit, sheet 1: Basalt</h1>
-      <p>Every device in the library is built from one template. This is the first full device: drag knobs and faders, click or type keys (A W S E D F T G Y H U J K). A simulated collaborator, Mira, is tweaking it too.</p>
+      <p>Every device in the library is built from one template. This is the first full device: drag knobs and faders, click or type keys (A W S E D F T G Y H U J K). The scope shows the wave as you play. LFO 1 moves the cutoff (purple ring): press "Assign to a knob", then click any knob to modulate it too. A simulated collaborator, Mira, is tweaking and playing it as well.</p>
     </div>
     <div class="tools">
       <button class="btn" id="anatBtn" aria-pressed="false">Show template anatomy</button>
@@ -152,6 +162,7 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
     <div class="hdr zone" data-zone="Header: nameplate, preset screen, who is here">
       <div class="plate"><b>BASAL<i>T</i></b><span>Mono bass synthesizer</span></div>
       <div class="who" aria-label="People on this device"><div class="av" style="background:var(--me)" title="You">Y</div><div class="av" id="miraAv" style="background:var(--peer)" title="Mira">M</div></div>
+      <div class="lcd scope"><small>Scope</small><canvas id="scope" aria-label="Live waveform"></canvas></div>
       <div class="preset">
         <button class="hw" id="pPrev" aria-label="Previous preset">‹</button>
         <div class="lcd" id="pName">01 Lava Bass</div>
@@ -168,6 +179,12 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
       <div class="sec"><h4>Envelope</h4>
         <div class="lcd envlcd"><svg id="envG" viewBox="0 0 200 50" preserveAspectRatio="none"></svg></div>
         <div class="env" id="envF"></div>
+      </div>
+      <div class="sec"><h4>LFO 1<span class="led" id="led"></span></h4>
+        <div class="waves" id="lwaves"></div>
+        <div class="row" id="lfoK"></div>
+        <button class="sbtn" id="assign">Assign to a knob</button>
+        <ul class="mods" id="mods"></ul>
       </div>
       <div class="sec"><h4>Output</h4><div class="row" id="outK"></div></div>
     </div>
@@ -211,8 +228,8 @@ h2{font:800 30px/1.1 "Big Shoulders Display",Impact,sans-serif;margin:0 0 6px}
 <script>
 {
 const $=id=>document.getElementById(id);
-const knobs={};
-const fmt={pct:v=>Math.round(v*100)+'%',hz:v=>{const f=20*Math.pow(1000,v);return f<1000?Math.round(f)+'Hz':(f/1000).toFixed(1)+'k'},st:v=>{const s=Math.round(v*24-12);return(s>0?'+':'')+s},ms:v=>{const m=Math.round(2*Math.pow(1000,v));return m<1000?m+'ms':(m/1000).toFixed(1)+'s'}};
+const knobs={};const cl=v=>Math.min(1,Math.max(0,v));
+const fmt={pct:v=>Math.round(v*100)+'%',hz:v=>{const f=20*Math.pow(1000,v);return f<1000?Math.round(f)+'Hz':(f/1000).toFixed(1)+'k'},st:v=>{const s=Math.round(v*24-12);return(s>0?'+':'')+s},ms:v=>{const m=Math.round(2*Math.pow(1000,v));return m<1000?m+'ms':(m/1000).toFixed(1)+'s'},lfo:v=>{const h=0.1*Math.pow(200,v);return h.toFixed(h<10?2:1)+'Hz'}};
 
 function arc(r,a0,a1){const p=a=>[50+r*Math.cos(a),50+r*Math.sin(a)];const[x0,y0]=p(a0),[x1,y1]=p(a1);return`M${x0} ${y0}A${r} ${r} 0 ${a1-a0>Math.PI?1:0} 1 ${x1} ${y1}`}
 function drawKnob(k){
@@ -224,12 +241,13 @@ function drawKnob(k){
   <circle cx="50" cy="53" r="31" fill="rgba(0,0,0,.45)"/>
   <circle cx="50" cy="50" r="31" fill="url(#g${k.id})"/>
   <circle cx="50" cy="50" r="24" fill="none" stroke="rgba(0,0,0,.12)" stroke-width="2"/>
+  ${k.modd?(()=>{const lo=A0+(A1-A0)*cl(k.v-k.modd),hi=A0+(A1-A0)*cl(k.v+k.modd),am=A0+(A1-A0)*k.mv;return`<path d="${arc(37,lo,hi)}" stroke="var(--mod)" stroke-width="3" fill="none"/><circle cx="${50+43*Math.cos(am)}" cy="${50+43*Math.sin(am)}" r="5" fill="var(--mod)" stroke="rgba(0,0,0,.5)"/>`})():''}
   <line x1="${50+10*Math.cos(a)}" y1="${50+10*Math.sin(a)}" x2="${50+27*Math.cos(a)}" y2="${50+27*Math.sin(a)}" stroke="var(--acc)" stroke-width="4" stroke-linecap="round"/>`;
   k.val.textContent=(fmt[k.f]||fmt.pct)(k.v);
   k.svg.setAttribute('aria-valuenow',Math.round(k.v*100));
 }
 function knob(host,id,label,v,opt={}){
-  const el=document.createElement('div');el.className='kn'+(opt.big?' big':'');
+  const el=document.createElement('div');el.className='kn'+(opt.big?' big':'')+(opt.cls?' '+opt.cls:'');el.dataset.k=id;
   el.innerHTML=`<span class="tag">Mira</span><svg viewBox="0 0 100 100" role="slider" tabindex="0" aria-label="${label}" aria-valuemin="0" aria-valuemax="100"></svg><span class="val"></span><span class="silk">${label}</span>`;
   host.appendChild(el);
   const k={id,el,v,f:opt.f,svg:el.querySelector('svg'),val:el.querySelector('.val'),d:v};knobs[id]=k;drawKnob(k);
@@ -283,10 +301,10 @@ function buildKeys(){const host=$('keys');let h='';const nW=15;
   $('oVal').textContent='C'+oct}
 buildKeys();
 const on=(s,c='on')=>keyEls[s]&&keyEls[s].classList.add(c),off=(s,c='on')=>keyEls[s]&&keyEls[s].classList.remove(c);
-$('keys').addEventListener('pointerdown',e=>{const k=e.target.closest('.wk,.bk');if(!k)return;on(k.dataset.s);const u=()=>{off(k.dataset.s);removeEventListener('pointerup',u)};addEventListener('pointerup',u)});
+$('keys').addEventListener('pointerdown',e=>{const k=e.target.closest('.wk,.bk');if(!k)return;on(k.dataset.s);noteOn(k.dataset.s);const u=()=>{off(k.dataset.s);noteOff(k.dataset.s);removeEventListener('pointerup',u)};addEventListener('pointerup',u)});
 const map='awsedftgyhujk';
-addEventListener('keydown',e=>{if(e.repeat||e.target.closest('[role=slider]'))return;const i=map.indexOf(e.key.toLowerCase());if(i>=0)on(String(i))});
-addEventListener('keyup',e=>{const i=map.indexOf(e.key.toLowerCase());if(i>=0)off(String(i))});
+addEventListener('keydown',e=>{if(e.key==='Escape')document.body.classList.remove('assigning');if(e.repeat||e.target.closest('[role=slider]'))return;const i=map.indexOf(e.key.toLowerCase());if(i>=0){on(String(i));noteOn(i)}});
+addEventListener('keyup',e=>{const i=map.indexOf(e.key.toLowerCase());if(i>=0){off(String(i));noteOff(i)}});
 $('oDn').onclick=()=>{oct=Math.max(0,oct-1);buildKeys()};$('oUp').onclick=()=>{oct=Math.min(6,oct+1);buildKeys()};
 
 /* sequencer lane */
@@ -307,12 +325,53 @@ function peerStep(){
   const ids=['cut','res','envamt','drive','shape'];const id=ids[Math.floor(Math.random()*ids.length)];const k=knobs[id];
   if(k.el.classList.contains('mine')){timer=setTimeout(peerStep,1500);return}
   pk=k;k.el.classList.add('peer');const from=k.v,to=Math.min(1,Math.max(0,from+(Math.random()-.5)*.6));const t0=performance.now(),dur=still?1:1400;
-  const s=Math.floor(Math.random()*24);on(String(s),'peer');setTimeout(()=>off(String(s),'peer'),600);
+  const s=Math.floor(Math.random()*24);on(String(s),'peer');noteOn(s);setTimeout(()=>{off(String(s),'peer');noteOff(s)},600);
   const tick=t=>{const p=Math.min(1,(t-t0)/dur);if(!k.el.classList.contains('mine'))set(k,from+(to-from)*(1-Math.pow(1-p,3)));if(p<1&&peerOn)requestAnimationFrame(tick);else setTimeout(()=>{k.el.classList.remove('peer');timer=setTimeout(peerStep,1800)},500)};
   requestAnimationFrame(tick);
 }
 timer=setTimeout(peerStep,1200);
 $('peerBtn').onclick=e=>{peerOn=!peerOn;e.currentTarget.setAttribute('aria-pressed',peerOn);e.currentTarget.textContent=peerOn?'Mira is here':'Mira left';$('miraAv').style.display=peerOn?'':'none';clearTimeout(timer);if(pk)pk.el.classList.remove('peer');if(peerOn)timer=setTimeout(peerStep,600)};
+
+/* LFO + modulation routes */
+const LW=[['Sine','M2 9 C6 -2 10 -2 14 9 S22 20 26 9'],['Triangle','M2 16 L8 2 L20 16 L26 6'],['Square','M2 16 V3 H14 V16 H26 V3'],['Sample and hold','M2 12 H8 V4 H14 V14 H20 V7 H26']];
+$('lwaves').innerHTML=LW.map((w,i)=>`<button class="wv" aria-label="${w[0]}" aria-pressed="${i===0}"><svg viewBox="0 0 28 18"><path d="${w[1]}"/></svg></button>`).join('');
+const lfo={wave:0,ph:0,sh:0,val:0,rate:knob($('lfoK'),'lrate','Rate',0.45,{f:'lfo',cls:'lfo'}),amt:knob($('lfoK'),'lamt','Amount',0.6,{cls:'lfo'})};
+$('lwaves').addEventListener('click',e=>{const b=e.target.closest('.wv');if(!b)return;[...$('lwaves').children].forEach((x,i)=>{x.setAttribute('aria-pressed',x===b);if(x===b)lfo.wave=i})});
+let routes=[{t:'cut',a:0.45}];
+function drawRoutes(){$('mods').innerHTML=routes.map(r=>`<li><span>LFO 1 → ${knobs[r.t].svg.getAttribute('aria-label')}</span><button data-t="${r.t}" aria-label="Remove route">×</button></li>`).join('')}
+$('mods').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;const k=knobs[b.dataset.t];routes=routes.filter(r=>r.t!==b.dataset.t);delete k.modd;delete k.mv;drawKnob(k);drawRoutes()});
+$('assign').onclick=()=>document.body.classList.add('assigning');
+document.addEventListener('pointerdown',e=>{if(!document.body.classList.contains('assigning')||e.target.closest('#assign'))return;const kn=e.target.closest('#basalt .kn');if(kn&&!kn.classList.contains('lfo')){e.stopPropagation();e.preventDefault();if(!routes.some(r=>r.t===kn.dataset.k))routes.push({t:kn.dataset.k,a:0.35});drawRoutes()}document.body.classList.remove('assigning')},true);
+drawRoutes();lfo.val=0;for(const r of routes){const k=knobs[r.t];k.modd=r.a*lfo.amt.v;k.mv=k.v;drawKnob(k)}
+function lfoTick(dt){
+  lfo.ph+=0.1*Math.pow(200,lfo.rate.v)*dt;if(lfo.ph>=1){lfo.ph%=1;lfo.sh=Math.random()*2-1}
+  const p=lfo.ph;lfo.val=[Math.sin(p*2*Math.PI),4*Math.abs(p-0.5)-1,p<0.5?1:-1,lfo.sh][lfo.wave];
+  $('led').style.opacity=0.25+0.75*(lfo.val+1)/2;
+  for(const r of routes){const k=knobs[r.t];k.modd=r.a*lfo.amt.v;k.mv=cl(k.v+k.modd*lfo.val);drawKnob(k)}
+}
+
+/* scope: simulated voice so the wave reacts to wave, cutoff, reso, shape, drive, envelope and LFO */
+const sc=$('scope'),sx=sc.getContext('2d');let sw=0,sh=0;
+const sro=new ResizeObserver(()=>{const d=devicePixelRatio||1;sw=sc.clientWidth;sh=sc.clientHeight;sc.width=sw*d;sc.height=sh*d;sx.setTransform(d,0,0,d,0,0)});sro.observe(sc);
+let amp=0,stage='idle',cur=null;const held=new Set();
+function noteOn(s){s=+s;held.add(s);cur=s;stage='A'}
+function noteOff(s){held.delete(+s);if(held.size)cur=[...held].pop();else if(stage!=='idle')stage='R'}
+function envStep(dt){const A=0.004+env.A*1.2,D=0.02+env.D*1.2,S=env.S,R=0.03+env.R*1.6;
+  if(stage==='A'){amp+=dt/A;if(amp>=1){amp=1;stage='D'}}
+  else if(stage==='D'){amp-=dt/D*(1-S);if(amp<=S){amp=S;stage='S'}}
+  else if(stage==='R'){amp-=dt/R*Math.max(S,0.25);if(amp<=0){amp=0;stage='idle'}}}
+function harm(x,type,N,res){let y=0;for(let n=1;n<=N;n++){let a=type===0?1/n:type===1?(n%2?1/n:0):type===2?(n%2?(((n-1)/2)%2?-1:1)/(n*n):0):(n===1?1:0);if(!a)continue;if(Math.abs(n-N)<1.5)a*=1+res*4;y+=a*Math.sin(n*x)}return y}
+function drawScope(){if(!sw)return;sx.clearRect(0,0,sw,sh);const col=getComputedStyle(sc).color;
+  sx.globalAlpha=.18;sx.strokeStyle=col;sx.lineWidth=1;sx.beginPath();sx.moveTo(0,sh/2);sx.lineTo(sw,sh/2);sx.stroke();sx.globalAlpha=1;
+  const type=[...$('waves').children].findIndex(b=>b.getAttribute('aria-pressed')==='true');
+  const ck=knobs.cut,cut=cl((ck.mv??ck.v)+knobs.envamt.v*amp*0.35),N=Math.max(1,Math.round(1+cut*cut*46));
+  const shp=knobs.shape.mv??knobs.shape.v,g=1+(knobs.drive.mv??knobs.drive.v)*5,res=knobs.res.mv??knobs.res.v,cyc=cur==null?2:1.5+(cur%24)/5;
+  const ys=[];let mx=1e-3;for(let i=0;i<=sw;i+=2){let x=i/sw*cyc*2*Math.PI;x+=shp*0.9*Math.sin(x);const y=Math.tanh(harm(x,type,N,res)*g);ys.push(y);mx=Math.max(mx,Math.abs(y))}
+  sx.beginPath();ys.forEach((y,j)=>{const X=j*2,Y=sh/2-(y/mx)*amp*(sh/2-5);j?sx.lineTo(X,Y):sx.moveTo(X,Y)});
+  sx.lineWidth=2;sx.shadowColor=col;sx.shadowBlur=8;sx.stroke();sx.shadowBlur=0}
+let lt=performance.now();
+function loop(t){const dt=Math.min(0.05,(t-lt)/1000);lt=t;envStep(dt);lfoTick(dt);drawScope();requestAnimationFrame(loop)}
+requestAnimationFrame(loop);
 
 /* material cards */
 const M=[['basalt','BASALT','Stone + lava','01 Lava Bass'],['quartz','QUART','Porcelain + teal','01 Glass Keys'],['cobalt','COBAL','Anodised blue + lime','01 Chip Lead']];

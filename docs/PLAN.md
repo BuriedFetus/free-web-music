@@ -43,6 +43,22 @@ What the user wants:
 - Quality bar: alias-free oscillators, analog-modelled filters, parameter smoothing, proper voice allocation, oversampling where needed.
 - SharedArrayBuffer ring buffers need **COOP/COEP headers** in the host app; fall back to postMessage if unavailable.
 
+## Modulation (LFOs etc.)
+- Every device parameter is **modulatable** by design: the param schema carries range + modulation slots.
+- **Sources**: per-device LFOs and envelopes, velocity, mod wheel/aftertouch, macros; later **track-level / global modulator devices** (an LFO device that can target any param on any track).
+- **Routes** = `{ source, target param, depth (bipolar) }`, stored in the project doc, so collaborators see and hear them.
+- UI: "assign" mode (pick a source, click a knob), purple depth arc + live position dot on modulated knobs, route list per device. Modulation is computed in the audio thread; the UI only mirrors it.
+
+## Scopes & meters
+- Every device header can show a **live scope** (waveform) of its own output; mixer strips get level meters.
+- Data comes from the audio thread via a cheap snapshot buffer, drawn at screen refresh.
+
+## Effects & routing
+- Effects (**reverb, delay**, chorus, EQ, compressor, distortion…) are devices of kind `effect`, in the same library.
+- Each track: **insert chain** (ordered effect slots) → fader/pan → **sends** to **return buses** (shared reverb/delay) → master.
+- **Routing graph** in the project model: any audio out → any audio in (buses, group tracks, sidechain inputs), with cycle prevention. A routing view shows and edits it.
+- Tape/recorder devices later sit anywhere in that graph (one track or master).
+
 ## Public API (to the host app)
 ```tsx
 <Studio doc={ydoc} awareness={awareness} channel={ephemeralChannel} user={{ id, name, color }} />
@@ -61,14 +77,22 @@ The core does no networking. The host owns providers, persistence and storage.
 | # | Goal | You see / approve |
 |---|---|---|
 | 0 | Visual direction + clickable prototype (no sound): library + drag-to-track, window workspace, instrument window with its sequencer lane, main sequencer, two-user presence. Plus tech tests: WASM worklet latency, COOP/COEP in friend's app, peer clock sync. | Prototype + test results |
-| 1 | Engine core: device registry, worklet + WASM, transport/clock, **one flagship instrument** at full quality, keyboard playing | That instrument, playable, final UI |
+| 1 | Engine core: device registry, worklet + WASM, transport/clock, **one flagship instrument** (Basalt) at full quality with its LFO/modulation and live scope, keyboard playing | That instrument, playable, final UI |
 | 2 | Project model on Yjs + collab stand-in (two tabs/windows), presence, per-user undo | Two people tweaking the same instrument, seeing each other |
 | 3 | Main sequencer device + instrument-window lens on its track; built-in-sequencer support | Programming patterns from both places |
 | 4 | Live jamming: shared transport, note events, jitter buffer | Two people playing together and hearing each other |
 | 5 | More instruments, one per slice, each with designed UI | Each signed off |
-| 6 | Mixer, scenes/song arrangement | Building a full track |
-| 7 | Hand-off package + integration guide for friend | Running inside their app |
-| Later | Effects, tape/recorder output, global + per-track time/pitch | Fits on the existing device/track chain |
+| 6 | Mixer with meters, scenes/song arrangement | Building a full track |
+| 7 | Effects + routing: reverb and delay devices, insert chains, sends/returns, routing view, global modulators | A mix with shared reverb/delay and custom routing |
+| 8 | Hand-off package + integration guide for friend | Running inside their app |
+| Later | Tape/recorder output, global + per-track time/pitch, 3D/immersive view | Fits on the existing device/track chain |
+
+### Phase 0 progress
+- [x] Device kit design sheet: Basalt, template anatomy, materials, presence states, editor colours (`design/phase0/design-sheet.html`)
+- [x] Live scope + LFO/modulation assignment on Basalt
+- [ ] Clickable 4-panel workspace (scene grid, piano roll, mixer, device) + library drag-to-track + presence
+- [ ] Main sequencer window
+- [ ] Tech tests: WASM worklet latency, COOP/COEP in friend's app, peer clock sync
 
 ## Verification
 - Unit tests (Vitest; Rust tests for DSP): model ops, concurrent-edit merging across two Y.Docs, scheduler timing, DSP output checks (aliasing, clicks).
