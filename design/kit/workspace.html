@@ -372,9 +372,13 @@ function renderPane(i){const el=document.querySelector(`.pane[data-i="${i}"]`),v
   if(nprw){if(ry!=null&&same)nprw.scrollTop=ry;else{const t=T(sel.t),c=rcfg(t),p=pats[pk(t.id,sel.s)]||[];if(!c.dr){const top=p.length?Math.max(...p.map(n=>n.m)):c.lo+24;nprw.scrollTop=Math.max(0,c.rAt(top)*c.RH-40)}}}}
 function renderPeople(){const t=T(mira.t);$('people').innerHTML=`<div class="pchip"><span class="av" style="background:var(--fwm-me)">Y</span><span>You · ${esc(T(sel.t).name)} · ${scenes[sel.s]}</span></div>${mira.on?`<div class="pchip"><span class="av" style="background:var(--fwm-peer)">M</span><span>Mira · ${VIEWS[mira.view]} · ${esc(t?t.name:'')} · ${scenes[mira.s]}</span></div>`:''}<button class="btn sm" data-act="mira" aria-pressed="${mira.on}">${mira.on?'Mira is here':'Mira left'}</button>`}
 function renderFloats(){$('floats').innerHTML=floats.map(f=>`<div class="float" data-fl="${f.id}" style="left:${f.x}px;top:${f.y}px"><div class="ph" data-drag="${f.id}"><b>${esc(T(f.t)?.name||'Removed')}</b><span class="ctx">Floating window · only in your layout</span><button class="ib" data-act="closefl" data-fl="${f.id}" aria-label="Close floating window">×</button></div><div class="pb">${devHtml(f.t)}</div></div>`).join('')}
-function renderAll(){if(busy){dirty=true;return}dirty=false;const ws=$('ws');ws.style.setProperty('--c1',L.c1+'%');ws.style.setProperty('--r1',L.r1+'%');ws.classList.toggle('max',L.max>=0);
+/* never interrupt the local user: while a menu is open, text is being typed or a slider is held,
+   remote/presence-driven re-renders wait and are applied right after (see loop()) */
+const uiOpen=()=>{const a=document.activeElement;return!!document.querySelector('input[type=range]:active')||!!(a&&a.matches('select,input:not([type=range]),textarea')&&a.closest('.pane,.float'))};
+function focusSel(){const a=document.activeElement;if(!a||a===document.body)return null;if(a.matches('.kn svg'))return`.kn[data-k="${a.parentNode.dataset.k}"] svg`;const d=Object.entries(a.dataset);if(!d.length)return null;return a.tagName.toLowerCase()+d.map(([k,v])=>`[data-${k.replace(/[A-Z]/g,c=>'-'+c.toLowerCase())}="${CSS.escape(v)}"]`).join('')}
+function renderAll(force){if(busy||(!force&&uiOpen())){dirty=true;return}dirty=false;const fs=focusSel();const ws=$('ws');ws.style.setProperty('--c1',L.c1+'%');ws.style.setProperty('--r1',L.r1+'%');ws.classList.toggle('max',L.max>=0);
   for(let i=0;i<4;i++){renderPane(i);document.querySelector(`.pane[data-i="${i}"]`).classList.toggle('maxed',L.max===i)}
-  renderPeople();renderFloats();document.querySelectorAll('.kn').forEach(drawKnob);['master',...tracks.map(t=>t.id)].forEach(updFader);saveL()}
+  renderPeople();renderFloats();document.querySelectorAll('.kn').forEach(drawKnob);['master',...tracks.map(t=>t.id)].forEach(updFader);saveL();if(fs){const el=document.querySelector(fs);if(el&&el!==document.activeElement)el.focus({preventScroll:true})}}
 const refreshNotes=key=>{document.querySelectorAll(`.nl[data-key="${key}"]`).forEach(e=>e.innerHTML=notesHtml(key));document.querySelectorAll(`.abars[data-key="${key}"]`).forEach(e=>e.innerHTML=velHtml(key))};
 let tt;function toast(m){const e=$('toast');e.textContent=m;e.classList.add('show');clearTimeout(tt);tt=setTimeout(()=>e.classList.remove('show'),2400)}
 
@@ -404,7 +408,7 @@ document.addEventListener('click',e=>{const b=e.target.closest('[data-act]');if(
   else if(a==='mira'){mira.on=!mira.on;mira.touch=null;if(mira.on)schedMira()}
   else return;
   renderAll()});
-document.addEventListener('change',e=>{if(e.target.dataset.act==='view'){L.views[+e.target.dataset.i]=e.target.value;renderAll()}if(e.target.dataset.act==='swing'){swing=e.target.value/100;renderAll()}if(e.target.dataset.act==='snap'){snap=e.target.value;renderAll()}if(e.target.dataset.act==='rq'){rq=e.target.value;renderAll()}});
+document.addEventListener('change',e=>{const act=e.target.dataset.act;if(act==='view')L.views[+e.target.dataset.i]=e.target.value;else if(act==='swing')swing=e.target.value/100;else if(act==='snap')snap=e.target.value;else if(act==='rq')rq=e.target.value;else return;e.target.blur();renderAll(true)});
 $('skins').addEventListener('click',e=>{const b=e.target.closest('button');if(!b)return;document.body.dataset.fwmTheme=b.dataset.skin;for(const x of $('skins').children)x.setAttribute('aria-pressed',x===b)});
 $('libq').addEventListener('input',e=>$('libList').innerHTML=libHtml(e.target.value));
 $('libList').innerHTML=libHtml('');
@@ -483,7 +487,7 @@ function trigger(t,idx){const stepMs=60000/bpm/4/t.seq.rate;document.querySelect
   if(t.seq.own){if(idx%2===0){const d=D(t.dev),m=d.drums?idx%3:(t.dev==='basalt'?36:t.dev==='cobalt'?72:60)+[0,7,12,7][(idx/2)%4];noteOn(t.id,m,.7);setTimeout(()=>noteOff(t.id,m),stepMs*.9)}return}
   const key=pk(t.id,ps);(pats[key]||[]).forEach((n,i)=>{if(Math.floor(n.s)!==idx||Object.values(held).some(h=>h.n===n))return;setTimeout(()=>{noteOn(t.id,n.m,n.v);setTimeout(()=>noteOff(t.id,n.m),n.l*stepMs*.9);document.querySelectorAll(`.nl[data-key="${key}"] .nt[data-i="${i}"]`).forEach(x=>{x.classList.add('hit');setTimeout(()=>x.classList.remove('hit'),120)})},(n.s-idx)*stepMs)})}
 let lt=performance.now();
-function loop(t){const dt=Math.min(.05,(t-lt)/1000);lt=t;
+function loop(t){const dt=Math.min(.05,(t-lt)/1000);lt=t;if(dirty&&!busy&&!uiOpen())renderAll();
   if(playing){gpos+=dt*bpm/60*4;const bar=Math.floor(gpos/16);if(bar!==lastBar){lastBar=bar;if(mode==='song'){ps=(ps+1)%scenes.length;renderAll()}}pos=gpos%16;const st=Math.floor(pos);
     for(const t of tracks){const raw=gpos*t.seq.rate;let n=Math.floor(raw);if(n%2===1&&raw-n<swing*.5)n-=1;t.frac=Math.min(.999,raw-n);if(n!==t.lt){t.lt=n;t.idx=stepOf(t,n);trigger(t,t.idx)}}
     $('posL').textContent=`${scenes[ps]} ${bar+1}.${Math.floor(st/4)+1}.${st%4+1}`;

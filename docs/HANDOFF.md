@@ -41,6 +41,7 @@ Both prototypes are silent. Sound starts in Phase 1.
   - "Own seq": a device runs its built-in sequencer, synced to the main clock.
   - Automation lanes per step, recordable from knob moves.
 - **Theming:** `--fwm-*` app tokens, depth/glow/round dials, `--dev-*` device tokens in `:where()` (zero specificity), replaceable primitives (Knob, Fader, Button, Screen, Keys). No hard-coded styles in devices.
+- **Remote activity never interrupts the local user.** Other people's edits and presence must not close an open menu, steal focus, or break a drag or typing. Apply them to the model straight away, but update the UI in place (or defer a full re-render until the user is done), and restore focus after re-renders. The workspace prototype does this with `uiOpen()` / deferred `renderAll()`. In React this means stable keys and no remounting of controls on remote updates.
 - **Live jamming:** remote notes play on each client's own instrument copy, scheduled at shared-clock timestamp + adaptive jitter buffer (≈ p95 one-way delay). Clock offset via a min-RTT filter (see RESULTS.md).
 - **Legal/design:** KORG Gadget's *feel* only. Our own mineral device names. `design/refs/` (copyrighted screenshots) is git-ignored and never published. Repo is public, MIT.
 
