@@ -234,18 +234,33 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
 
   // ---- keyboard: computer keys play the selected track; Space = play/stop; Ctrl+Z = undo ----
   const [octave, setOctave] = useState(0);
+  const keyTrack = useRef(new Map<number, string>());
   const entry = selTrack ? deviceEntry(selTrack.device) : null;
   useComputerKeys({
     enabled: !!selTrack,
     base: (entry?.rootNote ?? 48) + octave * 12,
-    onNoteOn: (n, v) => selTrack && playNote(selTrack.id, n, v),
-    onNoteOff: (n) => selTrack && releaseNote(selTrack.id, n),
+    // A key is released on the track it started on, even if you switched track while holding it.
+    onNoteOn: (n, v) => {
+      if (!selTrack) return;
+      keyTrack.current.set(n, selTrack.id);
+      playNote(selTrack.id, n, v);
+    },
+    onNoteOff: (n) => {
+      const t = keyTrack.current.get(n) ?? selTrack?.id;
+      keyTrack.current.delete(n);
+      if (t) releaseNote(t, n);
+    },
     onOctave: (d) => setOctave((o) => Math.max(-3, Math.min(4, o + d))),
   });
   useEffect(() => {
+    // Space is always play/stop (outside text fields). Without this, Space "clicks" whatever button
+    // you clicked last: a step, Clear, Mute, or remove track.
+    const typing = (e: KeyboardEvent) => !!(e.target as HTMLElement).closest?.('input:not([type=range]), textarea, select, [contenteditable=true]');
+    const ku = (e: KeyboardEvent) => {
+      if (e.code === 'Space' && !typing(e)) e.preventDefault();
+    };
     const kd = (e: KeyboardEvent) => {
-      const t = e.target as HTMLElement;
-      if (t.closest?.('input, textarea, select, [contenteditable=true]')) return;
+      if (typing(e)) return;
       const mod = e.ctrlKey || e.metaKey;
       if (mod && e.key.toLowerCase() === 'z') {
         e.preventDefault();
@@ -254,13 +269,17 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
       } else if (mod && e.key.toLowerCase() === 'y') {
         e.preventDefault();
         project.redo();
-      } else if (e.code === 'Space' && !t.closest?.('button, [role=slider]')) {
+      } else if (e.code === 'Space') {
         e.preventDefault();
-        setPlaying(!playing);
+        if (!e.repeat) setPlaying(!playing);
       }
     };
-    addEventListener('keydown', kd);
-    return () => removeEventListener('keydown', kd);
+    addEventListener('keydown', kd, true);
+    addEventListener('keyup', ku, true);
+    return () => {
+      removeEventListener('keydown', kd, true);
+      removeEventListener('keyup', ku, true);
+    };
   }, [project, playing, setPlaying]);
 
   const ctx: StudioCtx = {

@@ -24,6 +24,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   const ok = (cond: boolean, label: string) => out.push(`${cond ? 'PASS' : 'FAIL'} ${role}: ${label}`);
   const p = new Project(s.doc, { e2e: role });
   if (role === 'multi') return runMulti(p, engineRef, ok, out);
+  if (role === 'switch') return runSwitch(p, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
     if (role === 'a') {
@@ -148,5 +149,92 @@ async function runMulti(p: Project, engineRef: { current: Engine | null }, ok: (
     out.push(`FAIL multi: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: switch tracks in the main sequencer many times, stopped, playing, with keys held. */
+async function runSwitch(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push('error: ' + String(e.message)));
+  window.addEventListener('unhandledrejection', (e) => errs.push('rejection: ' + String(e.reason)));
+  const ce = console.error.bind(console);
+  console.error = (...a: unknown[]) => { errs.push('console: ' + a.map(String).join(' ').slice(0, 300)); ce(...a); };
+  const sel = (name: string) => ($(`[aria-label="Select ${name}"]`) as HTMLButtonElement | null);
+  const alive = () => document.querySelectorAll('.fwm-pane').length === 4 && !!$('.fwm-seq, .fwm-sq');
+  try {
+    await sleep(300);
+    for (let i = 0; i < 3; i++) {
+      const id = p.addTrack(m, undefined, 0);
+      for (const st of [0, 4, 8, 12]) p.addNote(id, 0, { s: st + i, l: 1, m: 36 + i * 7, v: 0.9 });
+    }
+    await sleep(200);
+    const names = p.tracks().map((t) => t.name);
+    const cycle = async (label: string, n: number, delay: number) => {
+      for (let k = 0; k < n; k++) {
+        const name = names[k % names.length];
+        const b = sel(name);
+        if (!b) { errs.push(`${label}: no select button for ${name}`); return; }
+        b.click();
+        await sleep(delay);
+        if (!alive()) { errs.push(`${label}: UI gone after selecting ${name} (step ${k})`); return; }
+      }
+    };
+    await cycle('stopped, no sound', 12, 40);
+    ok(alive() && errs.length === 0, `switch while stopped, no sound (${errs.join(' | ')})`);
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    await cycle('sound on', 12, 40);
+    ok(alive() && errs.length === 0, `switch with sound on (${errs.join(' | ')})`);
+    btn('▶ Play')!.click();
+    await cycle('playing', 30, 25);
+    ok(alive() && errs.length === 0, `switch fast while playing (${errs.join(' | ')})`);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    await cycle('key held', 6, 60);
+    document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+    ok(alive() && errs.length === 0, `switch while holding a key (${errs.join(' | ')})`);
+    btn('● Rec')!.click();
+    await cycle('recording', 10, 50);
+    btn('● Rec')!.click();
+    ok(alive() && errs.length === 0, `switch while recording (${errs.join(' | ')})`);
+    // Switch on the piano-roll/device tabs too, and from scene B.
+    btn('B')?.click();
+    for (const t of [...document.querySelectorAll<HTMLButtonElement>('.fwm-ttab')].slice(0, 6)) { t.click(); await sleep(40); }
+    ok(alive() && errs.length === 0, `switch via tabs in scene B (${errs.join(' | ')})`);
+    const env: Record<string, number> = {};
+    const t0 = performance.now();
+    while (performance.now() - t0 < 1500) {
+      for (const [k, d] of Object.entries(engineRef.current!.last!.devices)) env[k] = Math.max(env[k] ?? 0, d.mods[1]);
+      await sleep(25);
+    }
+    ok(Object.keys(env).length === 3, `engine still has 3 devices (${JSON.stringify(env)})`);
+    btn('■ Stop')?.click();
+    ok(!!$('[role=slider][aria-label="Cutoff"]'), 'device panel still shows Basalt');
+    // Hold a key on track 1, switch to track 2, release: track 1 must not keep droning.
+    sel(names[0])!.click();
+    await sleep(100);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    await sleep(300);
+    sel(names[1])!.click();
+    await sleep(100);
+    document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+    await sleep(1500);
+    const env0 = engineRef.current!.last!.devices[0].mods[1];
+    ok(env0 < 0.05, `no stuck note on the track you left (amp env ${env0.toFixed(3)})`);
+    // Space with a step button focused: plays, and does not toggle the step.
+    const stepBtn = $(`[aria-label="${names[1]} step 2"]`) as HTMLButtonElement;
+    stepBtn.click();
+    const before = p.notes(p.trackIds()[1], 1).length;
+    stepBtn.focus();
+    stepBtn.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true }));
+    const up = new KeyboardEvent('keyup', { key: ' ', code: 'Space', bubbles: true, cancelable: true });
+    stepBtn.dispatchEvent(up);
+    await until('Space plays', () => !!engineRef.current?.last?.transport.playing, 2000);
+    ok(true, 'Space plays while a step button has focus');
+    ok(up.defaultPrevented && p.notes(p.trackIds()[1], 1).length === before, 'Space does not press the focused button');
+    btn('■ Stop')?.click();
+  } catch (e) {
+    out.push(`FAIL switch: ${String(e)} | ${errs.join(' | ')}`);
+  }
+  out.push(`INFO errors: ${errs.length}`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
 }

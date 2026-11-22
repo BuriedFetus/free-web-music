@@ -1,5 +1,34 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
+## START HERE (2026-11-22): user testing feedback, in progress
+The user played with Phases 2–3 and said: "quite buggy", "Not satisfied with the sequencer".
+Fixed and pushed this session (each has a browser test):
+- `82adcec` Adding a 2nd device silenced the 1st: the Basalt panel also called `useDeviceSync`, so switching the
+  Device panel's track removed the old track's engine slot. Now only `TrackEngine` owns slots (panel syncs only
+  when it has no `host`). Test: `?e2e=multi`.
+- `51b719c` No way to pick which Basalt the Device panel edits ("I go on Device and only see 1 BASALT"). Added
+  track tabs in the Device and Piano roll panel headers. Lesson: the user won't find hidden affordances; make
+  every choice visible where it's needed.
+- Next commit: "changing track in the sequencer makes everything break". Two causes: (1) a computer key held
+  across a track switch was released on the NEW track, so the old mono Basalt droned forever; now released on
+  the track it started on. (2) Space "clicked" the last-clicked button (step, Clear, Mute, ×) instead of
+  play/stop; Space is now always play/stop outside text fields (capture phase, keyup default prevented).
+  Test: `?e2e=switch`.
+
+**Still open, waiting on the user's answers** (asked, not answered yet):
+1. Any other bugs they hit (they say "sometimes": if switching still breaks, get exact steps; it could be
+   two-tab specific, which `?e2e=switch` doesn't cover).
+2. What feels wrong in the sequencer. My own critique, given to the user: steps show only on/off (no pitch,
+   no length, long notes look like blips); no beat grouping by 4; a wall of tiny per-row buttons; lots of empty
+   space; step grid and piano roll feel like two separate tools. Plan: MOCK UP a new sequencer (show UI first,
+   publish as artifact) before building it.
+Then Phase 4 (shared transport). The Studio artifact (HEVoA3TExTjSF2bRmVUUei) has NOT been republished with these fixes.
+
+Single-tab e2e runs: `dist/index.html?e2e=multi` and `?e2e=switch` (one firefox tab, POST to ./log).
+`?seednow=3` seeds three Basalts for screenshots.
+
+---
+
 Notes for the next session (written 2026-11-21, before a context compaction). Read this, `CLAUDE.md`, `docs/PLAN.md` and `docs/THEMING.md` before writing code.
 
 ## Where we are
