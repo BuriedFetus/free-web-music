@@ -46,6 +46,7 @@ Both prototypes are silent. Sound starts in Phase 1.
 - **Legal/design:** KORG Gadget's *feel* only. Our own mineral device names. `design/refs/` (copyrighted screenshots) is git-ignored and never published. Repo is public, MIT.
 
 ## Open items
+- [ ] **Phase 1 progress:** Rust engine + Basalt DSP done in `packages/engine` (14 tests pass: pitch, alias ≤ -79 dB, no clicks, no denormals, ~1.2% CPU native). Next: worklet host (JS), hear it in the kit, then React once Node is in.
 - [ ] **Node.js is not installed on this machine** (no `node`/`npm`). Phase 1 needs it for Vite + React + TypeScript. Ask the user to install Node LTS (or get their OK to install it via nvm) before scaffolding.
 - [x] Rust is installed, plus the `wasm32-unknown-unknown` target (added in Phase 0). `wasm-pack` is not installed; plain `cargo build --target wasm32-unknown-unknown` works (see `spikes/build.sh`).
 - [ ] Live audio latency numbers: the user runs `python3 spikes/serve.py` → "Start audio test" and pastes the numbers into `spikes/RESULTS.md`.

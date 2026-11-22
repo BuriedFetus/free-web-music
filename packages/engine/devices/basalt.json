@@ -1,0 +1,42 @@
+{
+  "id": "basalt",
+  "name": "Basalt",
+  "kind": "instrument",
+  "version": 1,
+  "voices": "mono",
+  "description": "Mono bass synth: one oscillator with Shape, square sub, drive, resonant low-pass, two envelopes, LFO and a modulation matrix.",
+  "params": [
+    { "id": "wave",   "label": "Wave",     "section": "osc",  "type": "enum", "options": ["Saw", "Square", "Triangle", "Sine"], "default": 0 },
+    { "id": "tune",   "label": "Tune",     "section": "osc",  "type": "float", "default": 0.5,  "unit": "st",  "map": "lin", "min": -12, "max": 12, "mod": true },
+    { "id": "shape",  "label": "Shape",    "section": "osc",  "type": "float", "default": 0.3,  "unit": "%",   "map": "lin", "min": 0, "max": 100, "mod": true },
+    { "id": "sub",    "label": "Sub",      "section": "osc",  "type": "float", "default": 0.6,  "unit": "%",   "map": "lin", "min": 0, "max": 100, "mod": true },
+    { "id": "cut",    "label": "Cutoff",   "section": "filter", "type": "float", "default": 0.42, "unit": "Hz", "map": "exp", "min": 20, "max": 20480, "mod": true },
+    { "id": "res",    "label": "Reso",     "section": "filter", "type": "float", "default": 0.55, "unit": "%",  "map": "lin", "min": 0, "max": 100, "mod": true },
+    { "id": "envamt", "label": "Env amt",  "section": "filter", "type": "float", "default": 0.7,  "unit": "%",  "map": "lin", "min": 0, "max": 100, "mod": true },
+    { "id": "drive",  "label": "Drive",    "section": "filter", "type": "float", "default": 0.25, "unit": "%",  "map": "lin", "min": 0, "max": 100, "mod": true },
+    { "id": "glide",  "label": "Glide",    "section": "out",  "type": "float", "default": 0.2,  "unit": "ms",  "map": "exp0", "min": 3, "max": 3000, "mod": true },
+    { "id": "lvl",    "label": "Level",    "section": "out",  "type": "float", "default": 0.8,  "unit": "%",   "map": "lin", "min": 0, "max": 100, "mod": true },
+    { "id": "amp.A",  "label": "Attack",   "section": "amp",  "type": "float", "default": 0.05, "unit": "ms", "map": "exp", "min": 0.5, "max": 5000, "mod": true },
+    { "id": "amp.D",  "label": "Decay",    "section": "amp",  "type": "float", "default": 0.35, "unit": "ms", "map": "exp", "min": 5, "max": 10000, "mod": true },
+    { "id": "amp.S",  "label": "Sustain",  "section": "amp",  "type": "float", "default": 0.55, "unit": "%",  "map": "lin", "min": 0, "max": 100, "mod": true },
+    { "id": "amp.R",  "label": "Release",  "section": "amp",  "type": "float", "default": 0.3,  "unit": "ms", "map": "exp", "min": 5, "max": 10000, "mod": true },
+    { "id": "filt.A", "label": "Attack",   "section": "filt", "type": "float", "default": 0.02, "unit": "ms", "map": "exp", "min": 0.5, "max": 5000, "mod": true },
+    { "id": "filt.D", "label": "Decay",    "section": "filt", "type": "float", "default": 0.3,  "unit": "ms", "map": "exp", "min": 5, "max": 10000, "mod": true },
+    { "id": "filt.S", "label": "Sustain",  "section": "filt", "type": "float", "default": 0.2,  "unit": "%",  "map": "lin", "min": 0, "max": 100, "mod": true },
+    { "id": "filt.R", "label": "Release",  "section": "filt", "type": "float", "default": 0.25, "unit": "ms", "map": "exp", "min": 5, "max": 10000, "mod": true },
+    { "id": "lwave",  "label": "LFO wave", "section": "lfo",  "type": "enum", "options": ["Sine", "Triangle", "Square", "Sample and hold"], "default": 0 },
+    { "id": "lmode",  "label": "LFO mode", "section": "lfo",  "type": "enum", "options": ["Free", "Retrig", "Poly"], "default": 0 },
+    { "id": "lrate",  "label": "Rate",     "section": "lfo",  "type": "float", "default": 0.45, "unit": "Hz", "map": "exp", "min": 0.1, "max": 20, "mod": true },
+    { "id": "lamt",   "label": "Amount",   "section": "lfo",  "type": "float", "default": 0.6,  "unit": "%",  "map": "lin", "min": 0, "max": 100, "mod": true }
+  ],
+  "modSources": [
+    { "id": "lfo",  "label": "LFO 1",      "bipolar": true,  "noTargets": ["lwave", "lmode", "lrate", "lamt"] },
+    { "id": "amp",  "label": "Amp env",    "bipolar": false, "noTargets": ["amp.A", "amp.D", "amp.S", "amp.R"] },
+    { "id": "filt", "label": "Filter env", "bipolar": false, "noTargets": ["filt.A", "filt.D", "filt.S", "filt.R"] }
+  ],
+  "notes": {
+    "values": "Every param is stored normalised 0..1 (enums as their index). 'map' turns that into the display/DSP value: lin = min + v*(max-min); exp = min*(max/min)^v; exp0 = like exp but v=0 means off.",
+    "modulation": "Routes add depth*source to the normalised value, then clamp to 0..1. LFO routes are also scaled by the LFO Amount. A source cannot modulate its own controls.",
+    "glide": "Glide slides pitch only between overlapping (legato) notes, and legato notes do not restart the envelopes."
+  }
+}

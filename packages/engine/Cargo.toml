@@ -1,0 +1,22 @@
+[package]
+name = "fwm_engine"
+version = "0.1.0"
+edition = "2021"
+description = "free-web-music audio engine: devices and DSP, compiled to WebAssembly for an AudioWorklet"
+license = "MIT"
+publish = false
+
+[lib]
+crate-type = ["cdylib", "rlib"]
+
+[dependencies]
+libm = "0.2"
+
+[profile.release]
+opt-level = 3
+lto = true
+codegen-units = 1
+panic = "abort"
+
+[profile.test]
+opt-level = 2
