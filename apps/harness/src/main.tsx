@@ -45,6 +45,8 @@ function seed() {
   const line: [number, number, number, number][] = [[0, 2, 36, 0.9], [3, 1, 36, 0.6], [6, 2, 39, 0.8], [8, 1, 36, 0.9], [10, 1, 31, 0.7], [11, 1, 34, 0.7], [12, 3, 36, 1]];
   for (const [s, l, n, v] of line) p.addNote(id, 0, { s, l, m: n, v });
   for (const [s, l, n, v] of [[0, 6, 36, 0.8], [8, 6, 31, 0.7]] as const) p.addNote(id, 1, { s, l, m: n, v });
+  // ?seednow=3: extra copies, to see several tracks at once.
+  for (let i = 1; i < Number(params.get('seednow') || 1); i++) p.addTrack(m, BASALT_PRESETS[i % BASALT_PRESETS.length], 0);
 }
 
 if (params.has('seednow')) seed(); // screenshots: start with the demo track already there

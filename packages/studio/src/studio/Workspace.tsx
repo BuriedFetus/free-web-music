@@ -81,7 +81,7 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
                 <option key={id} value={id}>{label}</option>
               ))}
             </select>
-            <PaneContext view={v} />
+            {v === 'roll' || v === 'device' ? <TrackTabs peers={peers} /> : <PaneContext view={v} />}
             <button type="button" className="fwm-ib" aria-pressed={L.max === i} aria-label={L.max === i ? 'Restore panels' : 'Maximise panel'}
               onClick={() => save({ ...L, max: L.max === i ? -1 : i })}>
               {L.max === i ? '⤡' : '⤢'}
@@ -113,4 +113,26 @@ function PaneContext({ view }: { view: ViewId }) {
         ? `${project.trackIds().length} tracks · scene ${SCENES[ws.scene]}`
         : 'Bring a device in to make a track';
   return <span className="fwm-ctx">{text}</span>;
+}
+
+/** One tab per track, in the Device and Piano roll headers: pick which track this view shows. */
+function TrackTabs({ peers }: { peers: Peer[] }) {
+  const { project, ws, setWs } = useStudio();
+  const tracks = project.tracks();
+  if (!tracks.length) return <span className="fwm-ctx">No track yet</span>;
+  return (
+    <div className="fwm-ttabs" role="tablist" aria-label="Track">
+      {tracks.map((t) => (
+        <button key={t.id} type="button" role="tab" aria-selected={t.id === ws.track} data-device={t.device}
+          className="fwm-ttab" title={`Show ${t.name}`} onClick={() => setWs({ track: t.id })}>
+          {t.name}
+          {peers.filter((p) => p.track === t.id).map((p) => (
+            <span key={p.clientId} className="fwm-av fwm-av--xs" style={{ background: p.user.color }} title={`${p.user.name} is here`}>
+              {p.user.name[0]}
+            </span>
+          ))}
+        </button>
+      ))}
+    </div>
+  );
 }

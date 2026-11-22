@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import * as Y from 'yjs';
 import { Project, Studio } from '../src';
 
@@ -44,6 +44,18 @@ describe('<Studio>', () => {
     expect(p.notes(id2, 0)).toHaveLength(0);
     fireEvent.click(screen.getByRole('button', { name: 'Select Basalt 2' }));
     expect(screen.getByText(/Mono bass synth · Basalt 2/)).toBeTruthy();
+  });
+
+  it('the Device panel has a tab per track to switch which one you edit', () => {
+    mount();
+    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    const device = screen.getByRole('region', { name: 'Device' });
+    const tabs = within(device).getAllByRole('tab');
+    expect(tabs.map((t) => t.textContent)).toEqual(['Basalt', 'Basalt 2', 'Basalt 3']);
+    expect(tabs[2].getAttribute('aria-selected')).toBe('true'); // the newest one is selected
+    fireEvent.click(tabs[0]);
+    expect(within(device).getByText(/Mono bass synth · Basalt$/)).toBeTruthy();
+    expect(within(device).getAllByRole('tab')[0].getAttribute('aria-selected')).toBe('true');
   });
 
   it('your panel layout is private (stored per user, not in the shared doc)', () => {
