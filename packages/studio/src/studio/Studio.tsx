@@ -300,11 +300,12 @@ function TrackEngine({ project, track, slot, scene }: { project: Project; track:
   const manifest = deviceEntry(track.device)!.manifest!;
   const store = project.deviceStore(track.id, manifest)!;
   useDeviceSync(engine, store, slot, track.device);
-  // Re-send everything when the engine (re)starts.
+  // Re-send everything when the engine (re)starts or the device is re-created (removing a device
+  // in the worklet also forgets its pattern).
   useEffect(() => {
     sent.current = '';
     seqKey.current = '';
-  }, [engine]);
+  }, [engine, store]);
   useEffect(() => {
     if (!engine) return;
     const k = JSON.stringify(track.seq);

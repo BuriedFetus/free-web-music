@@ -23,6 +23,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   const out: string[] = [];
   const ok = (cond: boolean, label: string) => out.push(`${cond ? 'PASS' : 'FAIL'} ${role}: ${label}`);
   const p = new Project(s.doc, { e2e: role });
+  if (role === 'multi') return runMulti(p, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
     if (role === 'a') {
@@ -86,5 +87,66 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   } catch (e) {
     out.push(`FAIL ${role}: ${String(e)}`);
   }
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: a track plays, then more devices are added the way a user does (Library → Add). */
+async function runMulti(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  window.addEventListener('unhandledrejection', (e) => errs.push(String(e.reason)));
+  // Max amp envelope per slot and master peak over a window.
+  const watch = async (ms: number) => {
+    const env: Record<string, number> = {};
+    let peak = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      const last = engineRef.current!.last!;
+      for (const [slot, d] of Object.entries(last.devices)) env[slot] = Math.max(env[slot] ?? 0, d.mods[1]);
+      peak = Math.max(peak, ...Array.from(last.scope).map(Math.abs));
+      await sleep(25);
+    }
+    return { env, peak };
+  };
+  const fmt = (w: { env: Record<string, number>; peak: number }) =>
+    Object.entries(w.env).map(([k, v]) => `slot${k}=${v.toFixed(2)}`).join(' ') + ` peak=${w.peak.toFixed(3)}`;
+  try {
+    await sleep(300);
+    const a = p.addTrack(m, undefined, 0);
+    for (const st of [0, 4, 8, 12]) p.addNote(a, 0, { s: st, l: 1, m: 36, v: 0.9 });
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    btn('▶ Play')!.click();
+    let w = await watch(1500);
+    ok(Object.values(w.env).some((v) => v > 0.1), `one track plays (${fmt(w)})`);
+    // Add a second Basalt from the Library, while playing.
+    ($('[aria-label="Add Basalt as a new track"]') as HTMLButtonElement).click();
+    await sleep(200);
+    w = await watch(1500);
+    const vals = () => Object.values(w.env);
+    ok(Object.keys(w.env).length === 2, `engine has two devices (${Object.keys(w.env).join(',')})`);
+    ok(vals()[0] > 0.1, `track 1 still plays after adding track 2 (${fmt(w)})`);
+    const b = p.trackIds()[1];
+    for (const st of [2, 6, 10, 14]) p.addNote(b, 0, { s: st, l: 1, m: 48, v: 0.9 });
+    w = await watch(1500);
+    ok(vals().length === 2 && vals().every((v) => v > 0.1), `both tracks play their patterns (${fmt(w)})`);
+    btn('■ Stop')!.click();
+    await sleep(400);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    w = await watch(500);
+    document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+    ok(w.peak > 0.02, `computer key plays the new track (${fmt(w)})`);
+    // Third copy and a removal.
+    ($('[aria-label="Add Basalt as a new track"]') as HTMLButtonElement).click();
+    await sleep(200);
+    p.removeTrack(p.trackIds()[0]);
+    btn('▶ Play')!.click();
+    w = await watch(1500);
+    ok(vals().some((v) => v > 0.1), `after removing track 1, track 2 still plays (${fmt(w)})`);
+    btn('■ Stop')!.click();
+  } catch (e) {
+    out.push(`FAIL multi: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
 }

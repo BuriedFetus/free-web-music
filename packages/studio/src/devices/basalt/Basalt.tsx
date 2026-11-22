@@ -57,7 +57,9 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
   const tokens = useDeviceTokens('basalt');
   const state = useDeviceState(store);
   const m = store.manifest;
-  useDeviceSync(engine, store, slot, 'basalt');
+  // Standalone, this panel drives its own engine slot. Inside a host (the Studio) the host owns the
+  // slot, so closing or switching this panel never silences the track.
+  useDeviceSync(host ? null : engine, store, slot, 'basalt');
 
   // ---- notes -------------------------------------------------------------------------------
   const [held, setHeld] = useState<number[]>([]);
