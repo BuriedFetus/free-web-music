@@ -15,7 +15,7 @@ interface EngineContextValue {
 
 const EngineContext = createContext<EngineContextValue | null>(null);
 
-export function EngineProvider({ children }: { children: ReactNode }) {
+export function EngineProvider({ children, onEngine }: { children: ReactNode; onEngine?(engine: Engine): void }) {
   const [engine, setEngine] = useState<Engine | null>(null);
   const [status, setStatus] = useState<EngineStatus>('off');
   const [error, setError] = useState<string | null>(null);
@@ -28,6 +28,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       const e = await loading.current;
       await e.resume();
       setEngine(e);
+      onEngine?.(e);
       setStatus('on');
     } catch (err) {
       console.error(err);
@@ -35,7 +36,7 @@ export function EngineProvider({ children }: { children: ReactNode }) {
       setError(String(err));
       setStatus('error');
     }
-  }, []);
+  }, [onEngine]);
 
   const stop = useCallback(async () => {
     const e = await loading.current;

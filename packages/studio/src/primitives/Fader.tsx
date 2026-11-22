@@ -31,7 +31,7 @@ export function Fader({ value, onChange, label, format, modulation, presence = [
       style={peer ? ({ '--fwm-who': peer.color } as React.CSSProperties) : undefined}>
       <div ref={ref} className="fwm-fader__track" role="slider" tabIndex={0} aria-label={label}
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)} aria-valuetext={format?.(value)}
-        onPointerDown={(e) => { e.currentTarget.setPointerCapture(e.pointerId); setActive(true); onGestureStart?.(); onChange(fromEvent(e)); }}
+        onPointerDown={(e) => { try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* pointer gone */ } setActive(true); onGestureStart?.(); onChange(fromEvent(e)); }}
         onPointerMove={(e) => { if (e.currentTarget.hasPointerCapture(e.pointerId)) onChange(fromEvent(e)); }}
         onPointerUp={() => { setActive(false); onGestureEnd?.(); }}
         onPointerCancel={() => { setActive(false); onGestureEnd?.(); }}

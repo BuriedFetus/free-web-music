@@ -8,6 +8,7 @@
 @import '../skins/cobalt.css';
 @import '../skins/flint.css';
 @import '../skins/opal.css';
+@import './shell.css';
 
 .fwm-root { color: var(--fwm-ink); font: 16px/1.55 var(--fwm-font-ui); }
 .fwm-root *, .fwm-root *::before, .fwm-root *::after { box-sizing: border-box; min-width: 0; }

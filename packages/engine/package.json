@@ -5,8 +5,18 @@
   "license": "MIT",
   "type": "module",
   "exports": {
-    ".": { "types": "./web/engine.d.ts", "default": "./web/engine.js" },
-    "./devices/*.json": "./devices/*.json"
+    ".": {
+      "types": "./web/engine.d.ts",
+      "default": "./web/engine.js"
+    },
+    "./devices/*.json": "./devices/*.json",
+    "./worklet": {
+      "types": "./web/worklet.d.ts",
+      "default": "./web/worklet.js"
+    }
   },
-  "files": ["web", "devices"]
+  "files": [
+    "web",
+    "devices"
+  ]
 }

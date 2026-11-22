@@ -105,6 +105,26 @@ export async function createEngine({ base, context, manifests } = {}) {
     clearRoute(slot, r) {
       send({ t: 'unroute', slot, r });
     },
+    /** Main sequencer: play/stop (restarts from bar 1), tempo, swing (0..0.6). */
+    setTransport({ playing, bpm, swing }) {
+      send({ t: 'transport', playing, bpm, swing });
+    },
+    /** Per-track sequencer settings: len 1..16, dir fwd|rev|pp|rnd, rate 0.5|1|2, own, mute. */
+    setTrack(slot, settings) {
+      send({ t: 'track', slot, ...settings });
+    },
+    /** Notes [{s,l,m,v}] (s, l in steps, may be fractional) and automation {paramId: (value|null)[16]}. */
+    setPattern(slot, notes, auto = {}) {
+      const byIndex = {};
+      for (const id in auto) byIndex[index(slot, id)] = auto[id];
+      send({ t: 'pattern', slot, notes, auto: byIndex });
+    },
+    /** Estimated transport position in steps right now (between ticks), or null when stopped. */
+    position() {
+      const tr = engine.last?.transport;
+      if (!tr || !tr.playing) return null;
+      return tr.pos + (ctx.currentTime - tr.time) * (tr.bpm / 60) * 4;
+    },
     resume() {
       return ctx.resume();
     },

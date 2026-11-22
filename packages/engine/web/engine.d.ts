@@ -38,7 +38,23 @@ export interface EngineTick {
   /** Last 2048 output samples, oldest first. */
   scope: Float32Array;
   /** Per slot: modulated param values (manifest order) and mod source values [lfo, amp, filt]. */
-  devices: Record<number, { eff: Float32Array; mods: [number, number, number] }>;
+  devices: Record<number, { eff: Float32Array; mods: [number, number, number]; step: number }>;
+  transport: { playing: boolean; pos: number; bpm: number; time: number };
+}
+
+export type Direction = 'fwd' | 'rev' | 'pp' | 'rnd';
+export interface TrackSettings {
+  len: number;
+  dir: Direction;
+  rate: number;
+  own: boolean;
+  mute: boolean;
+}
+export interface SeqNote {
+  s: number;
+  l: number;
+  m: number;
+  v: number;
 }
 
 export interface Engine {
@@ -57,6 +73,10 @@ export interface Engine {
   paramIndex(slot: number, id: string): number;
   setRoute(slot: number, route: number, src: ModSourceId, target: string, depth: number): void;
   clearRoute(slot: number, route: number): void;
+  setTransport(t: { playing?: boolean; bpm?: number; swing?: number }): void;
+  setTrack(slot: number, settings: Partial<TrackSettings>): void;
+  setPattern(slot: number, notes: SeqNote[], auto?: Record<string, (number | null)[]>): void;
+  position(): number | null;
   resume(): Promise<void>;
   suspend(): Promise<void>;
   latency(): { base: number; output: number };

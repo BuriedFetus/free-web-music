@@ -1,4 +1,4 @@
-# Handoff: Phase 1 (engine + Basalt in React)
+# Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
 Notes for the next session (written 2026-11-21, before a context compaction). Read this, `CLAUDE.md`, `docs/PLAN.md` and `docs/THEMING.md` before writing code.
 
@@ -46,17 +46,13 @@ Both prototypes are silent. Sound starts in Phase 1.
 - **Legal/design:** KORG Gadget's *feel* only. Our own mineral device names. `design/refs/` (copyrighted screenshots) is git-ignored and never published. Repo is public, MIT.
 
 ## Open items
-- [ ] **Phase 1 progress** (see the checklist in the Phase 1 plan below):
-  - Done: Rust engine + Basalt DSP (`packages/engine`, 14 tests: pitch, aliasing ≤ -79 dB, no clicks, no denormals, ~1.2% CPU native).
-  - Done: worklet host `packages/engine/web/` (MessagePort path). Browser smoke test `web/test.html`.
-  - Done: Node via nvm (v26 LTS), npm workspaces, `@fwm/studio` React library (primitives, Basalt, theming, engine provider, device store), Vite harness with COOP/COEP. 12 Vitest tests. Harness `?selftest` proves sound through the bundled app in headless Firefox.
-  - Done: the design kit's Sound button plays the same engine.
-  - Next: user listens (sound + latency feedback); SharedArrayBuffer ring for lower latency; skin check of the React Basalt in flat/brand; then Phase 2.
-- [x] Rust is installed, plus the `wasm32-unknown-unknown` target (added in Phase 0). `wasm-pack` is not installed; plain `cargo build --target wasm32-unknown-unknown` works (see `spikes/build.sh`).
-- [ ] Live audio latency numbers: the user runs `python3 spikes/serve.py` → "Start audio test" and pastes the numbers into `spikes/RESULTS.md`.
-- [ ] Friend's app: COOP/COEP header test, their Yjs setup, and the ephemeral channel API (checklist in `spikes/RESULTS.md`).
-- [ ] Undo is only "undo clear" in the prototype. Real per-user undo (Y.UndoManager by origin) comes in Phase 2.
-- [ ] The design kit's lane (`index.html`) predates micro-timing. The workspace (`workspace.html`) is the reference for sequencer behaviour.
+- **Progress checklists for Phases 0–3 are in `docs/PLAN.md`.** Phases 1–3 are built and tested. Still open there: the SharedArrayBuffer ring, a side-by-side Flat/Brand review of the React Basalt, floating device windows, "Own seq" (waits for Cobalt), shared play/stop (Phase 4).
+- How to check everything: `npm test` (Rust + Vitest), `npm run typecheck`, `npm run build -w apps/harness`, then the browser checks in `CLAUDE.md` (two-tab e2e, Basalt self-test).
+- [x] Node.js installed with nvm (user approved). A fresh shell needs `. ~/.nvm/nvm.sh` first.
+- [x] Rust + `wasm32-unknown-unknown`. Rebuild the WASM with `packages/engine/build.sh`.
+- [ ] Live audio latency numbers on real speakers (user): harness Sound button shows output latency; or `python3 spikes/serve.py` → "Start audio test".
+- [ ] Friend's app: COOP/COEP header test, their Yjs provider, their live channel (checklist in `spikes/RESULTS.md`). With COEP, cross-origin fonts/images must be requested with CORS.
+- [ ] The design kit's lane (`index.html`) predates micro-timing; the real sequencer is in `packages/studio`.
 
 ## Phase 1 plan (engine core + Basalt for real)
 Goal: **Basalt plays real sound** at full quality from the computer keyboard, in its final UI, inside a dev harness. No collaboration yet (that's Phase 2).

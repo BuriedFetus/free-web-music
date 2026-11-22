@@ -25,6 +25,8 @@ Set them on any ancestor of the studio: `:root`, a wrapper element, or through t
 | `--fwm-roll`, `--fwm-roll2` | `#1d4fb8`, `#173f94` | Sequencer / piano-roll grid |
 | `--fwm-roll-btn`, `--fwm-roll-deep`, `--fwm-roll-ink` | `#2a5fcc`, `#0b2a66`, `#e6f1ff` | Sequencer buttons, displays, text |
 | `--fwm-note`, `--fwm-rec` | `#3fe0ff`, `#ff3b4a` | Notes, record button |
+| `--fwm-on-me`, `--fwm-on-peer`, `--fwm-on-mod`, `--fwm-on-note`, `--fwm-on-rec` | dark inks, white on rec | Text drawn on top of those colours |
+| `--fwm-roll-key`, `--fwm-roll-keyb`, `--fwm-roll-keyink`, `--fwm-roll-keyline` | light/dark blue-greys | Piano-roll key column |
 | `--fwm-font-display` | Big Shoulders Display | Device nameplates, big titles |
 | `--fwm-font-label` | Michroma | Silkscreen labels on devices |
 | `--fwm-font-screen` | VT323 | Device screens, readouts |

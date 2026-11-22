@@ -4,15 +4,21 @@ A collaborative, device-based music studio for the browser. This repo is the **c
 
 - Plan, phases, progress: `docs/PLAN.md`
 - Theming contract (tokens, skins, replaceable controls): `docs/THEMING.md`
-- Status: **Phase 1 in progress**: Basalt plays real sound in React. Start with `docs/HANDOFF.md`.
+- Status: **Phases 1–3 built** (engine + Basalt, Yjs collaboration, main sequencer). Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
 - Prototypes (no build step): `design/kit/index.html` (device kit, has a Sound button), `design/kit/workspace.html` (workspace). Serve with `python3 spikes/serve.py`.
 
 ## Commands
 Node comes from nvm: run `. ~/.nvm/nvm.sh` first in a fresh shell if `node` is missing.
-- `npm run dev`: harness at http://localhost:5173 (Basalt, Sound button, skin switcher)
+- `npm run dev`: harness at http://localhost:5173: the full studio, synced between tabs (open two tabs = two people). `?basalt` = Basalt alone, `?room=x` = a separate session, `?seednow` = demo track before first paint
 - `npm test`: Rust engine tests + Vitest (studio model and components)
 - `npm run typecheck`, `npm run build`
 - `packages/engine/build.sh`: rebuild `packages/engine/web/fwm_engine.wasm` after any Rust change (it is committed, the kit and the studio load it)
+
+## Browser checks (headless Firefox, no automation tools needed)
+Build (`npm run build -w apps/harness`), serve the repo root with COOP/COEP and a POST endpoint that appends the body to a log file, and use a fresh Firefox profile whose `user.js` sets `media.autoplay.default` to 0.
+- Two people: open `dist/index.html?e2e=a&room=R` and `dist/index.html?e2e=b&room=R` in ONE `firefox --headless` command (two tabs share BroadcastChannel). Each tab POSTs PASS/FAIL lines to `./log`.
+- Basalt alone: `dist/index.html?basalt&selftest`.
+- Screenshots: `firefox --headless --screenshot out.png URL` (add `?seednow&room=<random>` for a populated studio).
 
 ## Rules
 - **Our own designs only.** The visual reference is the *feel* of KORG Gadget, but device names, art and layouts are ours (devices are named after minerals: Basalt, Quartz, Cobalt…). Never copy KORG names, graphics or screens.
@@ -28,7 +34,7 @@ packages/engine/web/         AudioWorklet host: worklet.js, engine.js (+ .d.ts),
 packages/studio/src/         React library: primitives/, devices/<id>/, engine/ (provider, sync hooks), model/, theme/, styles/studio.css
 packages/studio/src/skins/   ALL skins: app.css (app tokens), device-base.css (every --dev-* token), <device>.css, host-examples.css
 packages/studio/test/        Vitest tests
-apps/harness/                Vite dev app (plays the host). ?selftest plays a note and POSTs results to ./log
+apps/harness/                Vite dev app playing the host: tabSync.ts (BroadcastChannel collab stand-in), e2e.ts (two-tab test)
 design/kit/                  Phase 0 prototypes. skins/ and engine/ are symlinks into packages/
 design/check-skin.sh         screenshot a skin in default / flat / brand
 spikes/                      Phase 0 tech tests, RESULTS.md

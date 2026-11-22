@@ -13,6 +13,8 @@ export interface Route {
 export interface DeviceState {
   params: Readonly<Record<string, number>>;
   routes: readonly Route[];
+  /** Index of the last loaded factory preset (shown on the preset screen). */
+  preset: number;
 }
 
 export interface DeviceStore {
@@ -21,7 +23,7 @@ export interface DeviceStore {
   subscribe(fn: () => void): () => void;
   setParam(id: string, value: number): void;
   /** Replace everything (presets). Missing params fall back to defaults. */
-  load(patch: { params?: Record<string, number>; routes?: Route[] }): void;
+  load(patch: { params?: Record<string, number>; routes?: Route[] }, preset?: number): void;
   addRoute(route: Route): boolean;
   setRouteDepth(index: number, depth: number): void;
   removeRoute(index: number): void;
@@ -64,6 +66,7 @@ export function createDeviceStore(manifest: DeviceManifest, init?: Partial<Devic
   let state: DeviceState = {
     params: { ...defaults(manifest), ...init?.params },
     routes: init?.routes ? [...init.routes] : [],
+    preset: init?.preset ?? 0,
   };
   const listeners = new Set<() => void>();
   const emit = (next: DeviceState) => {
@@ -86,8 +89,9 @@ export function createDeviceStore(manifest: DeviceManifest, init?: Partial<Devic
       if (state.params[id] === v) return;
       emit({ ...state, params: { ...state.params, [id]: v } });
     },
-    load(patch) {
+    load(patch, preset = 0) {
       emit({
+        preset,
         params: { ...defaults(manifest), ...patch.params },
         routes: (patch.routes ?? []).filter((r) => canRoute(manifest, r.src, r.target)).slice(0, MAX_ROUTES),
       });

@@ -112,6 +112,34 @@ The core does no networking. The host owns providers, persistence and storage.
 - [x] Tech tests (`spikes/`, results in `spikes/RESULTS.md`): isolation detection + fallback, Rust/WASM DSP ≈2.2× JS, clock sync <1 ms after 10 exchanges, jitter-buffer sizing
 - [ ] Still needs people: live audio latency on real speakers; COOP/COEP inside the friend's app
 
+### Phase 1 progress
+- [x] Rust engine (`packages/engine`): rack of device slots, sample-accurate event queue, smoothing, no allocation, 14 quality tests
+- [x] Basalt DSP: 4-point BLEP/BLAMP oscillators at 2× with half-band decimation (aliasing ≤ -79 dB), TPT filter + drive, analog-style ADSRs, LFO (Free/Retrig/Poly), mod matrix, glide, ~1.2% CPU
+- [x] AudioWorklet host (`packages/engine/web`), browser smoke test
+- [x] `@fwm/studio` React library: primitives (Knob, Fader, Button, Screen, Keys) with the THEMING contracts, Basalt front panel, 5 presets, theming levels 1–3
+- [x] Vite harness with COOP/COEP; Basalt alone at `?basalt`
+- [ ] SharedArrayBuffer ring (MessagePort only so far)
+- [ ] Skin check of the React Basalt in Flat / Brand (renders, not yet reviewed side by side)
+
+### Phase 2 progress
+- [x] Project model on Yjs (`packages/studio/src/model/project.ts`): tracks, device params/routes/preset, patterns per scene, automation, tempo, swing. Top-level types only, nested maps created with their track (no creation races)
+- [x] Per-user undo/redo (Y.UndoManager by origin). Discrete actions are always separate undo steps; drags merge
+- [x] Semantic presence over awareness: who is on which track/scene, which control or note they are touching; rings and name tags on knobs/faders, outlined notes, avatars on tracks and devices, people chips
+- [x] Private workspace: 2×2 resizable/maximisable panels, any view in any panel, saved per user in the browser
+- [x] `<Studio doc awareness channel user theme onEngine />`; collaboration stand-in in the harness (`tabSync.ts`: BroadcastChannel between tabs + localStorage)
+- [x] Live keys reach everyone through the host channel and play on each client's own copy of the instrument (immediate; Phase 4 adds the shared clock and jitter buffer)
+- [x] Two-tab end-to-end test in real Firefox (`?e2e=a` / `?e2e=b`): 9 checks pass
+- [ ] Floating device windows (prototype has them; panels cover the need for now)
+
+### Phase 3 progress
+- [x] Main sequencer on the audio thread (`Sequencer` in `worklet.js`): sample-accurate, per-track length / direction / rate, swing, micro-timing, same-pitch retrigger, automation per step, mute; 9 timing tests
+- [x] Main sequencer view: step lanes, playhead, length, direction, rate, mute, clear (undoable), remove track (undoable)
+- [x] Piano roll: add / move / resize / delete, Snap 1/4…1/64/Off, keyboard nudging, quantize, velocity lane, automation lanes for every continuous param, peer edits outlined
+- [x] Live recording: notes (Rec quantize, latency-compensated) and knob moves (as automation) while Rec + Play
+- [x] Scenes A–D (one pattern per track per scene)
+- [ ] "Own seq": plumbing done (flag reaches the engine), waits for a device with a built-in sequencer (Cobalt, Phase 5)
+- [ ] Play/stop is local per person for now; a shared transport is Phase 4
+
 **Phase 0 complete.** Handoff notes for Phase 1: `docs/HANDOFF.md`.
 
 ## Verification

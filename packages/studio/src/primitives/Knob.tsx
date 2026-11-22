@@ -22,7 +22,11 @@ export function Knob({ value, onChange, label, format, size = 'md', modulation, 
   const peer = presence[0];
 
   const down = (e: PointerEvent<SVGSVGElement>) => {
-    e.currentTarget.setPointerCapture(e.pointerId);
+    try {
+      e.currentTarget.setPointerCapture(e.pointerId);
+    } catch {
+      /* pointer already gone */
+    }
     drag.current = { y: e.clientY, v: value };
     setActive(true);
     onGestureStart?.();

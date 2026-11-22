@@ -7,6 +7,7 @@ import { useDeviceState, useDeviceSync, useEffectiveValue, useModSources } from 
 import { useComputerKeys } from '../../hooks/useComputerKeys';
 import { canRoute, modRange, type DeviceStore } from '../../model/deviceStore';
 import { formatParam } from '../../model/params';
+import type { Presence } from '../../primitives/types';
 import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
 import { Scope } from '../Scope';
 import { LFO_ICONS, OSC_ICONS, WaveIcon } from './icons';
@@ -19,8 +20,30 @@ const LFO_HINT = [
   'Poly: one LFO per voice, each starts with its note',
 ];
 
+/**
+ * When a device runs inside the studio, the host routes its notes (sound for everyone, recording)
+ * and carries presence. Standalone (no host), notes go straight to the engine.
+ */
+export interface DeviceHost {
+  noteOn(note: number, velocity: number): void;
+  noteOff(note: number): void;
+  /** People touching a control right now (param id). */
+  presenceFor(control: string): Presence[];
+  /** Keys other people are holding on this device. */
+  peerHeld: { note: number; color: string }[];
+  /** Everyone looking at this device (for the avatars). */
+  people: Presence[];
+  /** This user starts / stops touching a control (null = released). */
+  touch(control: string | null): void;
+  /** A param was changed by this user (for automation recording). */
+  paramChanged?(id: string, value: number): void;
+  /** Subtitle under the nameplate, e.g. the track name. */
+  subtitle?: string;
+}
+
 export interface BasaltProps {
   store: DeviceStore;
+  host?: DeviceHost;
   /** Engine slot this instance plays in. */
   slot: number;
   /** Play from the computer keyboard (only the focused device should). */
@@ -28,7 +51,7 @@ export interface BasaltProps {
   user?: { name: string; color: string };
 }
 
-export function Basalt({ store, slot, computerKeys = true, user = { name: 'You', color: 'var(--fwm-me)' } }: BasaltProps) {
+export function Basalt({ store, host, slot, computerKeys = true, user = { name: 'You', color: 'var(--fwm-me)' } }: BasaltProps) {
   const { engine, status, start } = useEngine();
   const P = usePrimitives();
   const tokens = useDeviceTokens('basalt');
@@ -44,26 +67,28 @@ export function Basalt({ store, slot, computerKeys = true, user = { name: 'You',
     (n: number, v: number) => {
       heldRef.current = [...heldRef.current.filter((x) => x !== n), n];
       setHeld(heldRef.current);
-      if (engine && status === 'on') engine.noteOn(slot, n, v);
+      if (host) host.noteOn(n, v);
+      else if (engine && status === 'on') engine.noteOn(slot, n, v);
       else if (status !== 'loading') {
         // First touch starts the audio (browsers need a gesture); play the note once it's up.
         void start();
       }
     },
-    [engine, status, slot, start],
+    [engine, status, slot, start, host],
   );
   const noteOff = useCallback(
     (n: number) => {
       heldRef.current = heldRef.current.filter((x) => x !== n);
       setHeld(heldRef.current);
-      engine?.noteOff(slot, n);
+      if (host) host.noteOff(n);
+      else engine?.noteOff(slot, n);
     },
-    [engine, slot],
+    [engine, slot, host],
   );
   // When the engine comes up while keys are held, sound them.
   useEffect(() => {
-    if (engine && status === 'on') for (const n of heldRef.current) engine.noteOn(slot, n, 0.85);
-  }, [engine, status, slot]);
+    if (!host && engine && status === 'on') for (const n of heldRef.current) engine.noteOn(slot, n, 0.85);
+  }, [engine, status, slot, host]);
   const low = 12 * (oct + 1);
   useComputerKeys({
     enabled: computerKeys,
@@ -74,11 +99,10 @@ export function Basalt({ store, slot, computerKeys = true, user = { name: 'You',
   });
 
   // ---- presets -----------------------------------------------------------------------------
-  const [presetIx, setPresetIx] = useState(0);
+  const presetIx = state.preset % BASALT_PRESETS.length;
   const loadPreset = (i: number) => {
     const n = (i + BASALT_PRESETS.length) % BASALT_PRESETS.length;
-    setPresetIx(n);
-    store.load(BASALT_PRESETS[n]);
+    store.load(BASALT_PRESETS[n], n);
   };
   // ---- modulation assign -------------------------------------------------------------------
   const [assign, setAssign] = useState<ModSourceId | null>(null);
@@ -103,7 +127,8 @@ export function Basalt({ store, slot, computerKeys = true, user = { name: 'You',
   const [envTab, setEnvTab] = useState<'amp' | 'filt'>('amp');
   const mods = useModSources(engine, slot);
 
-  const ctx: ParamCtx = { store, slot, assign, setAssign };
+  const ctx: ParamCtx = { store, slot, assign, setAssign, host };
+  const people = host?.people ?? [{ userId: 'me', name: user.name, color: user.color }];
   const lfoMode = state.params.lmode;
   const top = held[held.length - 1] ?? null;
 
@@ -114,12 +139,14 @@ export function Basalt({ store, slot, computerKeys = true, user = { name: 'You',
           <b>
             BASAL<i>T</i>
           </b>
-          <span>Mono bass synthesizer</span>
+          <span>{host?.subtitle ? `Mono bass synth · ${host.subtitle}` : 'Mono bass synthesizer'}</span>
         </div>
         <div className="fwm-who" aria-label="People on this device">
-          <div className="fwm-av" style={{ background: user.color }} title={user.name}>
-            {user.name[0]}
-          </div>
+          {people.map((p) => (
+            <div key={p.userId} className="fwm-av" style={{ background: p.color }} title={p.name}>
+              {p.name[0]}
+            </div>
+          ))}
         </div>
         <Scope engine={status === 'on' ? engine : null} note={top} />
         <div className="fwm-preset">
@@ -205,7 +232,8 @@ export function Basalt({ store, slot, computerKeys = true, user = { name: 'You',
                 <li key={r.src + r.target}>
                   <span>{name}</span>
                   <input type="range" min={-100} max={100} value={Math.round(r.depth * 100)} aria-label={`Depth of ${name}`}
-                    onChange={(e) => store.setRouteDepth(i, Number(e.target.value) / 100)} />
+                    onChange={(e) => store.setRouteDepth(i, Number(e.target.value) / 100)}
+                    onPointerDown={() => host?.touch(`route:${r.src}>${r.target}`)} onPointerUp={() => host?.touch(null)} />
                   <button type="button" aria-label={`Remove ${name}`} onClick={() => store.removeRoute(i)}>×</button>
                 </li>
               );
@@ -229,7 +257,7 @@ export function Basalt({ store, slot, computerKeys = true, user = { name: 'You',
           <P.Screen variant="readout">C{oct}</P.Screen>
           <P.Button variant="hw" label="Octave up" onPress={() => setOct((o) => Math.min(6, o + 1))}>+</P.Button>
         </div>
-        <P.Keys low={low} high={low + 24} held={held} onNoteOn={noteOn} onNoteOff={noteOff} />
+        <P.Keys low={low} high={low + 24} held={held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} />
       </div>
     </div>
   );
@@ -242,6 +270,7 @@ interface ParamCtx {
   slot: number;
   assign: ModSourceId | null;
   setAssign(s: ModSourceId | null): void;
+  host?: DeviceHost;
 }
 
 function useParam(ctx: ParamCtx, id: string) {
@@ -263,7 +292,13 @@ function useParam(ctx: ParamCtx, id: string) {
   return {
     spec,
     value: state.params[id],
-    onChange: (v: number) => ctx.store.setParam(id, v),
+    onChange: (v: number) => {
+      ctx.store.setParam(id, v);
+      ctx.host?.paramChanged?.(id, v);
+    },
+    presence: ctx.host?.presenceFor(id) ?? [],
+    onGestureStart: () => ctx.host?.touch(id),
+    onGestureEnd: () => ctx.host?.touch(null),
     format: (v: number) => formatParam(spec, v),
     modulation: range ? { ...range, current: live ?? undefined } : undefined,
     target,
@@ -277,7 +312,8 @@ function ParamKnob({ ctx, id, size }: { ctx: ParamCtx; id: string; size?: 'md' |
   return (
     <div className={'fwm-target' + (p.target ? ' is-target' : '')} onPointerDownCapture={p.onTargetDown}>
       <Knob value={p.value} onChange={p.onChange} label={p.spec.label} format={p.format} size={size}
-        modulation={p.modulation} defaultValue={p.spec.default} />
+        modulation={p.modulation} defaultValue={p.spec.default} presence={p.presence}
+        onGestureStart={p.onGestureStart} onGestureEnd={p.onGestureEnd} />
     </div>
   );
 }
@@ -288,7 +324,7 @@ function ParamFader({ ctx, id, label }: { ctx: ParamCtx; id: string; label: stri
   return (
     <div className={'fwm-target' + (p.target ? ' is-target' : '')} onPointerDownCapture={p.onTargetDown}>
       <Fader value={p.value} onChange={p.onChange} label={label} format={p.format} modulation={p.modulation}
-        defaultValue={p.spec.default} />
+        defaultValue={p.spec.default} presence={p.presence} onGestureStart={p.onGestureStart} onGestureEnd={p.onGestureEnd} />
     </div>
   );
 }

@@ -8,6 +8,13 @@
     ".": "./src/index.ts",
     "./skins/*": "./src/skins/*"
   },
-  "peerDependencies": { "react": ">=18", "react-dom": ">=18" },
-  "dependencies": { "@fwm/engine": "0.1.0" }
+  "peerDependencies": {
+    "react": ">=18",
+    "react-dom": ">=18",
+    "yjs": "^13.6.0",
+    "y-protocols": "^1.0.6"
+  },
+  "dependencies": {
+    "@fwm/engine": "0.1.0"
+  }
 }

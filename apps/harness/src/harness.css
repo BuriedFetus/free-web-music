@@ -10,3 +10,12 @@ body { margin: 0; background: var(--fwm-bg); }
 .h-sound small { color: var(--fwm-mute); font-size: 12px; }
 .h-btn { font: 600 15px var(--fwm-font-ui); min-height: 44px; padding: 0 16px; border-radius: calc(10px * var(--fwm-round)); border: 1px solid var(--fwm-line); background: var(--fwm-panel); color: var(--fwm-ink); cursor: pointer; }
 .h-btn[aria-pressed=true] { background: var(--fwm-me); color: var(--fwm-on-me); border-color: var(--fwm-me); }
+.h-btn--sm { min-height: 34px; padding: 0 12px; font-size: 14px; }
+.h-skins { display: flex; gap: 4px; }
+html, body, #root { height: 100%; }
+.h-studio { height: 100%; display: flex; flex-direction: column; background: var(--fwm-bg); color: var(--fwm-ink); font-family: var(--fwm-font-ui); }
+.h-studio > .fwm-root { flex: 1; min-height: 0; }
+.h-strip { display: flex; flex-wrap: wrap; gap: 6px 14px; align-items: center; padding: 6px 14px; font-size: 13px; color: var(--fwm-mute); border-bottom: 1px solid var(--fwm-line); }
+.h-strip b { color: var(--fwm-ink); }
+.h-strip i { font-style: normal; font-weight: 800; }
+.h-grow { flex: 1; }

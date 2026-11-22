@@ -11,3 +11,9 @@ export { canRoute, createDeviceStore, defaults, modRange, MAX_ROUTES, type Devic
 export { formatParam, toPhysical } from './model/params';
 export * from './primitives';
 export { ThemeRoot, useDeviceTokens, usePrimitives, type StudioTheme } from './theme/Theme';
+export { Studio, type StudioProps } from './studio/Studio';
+export { Project, SCENES, STEPS, patternKey, type Note, type SeqSettings, type TrackInfo } from './model/project';
+export { PresenceModel, type Peer, type PresenceState, type Touch } from './collab/presence';
+export type { LiveChannel, LiveMessage, StudioUser } from './collab/types';
+export type { DeviceHost } from './devices/basalt/Basalt';
+export { LIBRARY, deviceEntry, type DeviceEntry } from './devices/registry';

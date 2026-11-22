@@ -1,18 +1,190 @@
-// free-web-music engine: AudioWorklet side. Runs the Rust/WASM rack on the audio thread.
-// Messages in (port): {t:'add',slot,kind} {t:'on',slot,note,vel} {t:'off',slot,note} {t:'allOff',slot}
-//                     {t:'param',slot,i,v} {t:'route',slot,r,src,target,depth} {t:'unroute',slot,r}
-// Messages out: {t:'ready'} and, about 60 times a second, {t:'tick',scope,eff,mods} for the UI.
-// Phase 1 uses this MessagePort path everywhere; the SharedArrayBuffer ring (when the page is
-// cross-origin isolated) comes later behind the same message API.
+// free-web-music engine: AudioWorklet side. Runs the Rust/WASM rack and the main sequencer
+// on the audio thread, so pattern playback is sample-accurate and never stutters with the UI.
+//
+// Messages in (port):
+//   {t:'add',slot,kind} {t:'remove',slot} {t:'on',slot,note,vel} {t:'off',slot,note} {t:'allOff',slot}
+//   {t:'param',slot,i,v} {t:'route',slot,r,src,target,depth} {t:'unroute',slot,r}
+//   {t:'transport', playing, bpm, swing}            play/stop restarts from bar 1
+//   {t:'track', slot, len, dir, rate, own, mute}     per-track sequencer settings
+//   {t:'pattern', slot, notes:[{s,l,m,v}], auto:{[paramIndex]:(number|null)[16]}}
+// Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport}.
+// MessagePort is used everywhere for now; a SharedArrayBuffer ring comes later behind the same API.
 const UI_EVERY = 6; // blocks between UI snapshots (~16 ms at 48 kHz)
 
-class FwmEngine extends AudioWorkletProcessor {
+/** Deterministic hash for the Random direction (same on every client). */
+function hash(n, k) {
+  let h = (Math.imul(n, 2654435761) ^ Math.imul(k, 40503)) >>> 0;
+  h ^= h >>> 15;
+  h = Math.imul(h, 2246822519) >>> 0;
+  return h >>> 0;
+}
+
+/** Which pattern step plays on tick n, for a track's length and direction. */
+export function stepOf(n, len, dir, seed = 0) {
+  const L = Math.max(1, len | 0);
+  if (dir === 'rev') return L - 1 - (n % L);
+  if (dir === 'pp') {
+    if (L < 2) return 0;
+    const P = 2 * L - 2;
+    const k = n % P;
+    return k < L ? k : P - k;
+  }
+  if (dir === 'rnd') return hash(n, seed) % L;
+  return n % L;
+}
+
+/**
+ * Main sequencer. Time is counted in 16th notes ("steps") of the global clock. Each track runs its
+ * own tick counter (rate × clock); direction maps ticks to pattern steps; swing delays odd ticks.
+ * Notes keep their fractional start (micro-timing) inside the step that holds them.
+ */
+export class Sequencer {
+  constructor(sampleRate) {
+    this.sr = sampleRate;
+    this.playing = false;
+    this.bpm = 120;
+    this.swing = 0;
+    // Position is derived from a whole frame count (no drift): pos = anchorPos + (frame - anchorFrame) * steps/frame.
+    this.frame = 0;
+    this.anchorFrame = 0;
+    this.anchorPos = 0;
+    this.tracks = new Map(); // slot → {len,dir,rate,own,mute,notes,auto,step}
+    this.offs = []; // pending note-offs: {at (steps, global), slot, note}
+  }
+  track(slot) {
+    let t = this.tracks.get(slot);
+    if (!t) {
+      t = { len: 16, dir: 'fwd', rate: 1, own: false, mute: false, notes: [], auto: {}, step: -1 };
+      this.tracks.set(slot, t);
+    }
+    return t;
+  }
+  setTrack(slot, s) {
+    Object.assign(this.track(slot), s);
+  }
+  setPattern(slot, notes, auto) {
+    const t = this.track(slot);
+    t.notes = notes || [];
+    t.auto = auto || {};
+  }
+  removeTrack(slot) {
+    this.tracks.delete(slot);
+    this.offs = this.offs.filter((o) => o.slot !== slot);
+  }
+  /** Global position in steps at the start of the next block. */
+  get pos() {
+    return this.posAt(this.frame);
+  }
+  posAt(frame) {
+    return this.anchorPos + (frame - this.anchorFrame) * this.stepsPerFrame();
+  }
+  setTransport({ playing, bpm, swing }) {
+    if (bpm && bpm !== this.bpm) {
+      // Tempo change keeps the current position.
+      this.anchorPos = this.pos;
+      this.anchorFrame = this.frame;
+      this.bpm = bpm;
+    }
+    if (swing != null) this.swing = swing;
+    if (playing != null && playing !== this.playing) {
+      this.playing = playing;
+      this.frame = 0;
+      this.anchorFrame = 0;
+      this.anchorPos = 0;
+      for (const t of this.tracks.values()) t.step = -1;
+      return true; // caller flushes note-offs
+    }
+    return false;
+  }
+  stepsPerFrame() {
+    return (this.bpm / 60) * 4 / this.sr;
+  }
+  /** Tick n of a track starts this many track-ticks after n (swing delays odd ticks). */
+  swingShift(n) {
+    return n % 2 === 1 ? this.swing * 0.5 : 0;
+  }
+  /**
+   * Advance by `frames`, calling emit(frameOffset, kind, slot, a, b) for every event in this block,
+   * in time order. kind: 'on' (a=note, b=vel), 'off' (a=note), 'param' (a=index, b=value).
+   */
+  advance(frames, emit) {
+    if (!this.playing) return;
+    const spf = this.stepsPerFrame();
+    const p0 = this.posAt(this.frame);
+    const p1 = this.posAt(this.frame + frames);
+    const events = [];
+    const at = (pos) => Math.min(frames - 1, Math.max(0, Math.floor((pos - p0) / spf + 1e-6)));
+    for (const [slot, t] of this.tracks) {
+      const r = t.rate || 1;
+      const t0 = p0 * r;
+      const t1 = p1 * r;
+      // Ticks whose (shifted, offset) events could fall in [t0, t1): notes sit up to 1 tick after
+      // their tick start, swing adds up to half a tick.
+      for (let n = Math.max(0, Math.floor(t0) - 2); n <= Math.floor(t1); n++) {
+        const tickStart = n + this.swingShift(n);
+        const idx = stepOf(n, t.len, t.dir, slot + 1);
+        if (tickStart >= t0 - 1e-9 && tickStart < t1 - 1e-9) {
+          t.step = idx;
+          for (const k in t.auto) {
+            const v = t.auto[k]?.[idx];
+            if (v != null) events.push({ pos: tickStart / r, kind: 'param', slot, a: Number(k), b: v });
+          }
+        }
+        if (t.own || t.mute) continue;
+        for (const note of t.notes) {
+          if (Math.floor(note.s) !== idx) continue;
+          const on = tickStart + (note.s - idx);
+          if (on < t0 - 1e-9 || on >= t1 - 1e-9) continue;
+          const gOn = on / r;
+          events.push({ pos: gOn, kind: 'on', slot, a: note.m, b: note.v, off: gOn + Math.max(0.05, note.l * 0.98) / r });
+        }
+      }
+    }
+    events.sort((x, y) => x.pos - y.pos);
+    const out = [];
+    for (const e of events) {
+      if (e.kind === 'on') {
+        // A new note of the same pitch on the same track ends the one still sounding, first.
+        this.offs = this.offs.filter((o) => {
+          if (o.slot === e.slot && o.note === e.a && o.at > e.pos) {
+            out.push({ pos: e.pos, kind: 'off', slot: o.slot, a: o.note });
+            return false;
+          }
+          return true;
+        });
+        this.offs.push({ at: e.off, slot: e.slot, note: e.a });
+      }
+      out.push(e);
+    }
+    const keep = [];
+    for (const o of this.offs) {
+      if (o.at < p1) out.push({ pos: Math.max(p0, o.at), kind: 'off', slot: o.slot, a: o.note });
+      else keep.push(o);
+    }
+    this.offs = keep;
+    // Stable order: by time, and at equal times offs before ons (so retriggers work).
+    out.sort((x, y) => x.pos - y.pos || (x.kind === 'off' ? 0 : 1) - (y.kind === 'off' ? 0 : 1));
+    for (const e of out) emit(at(e.pos), e.kind, e.slot, e.a, e.b);
+    this.frame += frames;
+  }
+  /** All pending note-offs now (used on stop). */
+  flush(emit) {
+    for (const o of this.offs) emit(0, 'off', o.slot, o.note);
+    this.offs = [];
+  }
+}
+
+const Processor = globalThis.AudioWorkletProcessor ?? class {};
+
+class FwmEngine extends Processor {
   constructor(options) {
     super();
     const { wasm, slots = [] } = options.processorOptions;
     this.x = new WebAssembly.Instance(new WebAssembly.Module(wasm), {}).exports;
     this.x.fwm_init(sampleRate);
     this.slots = new Set();
+    this.seq = new Sequencer(sampleRate);
+    this.base = new Map(); // slot → Map(paramIndex → value) last set by the UI (restored on stop)
     for (const s of slots) this.add(s.slot, s.kind);
     this.n = 0;
     this.port.onmessage = (e) => this.msg(e.data);
@@ -21,21 +193,50 @@ class FwmEngine extends AudioWorkletProcessor {
   add(slot, kind) {
     if (this.x.fwm_add_device(slot, kind)) this.slots.add(slot);
   }
+  emit = (frame, kind, slot, a, b) => {
+    const x = this.x;
+    if (kind === 'on') x.fwm_note_on(slot, frame, a, b);
+    else if (kind === 'off') x.fwm_note_off(slot, frame, a);
+    else if (kind === 'param') x.fwm_param(slot, frame, a, b);
+  };
   msg(m) {
     const x = this.x;
     switch (m.t) {
       case 'add': this.add(m.slot, m.kind); break;
-      case 'remove': x.fwm_remove_device(m.slot); this.slots.delete(m.slot); break;
+      case 'remove': x.fwm_remove_device(m.slot); this.slots.delete(m.slot); this.seq.removeTrack(m.slot); this.base.delete(m.slot); break;
       case 'on': x.fwm_note_on(m.slot, 0, m.note, m.vel ?? 0.8); break;
       case 'off': x.fwm_note_off(m.slot, 0, m.note); break;
       case 'allOff': x.fwm_all_off(m.slot); break;
-      case 'param': x.fwm_param(m.slot, 0, m.i, m.v); break;
+      case 'param': {
+        x.fwm_param(m.slot, 0, m.i, m.v);
+        if (!this.base.has(m.slot)) this.base.set(m.slot, new Map());
+        this.base.get(m.slot).set(m.i, m.v);
+        break;
+      }
       case 'route': {
         const r = x.fwm_set_route(m.slot, m.r, m.src, m.target, m.depth);
         if (r !== 0) this.port.postMessage({ t: 'routeRejected', slot: m.slot, r: m.r, code: r });
         break;
       }
       case 'unroute': x.fwm_clear_route(m.slot, m.r); break;
+      case 'transport': {
+        const wasPlaying = this.seq.playing;
+        if (this.seq.setTransport(m)) {
+          this.seq.flush(this.emit);
+          if (wasPlaying) this.restoreAutomated();
+        }
+        break;
+      }
+      case 'track': this.seq.setTrack(m.slot, m); break;
+      case 'pattern': this.seq.setPattern(m.slot, m.notes, m.auto); break;
+    }
+  }
+  /** After playback, knobs go back to where the users left them (automation only applies while playing). */
+  restoreAutomated() {
+    for (const [slot, t] of this.seq.tracks) {
+      const base = this.base.get(slot);
+      if (!base) continue;
+      for (const k in t.auto) if (base.has(Number(k))) this.x.fwm_param(slot, 0, Number(k), base.get(Number(k)));
     }
   }
   view(ptr, len) {
@@ -45,6 +246,7 @@ class FwmEngine extends AudioWorkletProcessor {
     const out = outputs[0];
     const frames = out[0].length;
     const x = this.x;
+    this.seq.advance(frames, this.emit);
     x.fwm_render(frames);
     out[0].set(this.view(x.fwm_out_l(), frames));
     if (out[1]) out[1].set(this.view(x.fwm_out_r(), frames));
@@ -65,10 +267,12 @@ class FwmEngine extends AudioWorkletProcessor {
       devices[s] = {
         eff: this.view(x.fwm_effective(s), n).slice(),
         mods: [x.fwm_mod_source(s, 0), x.fwm_mod_source(s, 1), x.fwm_mod_source(s, 2)],
+        step: this.seq.tracks.get(s)?.step ?? -1,
       };
     }
-    this.port.postMessage({ t: 'tick', scope, devices }, [scope.buffer]);
+    const transport = { playing: this.seq.playing, pos: this.seq.pos, bpm: this.seq.bpm, time: currentTime };
+    this.port.postMessage({ t: 'tick', scope, devices, transport }, [scope.buffer]);
   }
 }
 
-registerProcessor('fwm-engine', FwmEngine);
+if (typeof registerProcessor === 'function') registerProcessor('fwm-engine', FwmEngine);

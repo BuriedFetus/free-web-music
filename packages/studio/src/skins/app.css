@@ -26,6 +26,12 @@
   --fwm-roll-ink: #e6f1ff;
   --fwm-note: #3fe0ff;
   --fwm-rec: #ff3b4a;
+  --fwm-on-note: #032033;   /* text on a --fwm-note fill */
+  --fwm-on-rec: #ffffff;    /* text on a --fwm-rec fill */
+  --fwm-roll-key: #e9eef7;  /* piano-roll white key */
+  --fwm-roll-keyb: #25324a; /* piano-roll black key */
+  --fwm-roll-keyink: #333;  /* label on a white key */
+  --fwm-roll-keyline: #b9c3d6;
 
   /* fonts */
   --fwm-font-display: "Big Shoulders Display", Impact, sans-serif;
