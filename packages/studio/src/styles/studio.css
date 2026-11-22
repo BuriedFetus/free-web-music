@@ -1,0 +1,129 @@
+/* @fwm/studio default look. Every colour, font and shadow comes from tokens:
+   --fwm-* (skins/app.css) and --dev-* (skins/device-base.css + skins/<device>.css).
+   All classes are prefixed fwm- and nothing styles global elements. */
+@import '../skins/app.css';
+@import '../skins/device-base.css';
+@import '../skins/basalt.css';
+@import '../skins/quartz.css';
+@import '../skins/cobalt.css';
+@import '../skins/flint.css';
+@import '../skins/opal.css';
+
+.fwm-root { color: var(--fwm-ink); font: 16px/1.55 var(--fwm-font-ui); }
+.fwm-root *, .fwm-root *::before, .fwm-root *::after { box-sizing: border-box; min-width: 0; }
+.fwm-root :focus-visible { outline: 2px solid var(--fwm-me); outline-offset: 2px; }
+
+/* ---------- device template ---------- */
+.fwm-dev {
+  position: relative; border-radius: calc(18px * var(--fwm-round)); padding: 14px; color: var(--dev-silk);
+  background: var(--dev-texture), linear-gradient(160deg, var(--dev-case), color-mix(in srgb, var(--dev-case2) calc(var(--fwm-depth) * 100%), var(--dev-case)));
+  background-size: 7px 7px, auto;
+  box-shadow: inset 0 1px 0 rgba(255,255,255,calc(.14 * var(--fwm-depth))), inset 0 -2px 0 rgba(0,0,0,calc(.4 * var(--fwm-depth))),
+    0 calc(18px * var(--fwm-depth)) calc(40px * var(--fwm-depth)) rgba(0,0,0,calc(.45 * var(--fwm-depth)));
+}
+.fwm-dev__hdr { display: flex; flex-wrap: wrap; align-items: center; gap: 12px 18px; padding: 6px 8px 14px; }
+.fwm-plate { display: flex; flex-direction: column; line-height: 1; }
+.fwm-plate b { font: 900 40px/0.9 var(--fwm-font-display); letter-spacing: .04em; color: var(--dev-silk); }
+.fwm-plate b i { font-style: normal; color: var(--dev-acc); }
+.fwm-plate span, .fwm-silk { font: 13px/1.2 var(--fwm-font-label); letter-spacing: .02em; color: var(--dev-silk); opacity: .85; }
+.fwm-who { display: flex; gap: 6px; }
+.fwm-av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 800 13px var(--fwm-font-ui); color: var(--fwm-on-me); border: 2px solid rgba(0,0,0,.4); }
+.fwm-preset { display: flex; align-items: center; gap: 6px; margin-left: auto; }
+.fwm-preset .fwm-lcd { min-width: 15ch; }
+
+.fwm-lcd {
+  position: relative; background: var(--dev-lcd); color: var(--dev-lcdink); font: 24px/1 var(--fwm-font-screen);
+  border-radius: calc(6px * var(--fwm-round)); padding: 8px 12px;
+  box-shadow: inset 0 2px 6px rgba(0,0,0,calc(.7 * var(--fwm-depth))), 0 1px 0 rgba(255,255,255,calc(.12 * var(--fwm-depth)));
+  text-shadow: 0 0 calc(8px * var(--fwm-glow)) color-mix(in srgb, var(--dev-lcdink) 60%, transparent);
+}
+.fwm-lcd__label { position: absolute; top: 3px; left: 8px; font: 15px var(--fwm-font-screen); opacity: .6; }
+.fwm-lcd--scope { flex: 1 1 240px; height: 66px; padding: 4px 6px; }
+.fwm-lcd--scope canvas { width: 100%; height: 100%; display: block; }
+.fwm-lcd--readout:has(.fwm-envgraph) { height: 76px; padding: 20px 8px 4px; margin-bottom: 10px; }
+.fwm-envgraph { width: 100%; height: 100%; display: block; overflow: visible; }
+.fwm-envgraph path { fill: none; stroke: currentColor; vector-effect: non-scaling-stroke; }
+.fwm-envgraph__other { stroke-width: 1.5; opacity: .25; }
+.fwm-envgraph__main { stroke-width: 2.5; }
+.fwm-envgraph__level { stroke: var(--fwm-mod); stroke-width: 1.5; vector-effect: non-scaling-stroke; opacity: .8; }
+
+.fwm-secs { display: grid; grid-template-columns: 1fr 1.3fr 1.15fr 1.05fr .75fr; gap: 10px; }
+.fwm-sec { border-radius: calc(12px * var(--fwm-round)); padding: 10px 12px 12px; background: var(--dev-sec); box-shadow: inset 0 1px 0 rgba(255,255,255,.06), inset 0 0 0 1px rgba(0,0,0,.25); }
+.fwm-sec h4 { margin: 0 0 8px; font: 13px var(--fwm-font-label); color: var(--dev-acc); letter-spacing: .04em; }
+.fwm-row { display: flex; flex-wrap: wrap; gap: 6px 10px; align-items: flex-start; justify-content: space-around; }
+.fwm-waves { display: flex; gap: 6px; justify-content: center; margin-bottom: 8px; }
+.fwm-seg { display: flex; gap: 4px; margin-bottom: 8px; }
+.fwm-hint { margin: 0 0 6px; font-size: 12px; text-align: center; min-height: 2.4em; }
+.fwm-led { display: inline-block; width: 9px; height: 9px; border-radius: 50%; background: var(--fwm-mod); margin-left: 6px; box-shadow: 0 0 calc(8px * var(--fwm-glow)) var(--fwm-mod); vertical-align: 1px; }
+
+/* ---------- buttons ---------- */
+.fwm-btn { cursor: pointer; border: 0; font-family: var(--fwm-font-ui); }
+.fwm-btn--hw {
+  width: 44px; height: 44px; border-radius: calc(8px * var(--fwm-round)); color: var(--dev-btnink); font-weight: 700; font-size: 18px;
+  background: linear-gradient(var(--dev-btn), color-mix(in srgb, var(--dev-btn2) calc(var(--fwm-depth) * 100%), var(--dev-btn)));
+  box-shadow: 0 calc(2px * var(--fwm-depth)) 0 var(--dev-btnedge), inset 0 1px 0 rgba(255,255,255,calc(.2 * var(--fwm-depth)));
+}
+.fwm-btn--hw:active { transform: translateY(2px); box-shadow: none; }
+.fwm-btn--seg { flex: 1; min-height: 40px; padding: 0 8px; white-space: nowrap; border-radius: calc(7px * var(--fwm-round)); background: rgba(0,0,0,.35); color: var(--dev-silk); font: 12px var(--fwm-font-label); }
+.fwm-btn--seg[aria-pressed=true] { background: var(--dev-lcd); color: var(--dev-lcdink); box-shadow: 0 0 0 2px var(--dev-acc); }
+.fwm-btn--wave { width: 46px; height: 44px; border-radius: calc(8px * var(--fwm-round)); background: rgba(0,0,0,.35); display: grid; place-items: center; box-shadow: inset 0 1px 0 rgba(255,255,255,.08); }
+.fwm-btn--wave svg { width: 28px; height: 18px; fill: none; stroke: var(--dev-silk); stroke-width: 2.2; opacity: .6; }
+.fwm-btn--wave[aria-pressed=true] { background: var(--dev-lcd); box-shadow: 0 0 0 2px var(--dev-acc); }
+.fwm-btn--wave[aria-pressed=true] svg { stroke: var(--dev-lcdink); opacity: 1; }
+.fwm-btn--assign { width: 100%; min-height: 44px; margin-top: 8px; border-radius: calc(8px * var(--fwm-round)); border: 1px dashed var(--fwm-mod); background: color-mix(in srgb, var(--fwm-mod) 8%, transparent); color: var(--dev-silk); font: 13px var(--fwm-font-label); }
+.fwm-btn--assign[aria-pressed=true] { background: var(--fwm-mod); color: var(--fwm-on-mod); border-style: solid; }
+
+/* ---------- knob ---------- */
+.fwm-knob { display: flex; flex-direction: column; align-items: center; gap: 2px; width: 78px; touch-action: none; user-select: none; position: relative; }
+.fwm-knob--lg { width: 104px; }
+.fwm-knob svg { width: 66px; height: 66px; cursor: ns-resize; overflow: visible; }
+.fwm-knob--lg svg { width: 92px; height: 92px; }
+.fwm-knob .fwm-silk { font-size: 12px; text-align: center; }
+.fwm-knob__val { font: 18px/1 var(--fwm-font-screen); color: var(--dev-silk); opacity: .8; height: 16px; white-space: nowrap; }
+.fwm-knob__tag { position: absolute; top: -8px; right: -4px; font: 800 12px var(--fwm-font-ui); padding: 1px 6px; border-radius: 9px; color: var(--fwm-on-peer); background: var(--fwm-who, var(--fwm-peer)); }
+.fwm-knob__ring { fill: none; stroke-width: 3; opacity: 0; transition: opacity .2s; }
+.fwm-knob.is-mine .fwm-knob__ring { opacity: 1; stroke: var(--fwm-me); }
+.fwm-knob.is-peer .fwm-knob__ring { opacity: 1; stroke: var(--fwm-who, var(--fwm-peer)); }
+.fwm-knob__track { stroke: rgba(0,0,0,.45); stroke-width: 5; fill: none; stroke-linecap: round; }
+.fwm-knob__value { stroke: var(--dev-acc); stroke-width: 5; fill: none; stroke-linecap: round; }
+.fwm-knob__shadow { fill: rgba(0,0,0,calc(.45 * var(--fwm-depth))); }
+.fwm-knob__groove { fill: none; stroke: rgba(0,0,0,.12); stroke-width: 2; }
+.fwm-knob__mod { stroke: var(--fwm-mod); stroke-width: 3; fill: none; }
+.fwm-knob__moddot { fill: var(--fwm-mod); stroke: rgba(0,0,0,.5); }
+.fwm-knob__pointer { stroke: var(--dev-acc); stroke-width: 4; stroke-linecap: round; }
+
+/* ---------- fader ---------- */
+.fwm-env { display: flex; gap: 10px; align-items: flex-end; justify-content: center; }
+.fwm-fader { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fwm-fader__track { width: 44px; height: 110px; position: relative; cursor: ns-resize; touch-action: none; border-radius: 6px; }
+.fwm-fader__track::before { content: ""; position: absolute; left: 50%; top: 4px; bottom: 4px; width: 6px; margin-left: -3px; border-radius: 3px; background: var(--dev-track); box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
+.fwm-fader__cap { position: absolute; left: 4px; right: 4px; height: 20px; border-radius: calc(4px * var(--fwm-round)); background: linear-gradient(var(--dev-cap), color-mix(in srgb, var(--dev-capd) calc(var(--fwm-depth) * 100%), var(--dev-cap))); box-shadow: 0 calc(3px * var(--fwm-depth)) calc(4px * var(--fwm-depth)) rgba(0,0,0,calc(.5 * var(--fwm-depth))); }
+.fwm-fader__cap::after { content: ""; position: absolute; left: 6px; right: 6px; top: 9px; height: 2px; background: var(--dev-acc); }
+.fwm-fader.is-mine .fwm-fader__track { box-shadow: 0 0 0 2px var(--fwm-me); }
+.fwm-fader.is-peer .fwm-fader__track { box-shadow: 0 0 0 2px var(--fwm-who, var(--fwm-peer)); }
+.fwm-fader__mbar { position: absolute; right: 3px; width: 4px; border-radius: 2px; background: var(--fwm-mod); opacity: .8; }
+.fwm-fader__mdot { position: absolute; right: 0; width: 10px; height: 10px; margin-top: -5px; border-radius: 50%; background: var(--fwm-mod); box-shadow: 0 0 0 2px rgba(0,0,0,.45); }
+
+/* ---------- modulation ---------- */
+.fwm-dev.is-assigning .fwm-target.is-target .fwm-knob svg { cursor: copy; outline: 2px dashed var(--fwm-mod); outline-offset: 4px; border-radius: 50%; }
+.fwm-dev.is-assigning .fwm-target.is-target .fwm-fader__track { cursor: copy; outline: 2px dashed var(--fwm-mod); outline-offset: 2px; }
+.fwm-mods { list-style: none; margin: 8px 0 0; padding: 0; }
+.fwm-mods li { display: flex; align-items: center; justify-content: space-between; gap: 6px; font: 18px/1.1 var(--fwm-font-screen); color: var(--fwm-mod); border-top: 1px solid rgba(255,255,255,.08); }
+.fwm-mods input[type=range] { width: 76px; accent-color: var(--fwm-mod); }
+.fwm-mods button { width: 40px; height: 40px; border: 0; background: none; color: var(--dev-silk); font: 20px var(--fwm-font-ui); cursor: pointer; }
+
+/* ---------- performance strip ---------- */
+.fwm-perf { display: flex; gap: 10px; margin-top: 12px; align-items: stretch; }
+.fwm-oct { display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; padding: 0 4px; }
+.fwm-oct .fwm-lcd { font-size: 22px; padding: 4px 8px; }
+.fwm-keys { flex: 1; position: relative; height: 118px; display: flex; border-radius: calc(8px * var(--fwm-round)); overflow: hidden; background: var(--dev-keybed); padding: 3px; gap: 3px; touch-action: none; user-select: none; }
+.fwm-keys__w { flex: 1; background: linear-gradient(var(--dev-keyhi), var(--dev-key)); border-radius: 0 0 6px 6px; position: relative; cursor: pointer; box-shadow: inset 0 -6px 0 rgba(0,0,0,.08); }
+.fwm-keys__w.is-on { background: linear-gradient(var(--dev-key), color-mix(in srgb, var(--dev-acc) 45%, var(--dev-key))); }
+.fwm-keys__w small { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font: 13px var(--fwm-font-screen); color: var(--dev-keylabel); pointer-events: none; }
+.fwm-keys__b { position: absolute; top: 3px; height: 62%; background: linear-gradient(var(--dev-keyb2), var(--dev-keyb)); border-radius: 0 0 5px 5px; z-index: 2; cursor: pointer; box-shadow: 0 3px 3px rgba(0,0,0,.5); }
+.fwm-keys__b.is-on { background: var(--dev-acc); }
+.fwm-keys__w.is-peer, .fwm-keys__b.is-peer { box-shadow: inset 0 0 0 3px var(--fwm-who, var(--fwm-peer)); }
+
+@media (max-width: 1000px) { .fwm-secs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
+@media (max-width: 600px) { .fwm-secs { grid-template-columns: 1fr; } .fwm-preset { margin-left: 0; } .fwm-keys { height: 96px; } .fwm-plate b { font-size: 32px; } }
+@media (prefers-reduced-motion: reduce) { .fwm-root * { transition: none !important; } }

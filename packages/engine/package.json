@@ -1,0 +1,12 @@
+{
+  "name": "@fwm/engine",
+  "version": "0.1.0",
+  "description": "free-web-music audio engine: Rust/WASM devices in an AudioWorklet, plus a small main-thread host",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": { "types": "./web/engine.d.ts", "default": "./web/engine.js" },
+    "./devices/*.json": "./devices/*.json"
+  },
+  "files": ["web", "devices"]
+}

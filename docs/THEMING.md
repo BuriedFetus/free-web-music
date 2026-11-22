@@ -8,7 +8,7 @@ The studio ships with its own look: hardware-style devices and a blue sequencer 
 | 2. Device skins | One device, or all devices (casing, accent, screen colours) | Device tokens (`--dev-*`) |
 | 3. Components | The controls themselves (knob, fader, button, screen, keys) | Pass your own React components |
 
-You can try levels 1 and 2 live on the Phase 0 design sheet (`design/kit/index.html`), using the skin buttons **Default / Flat / Host brand**.
+You can try levels 1 and 2 live in the harness (`npm run dev`) or on the design sheet (`design/kit/index.html`), using the skin buttons **Default / Flat / Host brand**. All skin files live in `packages/studio/src/skins/`.
 
 ---
 
@@ -69,7 +69,7 @@ Every device is drawn from the same template. Its skin is just these tokens:
 | `--dev-sec`, `--dev-track` | Section panels, fader tracks |
 | `--dev-key`, `--dev-keyb` | White and black keys |
 
-Each device's skin lives in its own small file, `design/kit/skins/<device>.css` (the template defaults, all commented, are in `device-base.css`). Preview any skin in all three reference styles with `design/check-skin.sh <device>`.
+Each device's skin lives in its own small file, `packages/studio/src/skins/<device>.css` (the template defaults, all commented, are in `device-base.css`). Preview any skin in all three reference styles with `design/check-skin.sh <device>`.
 
 Built-in skins are declared with `:where(...)`, so they have **zero specificity**. Any rule you write wins, with no `!important` needed.
 
@@ -81,7 +81,7 @@ Built-in skins are declared with `:where(...)`, so they have **zero specificity*
 .my-app [data-device="basalt"] { --dev-case: #222; --dev-case2: #000; }
 ```
 
-## 3. Replacing components (planned React API)
+## 3. Replacing components (React API)
 
 Devices never draw their own controls. They only use a small set of **primitives**, so swapping a primitive restyles every device in the library at once.
 
@@ -104,18 +104,20 @@ Primitive contracts (props every replacement receives):
 
 | Primitive | Props |
 |---|---|
-| `Knob` | `value` (0–1), `onChange(v)`, `label`, `format(v) → string`, `size`, `modulation?: { depth, current }`, `presence: { userId, name, color }[]`, `defaultValue` |
+| `Knob` | `value` (0–1), `onChange(v)`, `label`, `format(v) → string`, `size` (`md`/`lg`), `modulation?: { low, high, current? }` (offsets from `value`, plus the live value when sound is on), `presence?: { userId, name, color }[]`, `defaultValue`, `onGestureStart/End?` |
 | `Fader` | Same as Knob, vertical |
 | `Button` / `Toggle` | `pressed`, `onPress`, `label`, `icon?`, `presence` |
 | `Screen` | `children` (text or canvas), `variant` ("preset" / "scope" / "readout") |
 | `Keys` | `low`, `high`, `held: number[]`, `peerHeld: { note, color }[]`, `onNoteOn(n, velocity)`, `onNoteOff(n)` |
+
+The exact TypeScript contracts are in `packages/studio/src/primitives/types.ts`; `packages/studio/test/basalt.test.tsx` shows a host Knob replacing the default one.
 
 Presence (who is touching what) and modulation are **data passed in**. A replacement component decides how to show them, and the studio never draws on top of it.
 
 ## Rules the studio follows so this keeps working
 
 - **No hard-coded colours, fonts or shadows** in device or app code: everything goes through tokens.
-- **Scoped styles.** The package prefixes its classes (`fwm-`), never styles global elements (`body`, `button`, `h1`…), and can render inside a Shadow DOM if the host wants full isolation. (The Phase 0 prototype still uses short class names; the real package won't.)
-- **Fonts are optional.** With `loadFonts: false` the studio loads nothing and uses whatever fonts the tokens name.
+- **Scoped styles.** The package prefixes its classes (`fwm-`), never styles global elements (`body`, `button`, `h1`…), and can render inside a Shadow DOM if the host wants full isolation. (The Phase 0 prototype still uses short class names; `@fwm/studio` uses `fwm-` everywhere.)
+- **Fonts are optional.** With `loadFonts: false` the studio loads nothing and uses whatever fonts the tokens name. The default fonts are requested with CORS (`crossorigin`), so they also load on a cross-origin-isolated page; a host loading its own web fonts there must do the same.
 - **Light and dark.** The host can switch the whole palette at runtime by changing tokens; nothing is cached.
 - New devices must pass a "skin check": they render correctly with `--fwm-depth: 0`, with `--fwm-round: 0`, and with the host-brand example.

@@ -1,0 +1,12 @@
+/* Harness page only (plays the part of a host app). */
+body { margin: 0; background: var(--fwm-bg); }
+.h-page { min-height: 100vh; padding: clamp(16px, 4vw, 40px); background: var(--fwm-bg); color: var(--fwm-ink); }
+.h-page .fwm-root { max-width: 1240px; margin: 0 auto; }
+.h-top { display: flex; flex-wrap: wrap; gap: 12px 32px; align-items: end; justify-content: space-between; margin-bottom: 22px; }
+.h-top h1 { font: 900 clamp(30px, 4vw, 44px)/1.05 var(--fwm-font-display); margin: 0; }
+.h-top p { margin: 4px 0 0; color: var(--fwm-mute); max-width: 64ch; }
+.h-tools { display: flex; gap: 8px; flex-wrap: wrap; align-items: center; }
+.h-sound { display: flex; flex-direction: column; gap: 2px; }
+.h-sound small { color: var(--fwm-mute); font-size: 12px; }
+.h-btn { font: 600 15px var(--fwm-font-ui); min-height: 44px; padding: 0 16px; border-radius: calc(10px * var(--fwm-round)); border: 1px solid var(--fwm-line); background: var(--fwm-panel); color: var(--fwm-ink); cursor: pointer; }
+.h-btn[aria-pressed=true] { background: var(--fwm-me); color: var(--fwm-on-me); border-color: var(--fwm-me); }

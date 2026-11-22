@@ -1,4 +1,4 @@
-# Handoff: end of Phase 0 → start of Phase 1
+# Handoff: Phase 1 (engine + Basalt in React)
 
 Notes for the next session (written 2026-11-21, before a context compaction). Read this, `CLAUDE.md`, `docs/PLAN.md` and `docs/THEMING.md` before writing code.
 
@@ -46,13 +46,12 @@ Both prototypes are silent. Sound starts in Phase 1.
 - **Legal/design:** KORG Gadget's *feel* only. Our own mineral device names. `design/refs/` (copyrighted screenshots) is git-ignored and never published. Repo is public, MIT.
 
 ## Open items
-- [ ] **Phase 1 progress:**
-  - Done: Rust engine + Basalt DSP in `packages/engine` (`cargo test --release`: 14 tests: pitch, aliasing ≤ -79 dB, no clicks, no denormals, ~1.2% CPU native).
-  - Done: worklet host `packages/engine/web/` (`worklet.js`, `engine.js`, built `fwm_engine.wasm` via `packages/engine/build.sh`). MessagePort path only so far; the SAB ring is still to do.
-  - Done: browser smoke test `packages/engine/web/test.html` (OfflineAudioContext, checks sound + pitch). It passes in Firefox.
-  - Done: design kit "Sound" button plays the real engine (`design/kit/engine` is a symlink to `packages/engine/web`).
-  - Next: user listens and gives feedback on the sound; then React (needs Node).
-- [ ] **Node.js is not installed on this machine** (no `node`/`npm`). Phase 1 needs it for Vite + React + TypeScript. Ask the user to install Node LTS (or get their OK to install it via nvm) before scaffolding.
+- [ ] **Phase 1 progress** (see the checklist in the Phase 1 plan below):
+  - Done: Rust engine + Basalt DSP (`packages/engine`, 14 tests: pitch, aliasing ≤ -79 dB, no clicks, no denormals, ~1.2% CPU native).
+  - Done: worklet host `packages/engine/web/` (MessagePort path). Browser smoke test `web/test.html`.
+  - Done: Node via nvm (v26 LTS), npm workspaces, `@fwm/studio` React library (primitives, Basalt, theming, engine provider, device store), Vite harness with COOP/COEP. 12 Vitest tests. Harness `?selftest` proves sound through the bundled app in headless Firefox.
+  - Done: the design kit's Sound button plays the same engine.
+  - Next: user listens (sound + latency feedback); SharedArrayBuffer ring for lower latency; skin check of the React Basalt in flat/brand; then Phase 2.
 - [x] Rust is installed, plus the `wasm32-unknown-unknown` target (added in Phase 0). `wasm-pack` is not installed; plain `cargo build --target wasm32-unknown-unknown` works (see `spikes/build.sh`).
 - [ ] Live audio latency numbers: the user runs `python3 spikes/serve.py` → "Start audio test" and pastes the numbers into `spikes/RESULTS.md`.
 - [ ] Friend's app: COOP/COEP header test, their Yjs setup, and the ephemeral channel API (checklist in `spikes/RESULTS.md`).

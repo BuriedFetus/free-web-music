@@ -1,25 +1,44 @@
 // free-web-music engine: main-thread host. Plain ES module (no build step), used by the design
-// kit today and wrapped by the React package later.
+// kit directly and by @fwm/studio through a bundler.
 //
-//   const engine = await createEngine({ base: 'engine/' });
+//   const engine = await createEngine();
 //   engine.add(0, 'basalt');
 //   engine.noteOn(0, 48, 0.9); engine.setParam(0, 'cut', 0.6);
-//   engine.onTick = ({ scope, devices }) => { ... };   // ~60×/s: waveform + modulated values
+//   const stop = engine.subscribe(({ scope, devices }) => { ... });  // ~60×/s for the UI
 //
-// Parameters are addressed by id; the ids, order and ranges come from devices/<id>.json.
+// Parameters are addressed by id; ids, order and ranges come from devices/<id>.json.
+// The worklet and WASM files are found next to this module (`new URL(..., import.meta.url)`,
+// which Vite, webpack 5 and Rollup all understand), or under `base` if given.
 
 export const KINDS = { basalt: 1 };
 export const MOD_SOURCES = { lfo: 0, amp: 1, filt: 2 };
 
-export async function createEngine({ base = './', context, manifests = { basalt: 'basalt.json' } } = {}) {
+const DEFAULT_URLS = () => ({
+  wasm: new URL('./fwm_engine.wasm', import.meta.url).href,
+  worklet: new URL('./worklet.js', import.meta.url).href,
+  basalt: new URL('./basalt.json', import.meta.url).href,
+});
+
+export async function createEngine({ base, context, manifests } = {}) {
   const ctx = context || new AudioContext({ latencyHint: 'interactive' });
-  const url = (f) => new URL(f, new URL(base, location.href)).href;
-  const [wasm, ...mans] = await Promise.all([
-    fetch(url('fwm_engine.wasm')).then((r) => { if (!r.ok) throw new Error('engine wasm: ' + r.status); return r.arrayBuffer(); }),
-    ...Object.values(manifests).map((f) => fetch(url(f)).then((r) => r.json())),
+  const urls = base
+    ? Object.fromEntries(
+        Object.entries({ wasm: 'fwm_engine.wasm', worklet: 'worklet.js', basalt: 'basalt.json' }).map(([k, f]) => [
+          k,
+          new URL(f, new URL(base, location.href)).href,
+        ]),
+      )
+    : DEFAULT_URLS();
+  const loadManifest = async (m) => (typeof m === 'object' ? m : (await fetch(m)).json());
+  const [wasm, basalt] = await Promise.all([
+    fetch(urls.wasm).then((r) => {
+      if (!r.ok) throw new Error('engine wasm: HTTP ' + r.status);
+      return r.arrayBuffer();
+    }),
+    loadManifest(manifests?.basalt ?? urls.basalt),
   ]);
-  const manifest = Object.fromEntries(mans.map((m) => [m.id, m]));
-  await ctx.audioWorklet.addModule(url('worklet.js'));
+  const manifest = { basalt };
+  await ctx.audioWorklet.addModule(urls.worklet);
   const node = new AudioWorkletNode(ctx, 'fwm-engine', {
     numberOfInputs: 0,
     outputChannelCount: [2],
@@ -28,12 +47,16 @@ export async function createEngine({ base = './', context, manifests = { basalt:
   node.connect(ctx.destination);
 
   const slots = new Map(); // slot → device id
+  const listeners = new Set();
   const ready = new Promise((res) => {
     node.port.onmessage = (e) => {
       const m = e.data;
       if (m.t === 'ready') res();
-      else if (m.t === 'tick') engine.onTick?.(m);
-      else if (m.t === 'routeRejected') console.warn('engine: route rejected', m);
+      else if (m.t === 'tick') {
+        engine.last = m;
+        engine.onTick?.(m);
+        for (const fn of listeners) fn(m);
+      } else if (m.t === 'routeRejected') console.warn('engine: route rejected', m);
     };
   });
   const send = (m) => node.port.postMessage(m);
@@ -46,27 +69,53 @@ export async function createEngine({ base = './', context, manifests = { basalt:
 
   const engine = {
     context: ctx,
+    node,
     manifest,
+    last: null,
     onTick: null,
+    subscribe(fn) {
+      listeners.add(fn);
+      return () => listeners.delete(fn);
+    },
     add(slot, deviceId) {
       slots.set(slot, deviceId);
       send({ t: 'add', slot, kind: KINDS[deviceId] });
     },
-    remove(slot) { slots.delete(slot); send({ t: 'remove', slot }); },
-    noteOn(slot, note, vel = 0.8) { send({ t: 'on', slot, note, vel }); },
-    noteOff(slot, note) { send({ t: 'off', slot, note }); },
-    allOff(slot) { send({ t: 'allOff', slot }); },
+    remove(slot) {
+      slots.delete(slot);
+      send({ t: 'remove', slot });
+    },
+    noteOn(slot, note, vel = 0.8) {
+      send({ t: 'on', slot, note, vel });
+    },
+    noteOff(slot, note) {
+      send({ t: 'off', slot, note });
+    },
+    allOff(slot) {
+      send({ t: 'allOff', slot });
+    },
     /** value is normalised 0..1 (enums: the option index) */
-    setParam(slot, id, value) { send({ t: 'param', slot, i: index(slot, id), v: value }); },
+    setParam(slot, id, value) {
+      send({ t: 'param', slot, i: index(slot, id), v: value });
+    },
     paramIndex: index,
     setRoute(slot, r, src, target, depth) {
       send({ t: 'route', slot, r, src: MOD_SOURCES[src], target: index(slot, target), depth });
     },
-    clearRoute(slot, r) { send({ t: 'unroute', slot, r }); },
-    resume() { return ctx.resume(); },
-    latency() { return { base: ctx.baseLatency || 0, output: ctx.outputLatency || 0 }; },
+    clearRoute(slot, r) {
+      send({ t: 'unroute', slot, r });
+    },
+    resume() {
+      return ctx.resume();
+    },
+    suspend() {
+      return ctx.suspend();
+    },
+    latency() {
+      return { base: ctx.baseLatency || 0, output: ctx.outputLatency || 0 };
+    },
   };
-  // An OfflineAudioContext only starts the worklet when rendering starts, so don't wait for it there.
+  // An OfflineAudioContext only starts the worklet when rendering starts, so don't wait there.
   if (typeof OfflineAudioContext === 'undefined' || !(ctx instanceof OfflineAudioContext)) await ready;
   return engine;
 }

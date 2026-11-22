@@ -1,0 +1,13 @@
+{
+  "name": "@fwm/studio",
+  "version": "0.1.0",
+  "description": "free-web-music studio: React devices, primitives and theming (embeddable core)",
+  "license": "MIT",
+  "type": "module",
+  "exports": {
+    ".": "./src/index.ts",
+    "./skins/*": "./src/skins/*"
+  },
+  "peerDependencies": { "react": ">=18", "react-dom": ">=18" },
+  "dependencies": { "@fwm/engine": "0.1.0" }
+}

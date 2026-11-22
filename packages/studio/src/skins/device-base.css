@@ -19,4 +19,8 @@
   --dev-track: #0b0b0c;     /* fader track */
   --dev-key: #f1ede6;       /* white keys */
   --dev-keyb: #1b1b1d;      /* black keys */
+  --dev-keyb2: #333;        /* black keys, top highlight */
+  --dev-keybed: #000;       /* gaps between keys */
+  --dev-keylabel: #777;     /* octave labels on white keys */
+  --dev-keyhi: #fff;        /* white keys, top highlight */
 }

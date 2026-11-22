@@ -14,6 +14,9 @@
   --fwm-me: #4fc3ff;
   --fwm-peer: #ff4fa3;
   --fwm-mod: #b48cff;
+  --fwm-on-me: #04131c;     /* text on a --fwm-me fill */
+  --fwm-on-peer: #120610;   /* text on a --fwm-peer fill */
+  --fwm-on-mod: #160a2b;    /* text on a --fwm-mod fill */
 
   /* sequencer / piano roll */
   --fwm-roll: #1d4fb8;

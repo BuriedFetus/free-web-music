@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 # Preview a device skin in the three reference styles (default, flat, host brand).
 # Usage: design/check-skin.sh <skin> [out-dir]
-#   <skin>    a file name in design/kit/skins/ without .css, e.g. basalt, quartz, cobalt
+#   <skin>    a file name in packages/studio/src/skins/ (also linked as design/kit/skins/) without .css, e.g. basalt, quartz, cobalt
 #   [out-dir] where to write PNGs (default: a new temp dir)
 # Output: <out-dir>/<skin>-default.png, -flat.png, -brand.png and <skin>-check.png (all three stacked).
 # Needs: firefox (headless). ImageMagick 'convert' is optional (for the stacked image).
