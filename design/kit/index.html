@@ -192,6 +192,7 @@ h2{font:800 30px/1.1 var(--fwm-font-display);margin:0 0 6px}
       <p>Every device in the library is built from one template. This is the first full device: drag knobs and faders, click or type keys (A W S E D F T G Y H U J K). The scope shows the wave as you play. Envelopes has Amp and Filter tabs. LFO 1 (Free / Retrig / Poly) moves the cutoff. Modulation works both ways: "Assign LFO 1" or "Assign Amp/Filter env", then click any knob or envelope fader; each route gets its own depth slider. Below, the sequencer lane is a full piano roll with live recording, loop and automation (Space = play/stop). A simulated collaborator, Mira, is tweaking and playing it as well. The skin buttons show how a host app can restyle everything through tokens alone (docs/THEMING.md).</p>
     </div>
     <div class="tools">
+      <button class="btn" id="sndBtn" aria-pressed="false">Sound: off</button>
       <button class="btn" id="anatBtn" aria-pressed="false">Show template anatomy</button>
       <button class="btn" id="peerBtn" aria-pressed="true">Mira is here</button>
     </div>
@@ -277,7 +278,7 @@ h2{font:800 30px/1.1 var(--fwm-font-display);margin:0 0 6px}
       <div><span style="background:#4fc3ff"></span>You #4fc3ff</div>
       <div><span style="background:#ff4fa3"></span>Collaborator #ff4fa3</div>
     </div>
-    <p class="note">Pink note = being dragged by Mira right now. Phase 0 is silent, sound arrives in Phase 1.</p>
+    <p class="note">Pink note = being dragged by Mira right now. Press “Sound” (top) to hear the real Basalt engine.</p>
   </div>
 </div></div>
 
@@ -285,7 +286,8 @@ h2{font:800 30px/1.1 var(--fwm-font-display);margin:0 0 6px}
 {
 const $=id=>document.getElementById(id);
 const knobs={};const cl=v=>Math.min(1,Math.max(0,v));
-const fmt={pct:v=>Math.round(v*100)+'%',hz:v=>{const f=20*Math.pow(1000,v);return f<1000?Math.round(f)+'Hz':(f/1000).toFixed(1)+'k'},st:v=>{const s=Math.round(v*24-12);return(s>0?'+':'')+s},ms:v=>{const m=Math.round(2*Math.pow(1000,v));return m<1000?m+'ms':(m/1000).toFixed(1)+'s'},lfo:v=>{const h=0.1*Math.pow(200,v);return h.toFixed(h<10?2:1)+'Hz'}};
+const snd={on:false,eng:null,last:[],rkey:'',scope:null,mods:null};
+const fmt={pct:v=>Math.round(v*100)+'%',hz:v=>{const f=20*Math.pow(1024,v);return f<1000?Math.round(f)+'Hz':(f/1000).toFixed(1)+'k'},st:v=>{const s=Math.round(v*24-12);return(s>0?'+':'')+s},ms:v=>{if(v<=0)return'Off';const m=Math.round(3*Math.pow(1000,v));return m<1000?m+'ms':(m/1000).toFixed(1)+'s'},lfo:v=>{const h=0.1*Math.pow(200,v);return h.toFixed(h<10?2:1)+'Hz'}};
 
 function arc(r,a0,a1){const p=a=>[50+r*Math.cos(a),50+r*Math.sin(a)];const[x0,y0]=p(a0),[x1,y1]=p(a1);return`M${x0} ${y0}A${r} ${r} 0 ${a1-a0>Math.PI?1:0} 1 ${x1} ${y1}`}
 function drawKnob(k){
@@ -506,8 +508,8 @@ function lfoTick(dt){
 const sc=$('scope'),sx=sc.getContext('2d');let sw=0,sh=0;
 const sro=new ResizeObserver(()=>{const d=devicePixelRatio||1;sw=sc.clientWidth;sh=sc.clientHeight;sc.width=sw*d;sc.height=sh*d;sx.setTransform(d,0,0,d,0,0)});sro.observe(sc);
 const vA={st:'idle',l:0,e:'amp'},vF={st:'idle',l:0,e:'filt'};let cur=null;const held=new Set();
-function noteOn(s){s=+s;held.add(s);cur=s;vA.st='A';vF.st='A';if(lfo.mode!=='free'){lfo.ph=0;lfo.sh=Math.random()*2-1}}
-function noteOff(s){held.delete(+s);if(held.size)cur=[...held].pop();else for(const v of[vA,vF])if(v.st!=='idle')v.st='R'}
+function noteOn(s){s=+s;snd.on&&snd.eng.noteOn(0,s,0.85);held.add(s);cur=s;vA.st='A';vF.st='A';if(lfo.mode!=='free'){lfo.ph=0;lfo.sh=Math.random()*2-1}}
+function noteOff(s){held.delete(+s);snd.on&&snd.eng.noteOff(0,+s);if(held.size)cur=[...held].pop();else for(const v of[vA,vF])if(v.st!=='idle')v.st='R'}
 function eg(v,dt){const E=n=>envMod[v.e+'.'+n]?.cur??envs[v.e][n],A=0.004+E('A')*1.2,D=0.02+E('D')*1.2,S=E('S'),R=0.03+E('R')*1.6;
   if(v.st==='A'){v.l+=dt/A;if(v.l>=1){v.l=1;v.st='D'}}
   else if(v.st==='D'){v.l-=dt/D*(1-S);if(v.l<=S){v.l=S;v.st='S'}}
@@ -516,6 +518,7 @@ function envStep(dt){eg(vA,dt);eg(vF,dt)}
 modTick();
 function harm(x,type,N,res){let y=0;for(let n=1;n<=N;n++){let a=type===0?1/n:type===1?(n%2?1/n:0):type===2?(n%2?(((n-1)/2)%2?-1:1)/(n*n):0):(n===1?1:0);if(!a)continue;if(Math.abs(n-N)<1.5)a*=1+res*4;y+=a*Math.sin(n*x)}return y}
 function drawScope(){if(!sw)return;sx.clearRect(0,0,sw,sh);const col=getComputedStyle(sc).color;
+  if(snd.on&&snd.scope)return drawReal(col);
   sx.globalAlpha=.18;sx.strokeStyle=col;sx.lineWidth=1;sx.beginPath();sx.moveTo(0,sh/2);sx.lineTo(sw,sh/2);sx.stroke();sx.globalAlpha=1;
   const type=[...$('waves').children].findIndex(b=>b.getAttribute('aria-pressed')==='true');
   const ck=knobs.cut,cut=cl((ck.mv??ck.v)+knobs.envamt.v*vF.l*0.6),N=Math.max(1,Math.round(1+cut*cut*46));
@@ -523,8 +526,32 @@ function drawScope(){if(!sw)return;sx.clearRect(0,0,sw,sh);const col=getComputed
   const ys=[];let mx=1e-3;for(let i=0;i<=sw;i+=2){let x=i/sw*cyc*2*Math.PI;x+=shp*0.9*Math.sin(x);const y=Math.tanh(harm(x,type,N,res)*g);ys.push(y);mx=Math.max(mx,Math.abs(y))}
   sx.beginPath();ys.forEach((y,j)=>{const X=j*2,Y=sh/2-(y/mx)*vA.l*(sh/2-5);j?sx.lineTo(X,Y):sx.moveTo(X,Y)});
   sx.lineWidth=2;sx.shadowColor=col;sx.shadowBlur=8;sx.stroke();sx.shadowBlur=0}
+/* real sound: the Rust/WASM engine (packages/engine) runs in an AudioWorklet. The kit's state is
+   mirrored into it every frame; the engine sends back the waveform and the live modulation values. */
+function kitValue(p){if(p.id==='wave')return[...$('waves').children].findIndex(b=>b.getAttribute('aria-pressed')==='true');
+  if(p.id==='lwave')return lfo.wave;if(p.id==='lmode')return['free','retrig','poly'].indexOf(lfo.mode);
+  if(p.id.includes('.')){const[a,b]=p.id.split('.');return envs[a][b]}const k=knobs[p.id];return k?k.v:p.default}
+function pushState(){const e=snd.eng,ps=e.manifest.basalt.params;
+  ps.forEach((p,i)=>{const v=kitValue(p);if(snd.last[i]!==v){snd.last[i]=v;e.setParam(0,p.id,v)}});
+  const key=JSON.stringify(routes);if(key!==snd.rkey){snd.rkey=key;for(let r=0;r<16;r++)e.clearRoute(0,r);routes.slice(0,16).forEach((r,i)=>e.setRoute(0,i,r.src,r.t,r.a))}}
+function drawReal(col){const b=snd.scope,n=b.length,hz=440*Math.pow(2,((cur??36)-69)/12),fs=snd.eng.context.sampleRate;
+  const W=Math.max(200,Math.min(1200,Math.round(2.5*fs/hz)));let st=n-W-1;
+  for(let i=n-W-1;i>n-W-1-Math.min(800,n-W-1);i--)if(b[i-1]<=0&&b[i]>0){st=i;break}
+  let pk=0;for(let i=st;i<st+W;i++)pk=Math.max(pk,Math.abs(b[i]));const g=(sh/2-5)/Math.max(0.3,pk);
+  sx.globalAlpha=.18;sx.strokeStyle=col;sx.lineWidth=1;sx.beginPath();sx.moveTo(0,sh/2);sx.lineTo(sw,sh/2);sx.stroke();sx.globalAlpha=1;
+  sx.beginPath();for(let i=0;i<W;i++){const X=i/(W-1)*sw,Y=sh/2-b[st+i]*g;i?sx.lineTo(X,Y):sx.moveTo(X,Y)}
+  sx.lineWidth=2;sx.shadowColor=col;sx.shadowBlur=8;sx.stroke();sx.shadowBlur=0}
+$('sndBtn').onclick=async e=>{const btn=e.currentTarget;
+  if(snd.on){snd.on=false;snd.eng.allOff(0);snd.eng.context.suspend();btn.setAttribute('aria-pressed','false');btn.textContent='Sound: off';return}
+  try{btn.textContent='Sound: loading…';
+    if(!snd.eng){snd.eng=await createEngine();snd.eng.add(0,'basalt');snd.eng.onTick=m=>{snd.scope=m.scope;snd.mods=m.devices[0]?.mods}}
+    await snd.eng.resume();snd.last=[];snd.rkey='';pushState();snd.on=true;btn.setAttribute('aria-pressed','true');btn.textContent='Sound: on'}
+  catch(err){console.error(err);btn.textContent='Sound: failed (serve over http, see console)'}};
+async function createEngine(){const m=await import('./engine/engine.js');return m.createEngine({base:'engine/'})}
 let lt=performance.now();
-function loop(t){const dt=Math.min(0.05,(t-lt)/1000);lt=t;seqTick(dt);envStep(dt);lfoTick(dt);drawScope();requestAnimationFrame(loop)}
+function loop(t){const dt=Math.min(0.05,(t-lt)/1000);lt=t;seqTick(dt);envStep(dt);lfoTick(dt);
+  if(snd.on){pushState();if(snd.mods){[lfo.val,vA.l,vF.l]=snd.mods;$('led').style.opacity=0.25+0.75*(lfo.val+1)/2;modTick()}}
+  drawScope();requestAnimationFrame(loop)}
 requestAnimationFrame(loop);
 
 /* material cards */

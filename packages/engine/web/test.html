@@ -1,0 +1,35 @@
+<!doctype html>
+<meta charset="utf-8">
+<title>engine browser test</title>
+<style>body{font:20px monospace;padding:20px;white-space:pre}</style>
+<body>running…</body>
+<script type="module">
+// Browser smoke test: renders Basalt through the real AudioWorklet path in an OfflineAudioContext
+// and checks it makes sound at the right pitch. Open via `python3 spikes/serve.py`:
+// http://localhost:8765/packages/engine/web/test.html
+import { createEngine } from './engine.js';
+const out = [];
+try {
+  const fs = 48000;
+  const ctx = new OfflineAudioContext(2, fs * 2, fs);
+  const e = await createEngine({ base: './', context: ctx });
+  e.add(0, 'basalt');
+  e.setParam(0, 'wave', 3); e.setParam(0, 'cut', 1); e.setParam(0, 'sub', 0); e.setParam(0, 'shape', 0);
+  e.setParam(0, 'amp.S', 1); e.setParam(0, 'drive', 0); e.setParam(0, 'res', 0); e.setParam(0, 'envamt', 0);
+  e.clearRoute(0, 0);
+  e.noteOn(0, 57, 1);
+  let ticks = 0; e.onTick = () => ticks++;
+  const buf = await ctx.startRendering();
+  const x = buf.getChannelData(0).subarray(fs, 2 * fs);
+  let rms = 0, zc = 0;
+  for (let i = 1; i < x.length; i++) { rms += x[i] * x[i]; if (x[i - 1] <= 0 && x[i] > 0) zc++; }
+  rms = Math.sqrt(rms / x.length);
+  out.push(`crossOriginIsolated: ${self.crossOriginIsolated}`);
+  out.push(`rms: ${rms.toFixed(4)}  ${rms > 0.01 ? 'PASS' : 'FAIL'}`);
+  out.push(`pitch: ${zc} Hz (want 220)  ${Math.abs(zc - 220) <= 1 ? 'PASS' : 'FAIL'}`);
+  out.push(`ui ticks: ${ticks}`);
+} catch (err) { out.push('ERROR ' + err + '\n' + err.stack); }
+document.body.textContent = out.join('\n');
+fetch('/log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+document.title = out.every(l => !/FAIL|ERROR/.test(l)) ? 'PASS' : 'FAIL';
+</script>

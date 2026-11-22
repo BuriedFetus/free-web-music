@@ -46,7 +46,12 @@ Both prototypes are silent. Sound starts in Phase 1.
 - **Legal/design:** KORG Gadget's *feel* only. Our own mineral device names. `design/refs/` (copyrighted screenshots) is git-ignored and never published. Repo is public, MIT.
 
 ## Open items
-- [ ] **Phase 1 progress:** Rust engine + Basalt DSP done in `packages/engine` (14 tests pass: pitch, alias ≤ -79 dB, no clicks, no denormals, ~1.2% CPU native). Next: worklet host (JS), hear it in the kit, then React once Node is in.
+- [ ] **Phase 1 progress:**
+  - Done: Rust engine + Basalt DSP in `packages/engine` (`cargo test --release`: 14 tests: pitch, aliasing ≤ -79 dB, no clicks, no denormals, ~1.2% CPU native).
+  - Done: worklet host `packages/engine/web/` (`worklet.js`, `engine.js`, built `fwm_engine.wasm` via `packages/engine/build.sh`). MessagePort path only so far; the SAB ring is still to do.
+  - Done: browser smoke test `packages/engine/web/test.html` (OfflineAudioContext, checks sound + pitch). It passes in Firefox.
+  - Done: design kit "Sound" button plays the real engine (`design/kit/engine` is a symlink to `packages/engine/web`).
+  - Next: user listens and gives feedback on the sound; then React (needs Node).
 - [ ] **Node.js is not installed on this machine** (no `node`/`npm`). Phase 1 needs it for Vite + React + TypeScript. Ask the user to install Node LTS (or get their OK to install it via nvm) before scaffolding.
 - [x] Rust is installed, plus the `wasm32-unknown-unknown` target (added in Phase 0). `wasm-pack` is not installed; plain `cargo build --target wasm32-unknown-unknown` works (see `spikes/build.sh`).
 - [ ] Live audio latency numbers: the user runs `python3 spikes/serve.py` → "Start audio test" and pastes the numbers into `spikes/RESULTS.md`.
