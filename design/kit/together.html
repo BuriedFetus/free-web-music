@@ -1,0 +1,430 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Playing Together</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Figtree:wght@400;600;800&family=VT323&family=Big+Shoulders+Display:wght@800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="skins/app.css">
+<link rel="stylesheet" href="skins/device-base.css">
+<style>
+/* VOICE studio tool: calm chrome, the two people carry their own colours (--fwm-me, --fwm-peer)
+   IDEA two studio screens on one desk, joined by a cable you can make worse (the network)
+   PICTURE both screens playing the same TRACK on the same beat, and a timing strip that shows when Mira's keys reach you
+   COLOUR theme tokens only (skins/*.css): sequencer world in --fwm-roll, you in --fwm-me, Mira in --fwm-peer, late in --fwm-rec
+   TYPE tokens: display for TRACK labels, screen for readouts, ui for everything else
+   LAYOUT intro line, two screens side by side (stacked under 980px), network + timing panel, then what's proposed */
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--fwm-bg);color:var(--fwm-ink);font:15px/1.45 var(--fwm-font-ui);overflow-x:clip}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fwm-me);outline-offset:2px}
+header{display:flex;flex-wrap:wrap;align-items:center;gap:8px 16px;padding:14px max(2vw,12px);background:var(--fwm-panel);border-bottom:1px solid var(--fwm-line)}
+header h1{margin:0;font:900 28px/1.05 var(--fwm-font-display);letter-spacing:.03em}
+header p{margin:0;color:var(--fwm-mute);max-width:70ch}
+.grow{flex:1}
+.btn{min-height:40px;padding:0 14px;border-radius:calc(9px*var(--fwm-round));border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--fwm-mute)}
+.btn[aria-pressed=true]{background:var(--fwm-me);color:var(--fwm-on-me);border-color:var(--fwm-me)}
+.btn.sm{min-height:34px;padding:0 10px;font-size:14px}
+.grp{display:flex;gap:4px;flex-wrap:wrap;align-items:center}
+.lab{font-size:13px;color:var(--fwm-mute)}
+main{padding:12px max(2vw,12px) 28px;display:grid;gap:12px}
+.desk{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:12px}
+@media (max-width:980px){.desk{grid-template-columns:minmax(0,1fr)}}
+
+.scr{background:var(--fwm-panel);border:1px solid var(--fwm-line);border-radius:calc(12px*var(--fwm-round));overflow:hidden;border-top:4px solid var(--who)}
+.scr[data-who=you]{--who:var(--fwm-me);--on-who:var(--fwm-on-me)}
+.scr[data-who=mira]{--who:var(--fwm-peer);--on-who:var(--fwm-on-peer)}
+.scr .btn[aria-pressed=true]{background:var(--who);color:var(--on-who);border-color:var(--who)}
+.whose{display:flex;align-items:center;gap:8px;padding:8px 10px 0;font-weight:800}
+.whose small{font-weight:400;color:var(--fwm-mute)}
+.tb{display:flex;flex-wrap:wrap;align-items:center;gap:6px 8px;padding:8px 10px;border-bottom:1px solid var(--fwm-line)}
+.lcd{font:22px/1 var(--fwm-font-screen);background:var(--fwm-roll-deep);color:var(--fwm-note);padding:7px 10px;border-radius:7px;white-space:nowrap;min-width:150px}
+.lcd.bpm{min-width:0}
+.play{min-width:92px}
+.people{display:flex;flex-wrap:wrap;gap:6px;padding:8px 10px;border-bottom:1px solid var(--fwm-line)}
+.chip{display:inline-flex;align-items:center;gap:6px;min-height:30px;padding:2px 10px 2px 3px;border-radius:99px;background:var(--fwm-bg);border:1px solid var(--fwm-line);font-size:13px;white-space:nowrap}
+.av{width:24px;height:24px;border-radius:50%;display:grid;place-items:center;font-weight:800;font-size:12px}
+.av.me{background:var(--fwm-me);color:var(--fwm-on-me)}
+.av.peer{background:var(--fwm-peer);color:var(--fwm-on-peer)}
+.dot{width:8px;height:8px;border-radius:50%;background:var(--fwm-note);box-shadow:0 0 calc(6px*var(--fwm-glow)) var(--fwm-note)}
+.dot.far{background:var(--fwm-rec);box-shadow:0 0 calc(6px*var(--fwm-glow)) var(--fwm-rec)}
+.status{min-height:22px;padding:6px 10px 0;font-size:13px;color:var(--fwm-mute)}
+.status b{color:var(--fwm-ink)}
+
+.arr{background:var(--fwm-roll);margin:8px 10px;padding:8px;border-radius:8px;display:grid;gap:5px}
+.row{display:grid;grid-template-columns:112px repeat(3,minmax(0,1fr));gap:5px}
+.hd{color:var(--fwm-roll-ink);font-size:12px;font-weight:700;padding:0 6px;opacity:.85}
+.tl{position:relative;display:flex;flex-direction:column;justify-content:center;min-height:44px;padding:4px 8px;border-radius:7px;background:var(--fwm-roll2);color:var(--fwm-roll-ink);border:0;cursor:pointer;text-align:left}
+.tl b{font:900 16px/1 var(--fwm-font-display);letter-spacing:.04em}
+.tl small{font-size:11px;opacity:.85;margin-top:2px}
+.tl .nx{position:absolute;right:6px;top:5px;font-size:11px;font-weight:800;background:var(--fwm-note);color:var(--fwm-on-note);border-radius:4px;padding:0 4px}
+.tl.sel{outline:2px solid var(--fwm-roll-ink);outline-offset:1px}
+.row.now .tl{background:var(--fwm-roll-ink);color:var(--fwm-roll-deep)}
+.cell{position:relative;min-height:44px;border-radius:7px;background:color-mix(in srgb,var(--fwm-note) 22%,var(--fwm-roll2));color:var(--fwm-roll-ink);padding:5px 8px;font:900 15px/1.1 var(--fwm-font-display);overflow:hidden}
+.cell.off{background:var(--fwm-roll2);opacity:.55}
+.row.now .cell{box-shadow:inset 0 0 0 2px var(--fwm-roll-ink)}
+.cell .pr{position:absolute;left:0;bottom:0;height:4px;width:0;background:var(--fwm-note);box-shadow:0 0 calc(8px*var(--fwm-glow)) var(--fwm-note)}
+.pads{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:5px;padding:4px 10px 12px}
+.pad{min-height:52px;border-radius:8px;border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;display:grid;place-items:center;font-weight:700;line-height:1.1}
+.pad small{display:block;font-size:11px;font-weight:400;color:var(--fwm-mute)}
+.pad.hit{background:var(--fwm-me);color:var(--fwm-on-me)}
+.pad.hit small{color:inherit}
+.pad.hitp{background:var(--fwm-peer);color:var(--fwm-on-peer)}
+.pad.hitp small{color:inherit}
+.join{display:none;padding:30px 10px;text-align:center;color:var(--fwm-mute)}
+.scr.joining .join{display:block}
+.scr.joining .body{display:none}
+
+.panel{background:var(--fwm-panel);border:1px solid var(--fwm-line);border-radius:calc(12px*var(--fwm-round));overflow:hidden}
+.ph{display:flex;flex-wrap:wrap;align-items:center;gap:8px 14px;padding:10px;border-bottom:1px solid var(--fwm-line)}
+.ph h2{margin:0;font-size:16px}
+.sl{display:flex;align-items:center;gap:8px;font-size:14px}
+.sl input{width:150px;accent-color:var(--fwm-me)}
+.sl output{font:20px/1 var(--fwm-font-screen);min-width:58px}
+.strip{position:relative;margin:10px;height:150px;border-radius:8px;background:var(--fwm-roll);overflow:hidden}
+.strip .bt{position:absolute;top:0;bottom:0;width:1px;background:color-mix(in srgb,var(--fwm-roll-ink) 35%,transparent)}
+.strip .st{position:absolute;top:0;bottom:0;width:1px;background:color-mix(in srgb,var(--fwm-roll-ink) 10%,transparent)}
+.strip .ln{position:absolute;left:8px;font-size:12px;font-weight:700;color:var(--fwm-roll-ink);opacity:.85}
+.strip .hit{position:absolute;width:10px;height:22px;margin-left:-5px;border-radius:3px;transition:opacity 3s linear}
+.strip .hit.s{top:30px;background:var(--fwm-peer)}
+.strip .hit.h{top:98px;background:var(--fwm-note);box-shadow:0 0 calc(6px*var(--fwm-glow)) var(--fwm-note)}
+.strip .hit.late{background:var(--fwm-rec)}
+.strip .hit.fade{opacity:0}
+.strip .ph2{position:absolute;top:0;bottom:0;width:2px;background:var(--fwm-roll-ink);opacity:.7}
+.facts{display:flex;flex-wrap:wrap;gap:6px 22px;padding:0 10px 12px;font-size:14px;color:var(--fwm-mute)}
+.facts b{color:var(--fwm-ink);font-weight:700}
+.notes{font-size:14px;color:var(--fwm-mute);max-width:84ch;margin:0;padding-left:20px}
+.notes li{margin:4px 0}
+.notes b{color:var(--fwm-ink)}
+h3{margin:6px 0 0;font-size:16px}
+@media (prefers-reduced-motion:reduce){.strip .hit{transition:none}}
+@media (max-width:600px){.row{grid-template-columns:84px repeat(3,minmax(0,1fr))}.cell{font-size:13px}.lcd{font-size:19px;min-width:0}.pad{min-height:46px;font-size:13px}.sl input{width:110px}}
+</style>
+</head>
+<body>
+<header>
+  <h1>Playing together</h1>
+  <p>Mock-up of Phase 4. Left is your screen, right is Mira's, joined by a pretend network you can make worse below.</p>
+  <span class="grow"></span>
+  <button class="btn" id="snd" aria-pressed="false" title="Rough preview sounds: what YOUR screen plays">Sound: off</button>
+</header>
+
+<main>
+  <div class="desk" id="desk"></div>
+
+  <section class="panel" aria-label="Network and timing">
+    <div class="ph">
+      <h2>The network between you</h2>
+      <label class="sl">Delay <input type="range" id="dl" min="5" max="200" value="45"><output id="dlo"></output></label>
+      <label class="sl">Wobble <input type="range" id="jt" min="0" max="80" value="15"><output id="jto"></output></label>
+      <button class="btn sm" id="jam" aria-pressed="true" title="Mira plays a riff on her pads, exactly on her beat">Mira jams</button>
+      <button class="btn sm" id="rejoin" title="Mira reloads the page while the song plays">Mira reloads</button>
+    </div>
+    <div class="strip" id="strip" aria-label="When Mira's keys reach you, over one bar"></div>
+    <div class="facts" id="facts"></div>
+  </section>
+
+  <section>
+    <h3>What this proposes</h3>
+    <ul class="notes">
+      <li><b>One Play for everyone.</b> Whoever presses Play or Stop does it for the whole session. Everyone starts on the same beat: the studio waits a split second (a little more than the network delay) so the others can get the message in time.</li>
+      <li><b>Clicking a TRACK moves everyone</b> when the playing TRACK ends (as Wait does now). The switch carries the exact moment, so a late message still lands on the right beat.</li>
+      <li><b>Clocks agree on their own.</b> When someone joins, the studio sends a few quick pings to work out the difference between your clocks (Mira's computer clock is 1.2 s off here). Nobody has to do anything.</li>
+      <li><b>Joining while it plays</b> (try "Mira reloads"): the newcomer asks for the transport and drops in at the right bar and beat.</li>
+      <li><b>Live keys: Even or Tight</b> (per person). Even holds the other person's keys back by a small amount that follows the network, so their rhythm stays steady but slightly late. Tight plays them as soon as they arrive: sooner, but wobbly. Turn the Wobble up, Sound on, and switch between them to hear it.</li>
+      <li><b>Recording is always exact.</b> When Mira records, her notes go into the pattern at the moment she played them on her side, so on replay they are on the beat for everyone. Only live listening has a delay.</li>
+      <li><b>Play alone</b> (new, per person): your Play/Stop and TRACK clicks only affect you, for trying an idea without stopping the others. Edits still reach everyone. Turn it off to drop back into the group's song.</li>
+      <li><b>People chips</b> show how far each person is (green under 150 ms, red above) and whether they're playing alone or joining.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+{
+const $ = (s, r = document) => r.querySelector(s);
+const now = () => performance.now();
+const STEP = 125, BAR = 16 * STEP; // 120 BPM, 16ths: one bar = 2 s
+const ROWS = [['Intro', '—', 'Hum'], ['Verse', 'Beat', 'Hum'], ['Verse', 'Beat', 'Lead'], ['Drop', 'Fill', 'Lead']];
+const KEYS = ['A', 'S', 'D', 'F', 'G', 'H', 'J', 'K'];
+const NOTES = ['C', 'D♯', 'F', 'G', 'A♯', 'C', 'D♯', 'F'];
+const FREQ = [261.6, 311.1, 349.2, 392, 466.2, 523.3, 622.3, 698.5];
+const RIFF = [0, -1, 2, -1, 3, -1, 2, 4, -1, 3, -1, 2, 0, -1, -1, 1];
+const t0 = now();
+const net = { delay: 45, jitter: 15 };
+let jam = true;
+
+const mk = (id, name) => ({ id, name, tp: { playing: false, at: 0, row0: 0, by: null, cue: null }, sel: 0, alone: false, mode: 'even', delays: [], joining: false, note: '' });
+const S = { you: mk('you', 'You'), mira: mk('mira', 'Mira') };
+const other = (s) => (s.id === 'you' ? S.mira : S.you);
+
+// pretend network: base delay + random wobble (exponential tail) + rare spikes
+const netDelay = () => net.delay + net.jitter * -Math.log(1 - Math.random() * 0.999) + (Math.random() < 0.03 ? 60 + net.jitter * 2 : 0);
+const pct = (a, p) => { if (!a.length) return net.delay; const s = [...a].sort((x, y) => x - y); return s[Math.min(s.length - 1, Math.floor(p * s.length))]; };
+const buffer = (s) => Math.max(20, Math.min(250, pct(s.delays, 0.95) + 5));
+const lead = () => Math.max(80, Math.min(300, pct(S.you.delays.concat(S.mira.delays), 0.95) + 25));
+function send(from, msg) {
+  const d = netDelay();
+  setTimeout(() => receive(other(from), msg, d), d);
+}
+
+// ---- transport ----
+function pos(s, t = now()) {
+  const tp = s.tp;
+  if (tp.cue && t >= tp.cue.at) { tp.row0 = tp.cue.row; tp.at = tp.cue.at; tp.cue = null; }
+  if (!tp.playing || t < tp.at) return null;
+  const st = Math.floor((t - tp.at) / STEP);
+  return { row: (tp.row0 + Math.floor(st / 16)) % ROWS.length, step: st % 16, frac: ((t - tp.at) % BAR) / BAR };
+}
+function play(s) {
+  const at = now() + (s.alone ? 0 : lead());
+  s.tp = { playing: true, at, row0: s.sel, by: s.id, cue: null };
+  s.note = s.alone ? 'Playing alone' : 'Starting together…';
+  if (!s.alone) send(s, { t: 'play', tp: { ...s.tp } });
+  backingFrom = Math.max(now(), at);
+  renderScreen(s);
+}
+function stop(s) {
+  s.tp = { ...s.tp, playing: false, cue: null };
+  s.note = s.alone ? 'Stopped (alone)' : '';
+  if (!s.alone) send(s, { t: 'stop', by: s.id });
+  renderScreen(s);
+}
+function clickRow(s, r) {
+  s.sel = r;
+  const p = pos(s);
+  if (p) {
+    const at = s.tp.at + (Math.floor((now() - s.tp.at) / BAR) + 1) * BAR;
+    s.tp.cue = { row: r, at };
+    if (!s.alone) send(s, { t: 'cue', cue: { row: r, at }, by: s.id });
+  }
+  renderScreen(s);
+}
+function receive(s, m, d) {
+  if (m.t === 'key') return hearKey(s, m, d);
+  if (m.t === 'hello') { if (!s.alone && s.tp.playing) send(s, { t: 'state', tp: { ...s.tp } }); return; }
+  if (s.joining && m.t !== 'state') return;
+  if (s.alone && m.t !== 'state') return;
+  const by = m.by ?? m.tp?.by;
+  const who = by === 'you' ? 'you' : 'Mira';
+  if (m.t === 'play' || m.t === 'state') {
+    s.tp = { ...m.tp };
+    const late = now() - m.tp.at;
+    s.note = m.t === 'state' ? `Caught up: dropped in ${fmtPos(s)}` : late > 0 ? `Started by ${who} · message came ${Math.round(late)} ms late, joined at the right beat` : `Started by ${who} · everyone started together`;
+    s.joining = false;
+    if (s.id === 'you') backingFrom = Math.max(now(), m.tp.at);
+  }
+  if (m.t === 'stop') { s.tp.playing = false; s.tp.cue = null; s.note = `Stopped by ${who}`; }
+  if (m.t === 'cue') { s.tp.cue = m.cue; s.sel = m.cue.row; s.note = `${who === 'you' ? 'You' : 'Mira'} picked TRACK ${m.cue.row + 1}: it starts when this TRACK ends`; }
+  renderScreen(s);
+}
+const fmtPos = (s) => { const p = pos(s); return p ? `TRACK ${p.row + 1}, bar 1 beat ${Math.floor(p.step / 4) + 1}` : ''; };
+
+// ---- live keys ----
+function press(s, k, t = now()) {
+  flash(s, k, true);
+  if (s.id === 'you') tone(t, k, 'you');
+  send(s, { t: 'key', k, sent: t, from: s.id });
+}
+function hearKey(s, m, d) {
+  s.delays.push(d);
+  if (s.delays.length > 40) s.delays.shift();
+  const arrive = now();
+  const due = m.sent + buffer(s);
+  const at = s.mode === 'tight' ? arrive : Math.max(arrive, due);
+  const late = s.mode === 'even' && arrive > due + 1;
+  setTimeout(() => flash(s, m.k, false), at - arrive);
+  if (s.id === 'you') { tone(at, m.k, 'mira'); mark(m.sent, at, late); stats.n++; if (late) stats.late++; }
+}
+function flash(s, k, mine) {
+  const pad = $(`[data-who=${s.id}] [data-pad="${k}"]`);
+  if (!pad) return;
+  const c = mine === (s.id === 'you') ? 'hit' : 'hitp';
+  pad.classList.add(c);
+  setTimeout(() => pad.classList.remove(c), 140);
+}
+
+// Mira's riff: generated exactly on her beat (her transport, or a free 120 BPM grid when stopped)
+let jamUpTo = now();
+function jamTick() {
+  const until = now() + 120;
+  const m = S.mira;
+  if (!jam || m.joining) { jamUpTo = until; return; }
+  const anchor = m.tp.playing ? m.tp.at : t0;
+  for (let i = Math.ceil((jamUpTo - anchor) / STEP); anchor + i * STEP < until; i++) {
+    const t = anchor + i * STEP;
+    const k = RIFF[((i % 16) + 16) % 16];
+    if (t >= jamUpTo && k >= 0) setTimeout(() => press(m, k, t), Math.max(0, t - now()));
+  }
+  jamUpTo = until;
+}
+
+// ---- timing strip: one bar, Mira's presses on top, what you hear below ----
+const stats = { n: 0, late: 0 };
+function stripAnchor() { return S.you.tp.playing ? S.you.tp.at : t0; }
+function mark(sent, heard, late) {
+  const strip = $('#strip');
+  const a = stripAnchor();
+  const x = (t) => ((((t - a) % BAR) + BAR) % BAR) / BAR * 100;
+  for (const [t, c] of [[sent, 's'], [heard, 'h' + (late ? ' late' : '')]]) {
+    const e = document.createElement('span');
+    e.className = 'hit ' + c;
+    e.style.left = `calc(8px + (100% - 16px) * ${x(t) / 100})`;
+    setTimeout(() => { strip.appendChild(e); requestAnimationFrame(() => requestAnimationFrame(() => e.classList.add('fade'))); setTimeout(() => e.remove(), 3200); }, Math.max(0, t - now()));
+  }
+}
+function renderStrip() {
+  let h = '';
+  for (let i = 0; i < 16; i++) h += `<span class="${i % 4 ? 'st' : 'bt'}" style="left:calc(8px + (100% - 16px) * ${i / 16})"></span>`;
+  h += `<span class="ln" style="top:8px">Mira presses (exactly on her beat)</span><span class="ln" style="top:76px">You hear it</span><span class="ph2" id="sph"></span>`;
+  $('#strip').innerHTML = h;
+}
+
+// ---- screens: built once, playback only updates moving parts ----
+function renderScreen(s) {
+  let el = $(`[data-who=${s.id}]`);
+  if (!el) { el = document.createElement('section'); el.className = 'scr'; el.dataset.who = s.id; el.setAttribute('aria-label', `${s.name}'s screen`); $('#desk').appendChild(el); }
+  const o = other(s), p = pos(s);
+  el.classList.toggle('joining', s.joining);
+  el.innerHTML = `<div class="whose"><span class="av ${s.id === 'you' ? 'me' : 'peer'}">${s.name[0]}</span>${s.id === 'you' ? 'Your screen' : "Mira's screen"}<small>${s.id === 'you' ? 'computer keys A–K play your pads' : 'click her pads to play as Mira'}</small></div>
+  <div class="join">Joining the session… asking for the song and the transport</div>
+  <div class="body">
+  <div class="tb">
+    <button class="btn play" data-act="play" aria-pressed="${s.tp.playing}">${s.tp.playing ? '■ Stop' : '▶ Play'}</button>
+    <span class="lcd" data-lcd></span><span class="lcd bpm">120 BPM</span>
+    <button class="btn sm" data-act="alone" aria-pressed="${s.alone}" title="Your Play, Stop and TRACK clicks only affect you">Play alone</button>
+    <span class="grp" role="group" aria-label="Live keys from others"><span class="lab">Live keys</span>
+      <button class="btn sm" data-act="even" aria-pressed="${s.mode === 'even'}" title="Steady timing, slightly late">Even</button>
+      <button class="btn sm" data-act="tight" aria-pressed="${s.mode === 'tight'}" title="As soon as they arrive, wobbly">Tight</button></span>
+  </div>
+  <div class="people" data-people></div>
+  <div class="status" data-status>${s.note ? `<b>${s.note}</b>` : 'Press Play: it starts for both screens on the same beat.'}</div>
+  <div class="arr"><div class="row"><span></span><span class="hd">Bass</span><span class="hd">Drums</span><span class="hd">Lead</span></div>
+  ${ROWS.map((r, i) => `<div class="row" data-row="${i}"><button class="tl${s.sel === i ? ' sel' : ''}" data-act="row" data-r="${i}"><b>TRACK ${i + 1}</b><small>1 bar</small>${s.tp.cue?.row === i ? '<span class="nx">next</span>' : ''}</button>${r.map((c) => `<span class="cell${c === '—' ? ' off' : ''}">${c}${c === '—' ? '' : '<span class="pr"></span>'}</span>`).join('')}</div>`).join('')}
+  </div>
+  <div class="pads">${KEYS.map((k, i) => `<button class="pad" data-pad="${i}" aria-label="Pad ${i + 1}, ${NOTES[i]}">${NOTES[i]}<small>${s.id === 'you' ? k : ''}</small></button>`).join('')}</div>
+  </div>`;
+  paintScreen(s, p);
+}
+function paintScreen(s, p = pos(s)) {
+  const el = $(`[data-who=${s.id}]`);
+  const o = other(s);
+  $('[data-lcd]', el).textContent = p ? `TRACK ${p.row + 1}  1.${Math.floor(p.step / 4) + 1}.${(p.step % 4) + 1}` : s.tp.playing ? 'Starting…' : `TRACK ${s.sel + 1}  1.1.1`;
+  for (const r of el.querySelectorAll('.row[data-row]')) {
+    const here = p && Number(r.dataset.row) === p.row;
+    r.classList.toggle('now', !!here);
+    for (const pr of r.querySelectorAll('.pr')) pr.style.width = here ? (p.frac * 100).toFixed(1) + '%' : '0';
+    const nx = r.querySelector('.nx');
+    if (nx && s.tp.cue?.row !== Number(r.dataset.row)) nx.remove();
+  }
+  const ms = Math.round(pct(s.delays, 0.5));
+  const far = ms > 150;
+  const oState = o.joining ? ' · joining…' : o.alone ? ' · playing alone' : '';
+  const html = `<span class="chip"><span class="av ${s.id === 'you' ? 'me' : 'peer'}">${s.name[0]}</span>${s.id === 'you' ? 'You' : 'Mira (you)'}</span>`
+    + `<span class="chip" title="How long their keys take to reach you"><span class="av ${o.id === 'you' ? 'me' : 'peer'}">${o.id === 'you' ? 'Y' : 'M'}</span>${o.id === 'you' ? 'You' : 'Mira'}${oState} <span class="dot${far ? ' far' : ''}"></span>${far ? 'far' : 'in time'} · ${ms} ms</span>`;
+  const pe = $('[data-people]', el);
+  if (pe.innerHTML !== html) pe.innerHTML = html;
+}
+
+function frame() {
+  for (const s of Object.values(S)) if (!s.joining) paintScreen(s);
+  const ph = $('#sph');
+  if (ph) ph.style.left = `calc(8px + (100% - 16px) * ${(((now() - stripAnchor()) % BAR) + BAR) % BAR / BAR})`;
+  requestAnimationFrame(frame);
+}
+function renderFacts() {
+  const y = S.you, b = Math.round(buffer(y));
+  $('#dlo').textContent = net.delay + ' ms';
+  $('#jto').textContent = '±' + net.jitter;
+  $('#facts').innerHTML = `<span>Mira's keys reach you in <b>${Math.round(pct(y.delays, 0.5))} ms</b> (most of the time), <b>${Math.round(pct(y.delays, 0.95))} ms</b> at worst</span>`
+    + `<span>${y.mode === 'even' ? `Even: you hear them <b>${b} ms</b> after she plays · <b>${stats.n ? Math.round((stats.late / stats.n) * 100) : 0}%</b> arrived too late (played at once)` : 'Tight: you hear them <b>as soon as they arrive</b>'}</span>`
+    + `<span>Play starts <b>${Math.round(lead())} ms</b> after the click, together</span>`
+    + `<span>Clocks agree within <b>${(0.1 + net.jitter * 0.02).toFixed(1)} ms</b> (Mira's clock is 1234.6 ms off)</span>`;
+}
+
+// ---- rough preview sound: what your screen plays ----
+let ac = null, backingFrom = now(), backUpTo = now();
+const acT = (t) => ac.currentTime + Math.max(0, t - now()) / 1000;
+function tone(t, k, who) {
+  if (!ac) return;
+  const o = ac.createOscillator(), g = ac.createGain(), f = ac.createBiquadFilter();
+  o.type = who === 'you' ? 'sawtooth' : 'square';
+  o.frequency.value = FREQ[k] * (who === 'you' ? 1 : 2);
+  f.type = 'lowpass'; f.frequency.value = 2200;
+  const a = acT(t);
+  g.gain.setValueAtTime(0.0001, a); g.gain.exponentialRampToValueAtTime(0.12, a + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, a + 0.22);
+  o.connect(f).connect(g).connect(ac.destination); o.start(a); o.stop(a + 0.25);
+}
+function drum(t, kick) {
+  const a = acT(t), g = ac.createGain();
+  if (kick) {
+    const o = ac.createOscillator(); o.frequency.setValueAtTime(140, a); o.frequency.exponentialRampToValueAtTime(45, a + 0.12);
+    g.gain.setValueAtTime(0.5, a); g.gain.exponentialRampToValueAtTime(0.0001, a + 0.25); o.connect(g).connect(ac.destination); o.start(a); o.stop(a + 0.26);
+  } else {
+    const n = ac.createBufferSource(), b = ac.createBuffer(1, 2048, ac.sampleRate), d = b.getChannelData(0);
+    for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+    const f = ac.createBiquadFilter(); f.type = 'highpass'; f.frequency.value = 7000;
+    n.buffer = b; g.gain.setValueAtTime(0.06, a); g.gain.exponentialRampToValueAtTime(0.0001, a + 0.04); n.connect(f).connect(g).connect(ac.destination); n.start(a);
+  }
+}
+function backingTick() {
+  const y = S.you, until = now() + 120;
+  if (ac && y.tp.playing) {
+    for (let i = Math.ceil((Math.max(backUpTo, backingFrom) - y.tp.at) / STEP); y.tp.at + i * STEP < until; i++) {
+      const t = y.tp.at + i * STEP;
+      if (i >= 0 && t >= Math.max(backUpTo, backingFrom)) { if (i % 4 === 0) drum(t, true); if (i % 2 === 0) drum(t, false); }
+    }
+  }
+  backUpTo = until;
+}
+
+// ---- events ----
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const scr = b.closest('.scr'), s = scr && S[scr.dataset.who];
+  if (b.id === 'snd') {
+    if (!ac) { try { ac = new AudioContext(); } catch { return; } }
+    if (ac.state === 'running') ac.suspend(); else ac.resume();
+    setTimeout(() => { const on = ac.state === 'running'; b.setAttribute('aria-pressed', on); b.textContent = on ? 'Sound: on' : 'Sound: off'; }, 50);
+    return;
+  }
+  if (b.id === 'jam') { jam = !jam; b.setAttribute('aria-pressed', jam); return; }
+  if (b.id === 'rejoin') {
+    const m = S.mira;
+    m.joining = true; m.tp = { playing: false, at: 0, row0: 0, by: null, cue: null }; m.alone = false; m.note = '';
+    renderScreen(m); renderScreen(S.you);
+    setTimeout(() => { send(m, { t: 'hello' }); setTimeout(() => { if (m.joining) { m.joining = false; m.note = 'Joined: nobody is playing'; renderScreen(m); renderScreen(S.you); } }, 600); }, 900);
+    return;
+  }
+  if (!s) return;
+  const a = b.dataset.act;
+  if (b.dataset.pad != null) return press(s, Number(b.dataset.pad));
+  if (a === 'play') return s.tp.playing ? stop(s) : play(s);
+  if (a === 'row') return clickRow(s, Number(b.dataset.r));
+  if (a === 'even' || a === 'tight') { s.mode = a; stats.n = stats.late = 0; renderScreen(s); return renderFacts(); }
+  if (a === 'alone') {
+    s.alone = !s.alone;
+    if (s.alone) s.note = 'Playing alone: your Play and TRACK clicks only affect you';
+    else { s.note = 'Back with the group'; s.tp = { playing: false, at: 0, row0: 0, by: null, cue: null }; send(s, { t: 'hello' }); }
+    renderScreen(s); renderScreen(other(s));
+  }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.repeat || e.target.closest('input,select') || e.ctrlKey || e.metaKey || e.altKey) return;
+  const k = KEYS.indexOf(e.key.toUpperCase());
+  if (k >= 0) press(S.you, k);
+  if (e.key === ' ') { e.preventDefault(); S.you.tp.playing ? stop(S.you) : play(S.you); }
+});
+for (const [id, key] of [['dl', 'delay'], ['jt', 'jitter']]) $('#' + id).addEventListener('input', (e) => { net[key] = Number(e.target.value); S.you.delays = []; S.mira.delays = []; stats.n = stats.late = 0; renderFacts(); });
+
+renderScreen(S.you); renderScreen(S.mira); renderStrip(); renderFacts();
+setInterval(() => { jamTick(); backingTick(); }, 25);
+setInterval(renderFacts, 500);
+requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>

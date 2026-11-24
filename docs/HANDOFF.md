@@ -1,6 +1,15 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-24): Flint (drum machine) built in 3 slices, waiting for the user's review
+## START HERE (2026-11-24, later): Phase 4 (shared transport) mock-up, waiting for the user's feedback
+The user reviewed Flint and Wait: "The drums and tracks are good. Start phase 4". Mock-up: `design/kit/together.html`
+(two screens, You and Mira, with a pretend network: delay + wobble sliders, timing strip, rough sounds). It proposes:
+one Play/Stop for everyone, starting together after a short lead (> p95 network delay); TRACK clicks cue for everyone
+with the exact switch time; automatic clock sync (NTP-style pings, see `spikes/RESULTS.md`); late joiners ask for the
+transport and drop in on the right beat; live keys **Even** (adaptive buffer ~p95) or **Tight** (on arrival), per
+person; recording always at the player's own exact time; a new **Play alone** toggle (local transport, edits still
+shared); people chips show ms and in time / far. Build only after the user signs off.
+
+## Earlier (2026-11-24): Flint (drum machine) built in 3 slices, waiting for the user's review
 The user approved the Flint mock-up (`design/kit/flint.html`) and asked to build all three slices and commit;
 they test and review next. Built:
 1. **Sound** (`packages/engine/src/devices/flint.rs`, `devices/flint.json`, tests `tests/flint.rs`): device kind 2,
