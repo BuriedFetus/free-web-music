@@ -6,11 +6,12 @@ import type { Awareness } from 'y-protocols/awareness';
 import type { Engine } from '@fwm/engine';
 import { stepOf } from '@fwm/engine/worklet';
 import { PresenceModel } from '../collab/presence';
+import { LiveTiming } from '../collab/liveTiming';
 import { TransportSync, type Loop, type TransportTarget } from '../collab/transport';
 import type { LiveChannel, LiveMessage, SongLibrary, StudioUser } from '../collab/types';
 import { deviceEntry } from '../devices/registry';
 import { EngineProvider, useEngine } from '../engine/EngineProvider';
-import { useDeviceSync } from '../engine/useDeviceSync';
+import { HeldParams, useDeviceSync } from '../engine/useDeviceSync';
 import { useComputerKeys } from '../hooks/useComputerKeys';
 import { MAX_LEN, Project, type TrackInfo } from '../model/project';
 import { ThemeRoot, type StudioTheme } from '../theme/Theme';
@@ -41,7 +42,7 @@ export function Studio(props: StudioProps) {
   );
 }
 
-const WS_DEFAULT: Workspace = { track: null, row: null, snap: '1/16', recQuant: '1/16', fold: false, loop: 'song', cueWait: true };
+const WS_DEFAULT: Workspace = { track: null, row: null, snap: '1/16', recQuant: '1/16', fold: false, loop: 'song', cueWait: true, liveMode: 'even' };
 function loadWs(key: string): Workspace {
   try {
     return { ...WS_DEFAULT, ...JSON.parse(localStorage.getItem(key) || '{}') };
@@ -117,9 +118,14 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   const peersRef = useRef(peers);
   peersRef.current = peers;
   const nameOf = (id: string) => peersRef.current.find((p) => p.user.id === id)?.user.name ?? 'Someone';
+  // Times given to the engine are "page time when it is heard". The soonest anything can be heard is
+  // now + this computer's output delay: Play and other people's keys are never planned sooner.
+  const outLatency = useRef(0);
+  const heardNow = useCallback(() => performance.now() + outLatency.current, []);
   const sync = useMemo(
     () =>
       new TransportSync(channel, user.id, {
+        latency: () => outLatency.current,
         loop: wsRef.current.loop,
         onRemote: (kind, who, s) => {
           if (kind === 'loop') setWs({ loop: s.loop });
@@ -132,6 +138,9 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     [channel, user.id],
   );
   useEffect(() => () => sync.destroy(), [sync]);
+  const timing = useMemo(() => new LiveTiming(sync, heardNow), [sync, heardNow]);
+  const held = useMemo(() => new HeldParams(), []);
+  useEffect(() => () => held.clear(), [held]);
   const tp = useSyncExternalStore(sync.subscribe, sync.getSnapshot);
   const playing = tp.playing;
   const rowsRef = useRef(rows);
@@ -236,25 +245,29 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   );
 
   // ---- notes ----
+  // When this key is heard here (page ms): others play it at this moment + their buffer.
+  const lat = live?.latency();
+  outLatency.current = lat ? (lat.base + lat.output) * 1000 : 0;
+  const heardAt = heardNow;
   const playNote = useCallback(
     (track: string, note: number, vel: number) => {
       if (status !== 'on') void start();
       const slot = slots.current.get(track);
       if (live && slot != null) live.noteOn(slot, note, vel);
-      channel?.send({ t: 'on', track, note, vel, user: user.id });
+      channel?.send({ t: 'on', track, note, vel, user: user.id, from: sync.session, at: heardAt() });
       const t = project.track(track);
       if (rec && playing && t) recordOn(t, note, vel);
     },
-    [status, start, live, channel, user.id, project, rec, playing, recordOn],
+    [status, start, live, channel, user.id, project, rec, playing, recordOn, sync, heardAt],
   );
   const releaseNote = useCallback(
     (track: string, note: number) => {
       const slot = slots.current.get(track);
       if (live && slot != null) live.noteOff(slot, note);
-      channel?.send({ t: 'off', track, note, user: user.id });
+      channel?.send({ t: 'off', track, note, user: user.id, from: sync.session, at: heardAt() });
       recordOff(track, note);
     },
-    [live, channel, user.id, recordOff],
+    [live, channel, user.id, recordOff, sync, heardAt],
   );
   const audition = useCallback(
     (track: string, note: number, on: boolean) => {
@@ -266,6 +279,13 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     [live],
   );
 
+  // ---- my knob turns: their timing goes out live (the value itself also goes through the doc) ----
+  useEffect(() => {
+    if (!channel) return;
+    const off = project.onLocalParam((track, id, v) => channel.send({ t: 'param', track, id, v, user: user.id, from: sync.session, at: heardAt() }));
+    return () => void off();
+  }, [project, channel, user.id, sync, heardAt]);
+
   // ---- notes from other people: play on our own copy of their instrument ----
   const [peerHeld, setPeerHeld] = useState<Record<string, { note: number; color: string; user: string }[]>>({});
   const liveRef = useRef(live);
@@ -273,21 +293,40 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   useEffect(() => {
     if (!channel) return;
     return channel.subscribe((m: LiveMessage) => {
-      if ((m.t !== 'on' && m.t !== 'off') || m.user === user.id) return;
+      if (m.t !== 'on' && m.t !== 'off' && m.t !== 'param') return;
+      if (m.from ? m.from === sync.session : m.user === user.id) return;
       const slot = slots.current.get(m.track);
       const e = liveRef.current;
+      const mode = wsRef.current.liveMode;
+      if (m.t === 'param') {
+        // Tight: the doc's update is the turn, on arrival. Even: play the turn at its own pace.
+        if (mode !== 'even' || !e || slot == null || !m.from) return;
+        const at = timing.when(m.from, m.at, 'even');
+        try {
+          e.setParamAt(slot, m.id, m.v, at);
+        } catch {
+          return; // a param this device doesn't have
+        }
+        held.hold(slot, m.id, at + 250);
+        return;
+      }
+      const at = m.from ? timing.when(m.from, m.at, mode, { id: `${m.track}:${m.note}`, on: m.t === 'on' }) : heardNow();
+      const soon = at <= heardNow() + 1;
       if (e && slot != null) {
-        if (m.t === 'on') e.noteOn(slot, m.note, m.vel);
-        else e.noteOff(slot, m.note);
+        if (m.t === 'on') soon ? e.noteOn(slot, m.note, m.vel) : e.noteOnAt(slot, m.note, m.vel, at);
+        else soon ? e.noteOff(slot, m.note) : e.noteOffAt(slot, m.note, at);
       }
       const color = peersRef.current.find((p) => p.user.id === m.user)?.user.color ?? 'var(--fwm-peer)';
-      setPeerHeld((h) => {
-        const list = (h[m.track] ?? []).filter((x) => !(x.note === m.note && x.user === m.user));
-        if (m.t === 'on') list.push({ note: m.note, color, user: m.user });
-        return { ...h, [m.track]: list };
-      });
+      const show = () =>
+        setPeerHeld((h) => {
+          const list = (h[m.track] ?? []).filter((x) => !(x.note === m.note && x.user === m.user));
+          if (m.t === 'on') list.push({ note: m.note, color, user: m.user });
+          return { ...h, [m.track]: list };
+        });
+      if (soon) show();
+      else setTimeout(show, at - heardNow()); // the key lights when it sounds
     });
-  }, [channel, user.id]);
+  }, [channel, user.id, sync, timing, held, heardNow]);
   // Someone left while holding keys: release them.
   useEffect(() => {
     const ids = new Set(peers.map((p) => p.user.id));
@@ -360,7 +399,8 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   }, [project, playing, setPlaying]);
 
   const ctx: StudioCtx = {
-    project, presence, user, channel, songs, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop, rec, setRec, slotOf, cueRow,
+    project, presence, user, channel, songs, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop,
+    transport: sync, liveTiming: timing, rec, setRec, slotOf, cueRow,
     playNote, releaseNote, audition, peerHeld, toast,
   };
 
@@ -368,7 +408,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     <StudioContext.Provider value={ctx}>
       {live && tracks.map((t) => {
         const slot = slots.current.get(t.id);
-        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} />;
+        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} held={held} />;
       })}
       {live && <SongEngine project={project} slotOf={slotOf} loop={ws.loop} />}
       <div className="fwm-app">
@@ -390,13 +430,13 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
 }
 
 /** Keeps one instrument's device, sequencer settings and all its patterns mirrored in the engine. */
-function TrackEngine({ project, track, slot }: { project: Project; track: TrackInfo; slot: number }) {
+function TrackEngine({ project, track, slot, held }: { project: Project; track: TrackInfo; slot: number; held: HeldParams }) {
   const { engine } = useEngine();
   const sent = useRef(new Map<string, string>()); // patternId → what the engine has
   const seqKey = useRef('');
   const manifest = deviceEntry(track.device)!.manifest!;
   const store = project.deviceStore(track.id, manifest)!;
-  useDeviceSync(engine, store, slot, track.device);
+  useDeviceSync(engine, store, slot, track.device, held);
   // Re-send everything when the engine (re)starts or the device is re-created (removing a device
   // in the worklet also forgets its patterns).
   useEffect(() => {

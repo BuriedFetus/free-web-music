@@ -4,20 +4,20 @@ A collaborative, device-based music studio for the browser. This repo is the **c
 
 - Plan, phases, progress: `docs/PLAN.md`
 - Theming contract (tokens, skins, replaceable controls): `docs/THEMING.md`
-- Status: **Phases 1–3 built** (song arrangement, Flint drum machine), reviewed. **Phase 4** (playing together, mock-up `design/kit/together.html` approved): slice 1 shared transport built; slices 2–3 next. See HANDOFF START HERE. Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
+- Status: **Phases 1–3 built** (song arrangement, Flint drum machine), reviewed. **Phase 4** (playing together, mock-up `design/kit/together.html` approved): slices 1–3 built (shared Play, live keys Even/Tight, people chips), waiting for the user's review. See HANDOFF START HERE. Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
 - Words: in code a **track** is an instrument lane; the song's rows (TRACK 1, TRACK 2… in the UI) are **rows**.
 - Prototypes (no build step): `design/kit/index.html` (device kit, has a Sound button), `design/kit/workspace.html` (workspace), `design/kit/arrange.html` (song arrangement mock-up), `design/kit/flint.html` (Flint drum machine mock-up, with rough WebAudio preview sounds), `design/kit/together.html` (Phase 4: playing together over a pretend network). Serve with `python3 spikes/serve.py`.
 
 ## Commands
 Node comes from nvm: run `. ~/.nvm/nvm.sh` first in a fresh shell if `node` is missing.
-- `npm run dev`: harness at http://localhost:5173: the full studio, synced between tabs (open two tabs = two people). `?basalt` = Basalt alone, `?room=x` = a separate session, `?seednow` = demo track before first paint
+- `npm run dev`: harness at http://localhost:5173: the full studio, synced between tabs (open two tabs = two people). `?basalt` = Basalt alone, `?room=x` = a separate session, `?seednow` = demo track before first paint, `?ghost` = a hidden second person in the room
 - `npm test`: Rust engine tests + Vitest (studio model and components)
 - `npm run typecheck`, `npm run build`
 - `packages/engine/build.sh`: rebuild `packages/engine/web/fwm_engine.wasm` after any Rust change (it is committed, the kit and the studio load it)
 
 ## Browser checks (headless Firefox, no automation tools needed)
 Build (`npm run build -w apps/harness`), serve the repo root with COOP/COEP and a POST endpoint that appends the body to a log file, and use a fresh Firefox profile whose `user.js` sets `media.autoplay.default` to 0.
-- Two people: open `dist/index.html?e2e=a&room=R` and `dist/index.html?e2e=b&room=R` in ONE `firefox --headless` command (two tabs share BroadcastChannel). Each tab POSTs PASS/FAIL lines to `./log`.
+- Two people: open `dist/index.html?e2e=a&room=R` and `dist/index.html?e2e=b&room=R` in ONE `firefox --headless` command (two tabs share BroadcastChannel). Each tab POSTs PASS/FAIL lines to `./log`. Playing together (shared Play, live keys, chips): `?e2e=ta` + `?e2e=tb`.
 - Basalt alone: `dist/index.html?basalt&selftest`.
 - Screenshots: `firefox --headless --screenshot out.png URL` (add `?seednow&room=<random>` for a populated studio).
 

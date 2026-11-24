@@ -112,6 +112,16 @@ export async function createEngine({ base, context, manifests } = {}) {
     noteOff(slot, note) {
       send({ t: 'off', slot, note });
     },
+    /** Other people's live keys and knob turns: at page time `at` (performance.now() ms), to the sample. */
+    noteOnAt(slot, note, vel, at) {
+      send({ t: 'at', at: ctxAt(at), m: { t: 'on', slot, note, vel } });
+    },
+    noteOffAt(slot, note, at) {
+      send({ t: 'at', at: ctxAt(at), m: { t: 'off', slot, note } });
+    },
+    setParamAt(slot, id, value, at) {
+      send({ t: 'at', at: ctxAt(at), m: { t: 'param', slot, i: index(slot, id), v: value } });
+    },
     allOff(slot) {
       send({ t: 'allOff', slot });
     },

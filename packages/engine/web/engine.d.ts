@@ -82,6 +82,10 @@ export interface Engine {
   remove(slot: number): void;
   noteOn(slot: number, note: number, velocity?: number): void;
   noteOff(slot: number, note: number): void;
+  /** At page time `at` (performance.now() ms), to the sample: other people's live keys and knob turns. */
+  noteOnAt(slot: number, note: number, velocity: number, at: number): void;
+  noteOffAt(slot: number, note: number, at: number): void;
+  setParamAt(slot: number, id: string, value: number, at: number): void;
   allOff(slot: number): void;
   setParam(slot: number, id: string, value: number): void;
   paramIndex(slot: number, id: string): number;

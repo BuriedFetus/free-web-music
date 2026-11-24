@@ -19,6 +19,8 @@ export interface Workspace {
   loop: 'track' | 'song';
   /** Clicking a TRACK while playing: switch when the playing TRACK ends (true) or at once. */
   cueWait: boolean;
+  /** Other people's live keys and knob turns: steady and slightly late ('even') or on arrival ('tight'). */
+  liveMode: 'even' | 'tight';
 }
 
 export interface StudioCtx {
@@ -38,6 +40,9 @@ export interface StudioCtx {
   setAlone(a: boolean): void;
   /** Loop TRACK / Loop SONG, shared with the group. */
   setLoop(loop: 'track' | 'song'): void;
+  /** Shared transport and live timing (clocks, delays), for the people chips. */
+  transport: import('../collab/transport').TransportSync;
+  liveTiming: import('../collab/liveTiming').LiveTiming;
   rec: boolean;
   setRec(r: boolean): void;
   slotOf(track: string): number | undefined;

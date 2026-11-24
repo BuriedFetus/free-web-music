@@ -1,6 +1,25 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-24, later): Phase 4 slice 1 (shared transport) built; slices 2–3 next
+## START HERE (2026-11-24, evening): Phase 4 done (slices 1–3), waiting for the user's review
+The user said "Go ahead with slice 2 & slice 3 then commit and push" and left for work; next session starts with
+their review of Phase 4 (ask how playing together feels: Even vs Tight, the chips, Play alone).
+- Slice 2: `collab/liveTiming.ts` (LiveTiming: when to play another person's key / knob turn), worklet timed
+  events, `HeldParams` in `engine/useDeviceSync.ts`, `Project.onLocalParam` (local knob turns go out on the
+  channel as `{t:'param'}` with their time; the value still goes through the doc). Even/Tight in the top bar.
+- Slice 3: people chips in `TopBar.tsx` (`useLinks`), styles `.fwm-plink` in `styles/shell.css`.
+- Timing words: every time handed to the engine is "page time when it is heard" (getOutputTimestamp). A key's
+  `at` = sender's page time + its output delay. LiveTiming's `now` = page time + my output delay (the soonest I
+  can sound anything). TransportSync's clock is plain page time, its Play lead includes everyone's output delay.
+- Harness: `?ghost` opens a hidden second person in the same room (screenshots of chips); `?newuser` = a fresh
+  identity. For screenshots that need time, my scratch server had `/shot?<ms>&<query>` (holds the load event).
+- Tests: `packages/studio/test/transport.test.ts` (sync + Even/Tight over a simulated wobbly network),
+  `packages/engine/test/timed.test.ts` (real WASM: a timed note starts on its sample), browser `?e2e=ta`/`tb` (21 checks).
+- A flaky `?e2e=songs` failure ("INIT is silent") appeared mid-slice (1 in 3 runs) and went away (0 in 10) after
+  Play stopped being scheduled sooner than the output delay; the exact link was not proven. If it comes back, look there.
+- Not done / ideas: the Studio artifact (HEVoA3TExTjSF2bRmVUUei) is still the Phase 1–3 build; the mock-up's
+  "Mira reloads" is covered by `hello`, but a real reload test across two Firefox tabs isn't automated.
+
+## Earlier (2026-11-24, later): Phase 4 slice 1 (shared transport)
 The user approved the Playing Together mock-up (`design/kit/together.html`): "its all good" (after asking whether
 latency only affects live playing: yes; the song itself, your own keys and recordings have no network delay).
 Slice 1 built (see PLAN.md "Phase 4 progress"): `collab/transport.ts` (TransportSync) owns Play / Stop / TRACK clicks /

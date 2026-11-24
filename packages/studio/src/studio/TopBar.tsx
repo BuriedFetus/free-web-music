@@ -1,4 +1,4 @@
-import { useState, useSyncExternalStore } from 'react';
+import { useEffect, useState, useSyncExternalStore } from 'react';
 import type { Peer } from '../collab/presence';
 import { useEngine } from '../engine/EngineProvider';
 import { NOTE_NAMES, SCALES } from '../model/scales';
@@ -21,8 +21,40 @@ function usePosition(): string | null {
   );
 }
 
+/** How the connection to each person is: refreshed once a second (the chips). */
+function useLinks() {
+  const { transport, liveTiming, channel, ws } = useStudio();
+  const [, tick] = useState(0);
+  useEffect(() => {
+    const i = setInterval(() => tick((x) => x + 1), 1000);
+    return () => clearInterval(i);
+  }, []);
+  const clocks = transport.clocks();
+  return (p: Peer): { cls: string; text: string; title: string } | null => {
+    if (!channel) return null;
+    const c = clocks.find((x) => x.user === p.user.id);
+    if (!c || c.offset == null) return { cls: 'is-joining', text: 'joining…', title: 'Measuring the connection to them' };
+    if (c.alone) return { cls: 'is-alone', text: 'playing alone', title: 'Their Play, Stop and TRACK clicks only affect them' };
+    const info = liveTiming.info(c.session);
+    const ms = Math.round(c.delay);
+    const far = ms > 150;
+    const timing =
+      ws.liveMode === 'tight'
+        ? 'Tight: you hear them as their keys arrive.'
+        : info.lag != null
+          ? `Even: you hear their keys ${Math.max(0, Math.round(info.lag))} ms after they do${info.late >= 0.01 ? ` (${Math.round(info.late * 100)}% arrived too late and played at once)` : ''}.`
+          : 'Even: their keys will play at a steady delay.';
+    return {
+      cls: far ? 'is-far' : 'is-ok',
+      text: `${far ? 'far' : 'in time'} · ${ms < 1 ? '<1' : ms} ms`,
+      title: `Messages take about ${ms} ms to reach you. ${timing} The song itself plays in time for everyone.`,
+    };
+  };
+}
+
 export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
   const { project, ws, setWs, playing, setPlaying, alone, setAlone, setLoop, rec, setRec, user } = useStudio();
+  const link = useLinks();
   const { status, start, stop } = useEngine();
   const live = usePosition();
   const [playRow, pos] = live ? live.split('|') : [null, null];
@@ -62,6 +94,17 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
             🎧 Play alone
           </button>
         )}
+        {peers.length > 0 && (
+          <span className="fwm-grp" role="group" aria-label="Other people's live keys">
+            <span className="fwm-livemode">Live keys</span>
+            <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.liveMode === 'even'}
+              title="Other people's live keys and knob turns: steady timing, slightly late"
+              onClick={() => setWs({ liveMode: 'even' })}>Even</button>
+            <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.liveMode === 'tight'}
+              title="Other people's live keys and knob turns as soon as they arrive: sooner, but the network's wobble is heard"
+              onClick={() => setWs({ liveMode: 'tight' })}>Tight</button>
+          </span>
+        )}
         <span className="fwm-bpm">
           <button type="button" className="fwm-tb fwm-tb--sm" aria-label="Slower" onClick={() => project.setBpm(project.bpm - 1)}>−</button>
           <BpmField />
@@ -88,7 +131,7 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
       <div className="fwm-people" aria-label="People in this session">
         <span className="fwm-pchip">
           <span className="fwm-av" style={{ background: user.color }}>{user.name[0]}</span>
-          <span>{user.name} (you){trackName(ws.track) ? ` · ${trackName(ws.track)}` : ''}</span>
+          <span>{user.name} (you){trackName(ws.track) ? ` · ${trackName(ws.track)}` : ''}{alone ? ' · playing alone' : ''}</span>
         </span>
         {peers.map((p) => (
           <span key={p.clientId} className="fwm-pchip">
@@ -98,6 +141,10 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
               {trackName(p.track) ? ` · ${trackName(p.track)} ${rowName(p.row)}` : ''}
               {p.touch && project.track(p.touch.track) && !p.touch.control.startsWith('note:') ? ` · ${p.touch.control}` : ''}
             </span>
+            {(() => {
+              const l = link(p);
+              return l && <span className={'fwm-plink ' + l.cls} title={l.title}>{l.text}</span>;
+            })()}
           </span>
         ))}
       </div>

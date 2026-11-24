@@ -18,6 +18,8 @@
 //                                                  (`at` in the future: waits, to the sample; in the past: joins mid-row)
 //   {t:'seek', row, pos, at}                       while playing: move so that row `row` is `pos` steps in at `at`
 //                                                  (corrects drift between people; the global clock keeps running)
+//   {t:'at', at, m}                                 do `m` ('on' | 'off' | 'param') at audio time `at`, to the sample
+//                                                  (other people's live keys and knob turns, played evenly)
 // Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport}.
 // MessagePort is used everywhere for now; a SharedArrayBuffer ring comes later behind the same API.
 const UI_EVERY = 6; // blocks between UI snapshots (~16 ms at 48 kHz)
@@ -295,7 +297,7 @@ export class Sequencer {
 
 const Processor = globalThis.AudioWorkletProcessor ?? class {};
 
-class FwmEngine extends Processor {
+export class FwmEngine extends Processor {
   constructor(options) {
     super();
     const { wasm, slots = [] } = options.processorOptions;
@@ -307,6 +309,8 @@ class FwmEngine extends Processor {
     for (const s of slots) this.add(s.slot, s.kind);
     this.n = 0;
     this.next = typeof currentFrame === 'number' ? currentFrame : 0; // frame where the next block starts
+    this.timed = []; // {frame, n, m}: events waiting for their time, in order
+    this.timedN = 0;
     this.port.onmessage = (e) => this.msg(e.data);
     this.port.postMessage({ t: 'ready', sampleRate });
   }
@@ -323,14 +327,16 @@ class FwmEngine extends Processor {
     const x = this.x;
     switch (m.t) {
       case 'add': this.add(m.slot, m.kind); break;
-      case 'remove': x.fwm_remove_device(m.slot); this.slots.delete(m.slot); this.seq.removeTrack(m.slot); this.base.delete(m.slot); break;
+      case 'remove': this.timed = this.timed.filter((e) => e.m.slot !== m.slot); x.fwm_remove_device(m.slot); this.slots.delete(m.slot); this.seq.removeTrack(m.slot); this.base.delete(m.slot); break;
       case 'on': x.fwm_note_on(m.slot, 0, m.note, m.vel ?? 0.8); break;
       case 'off': x.fwm_note_off(m.slot, 0, m.note); break;
       case 'allOff': x.fwm_all_off(m.slot); break;
-      case 'param': {
-        x.fwm_param(m.slot, 0, m.i, m.v);
-        if (!this.base.has(m.slot)) this.base.set(m.slot, new Map());
-        this.base.get(m.slot).set(m.i, m.v);
+      case 'param': this.param(m.slot, 0, m.i, m.v); break;
+      case 'at': {
+        const e = { frame: Math.round(m.at * sampleRate), n: this.timedN++, m: m.m };
+        let i = this.timed.length;
+        while (i > 0 && this.timed[i - 1].frame > e.frame) i--;
+        this.timed.splice(i, 0, e);
         break;
       }
       case 'route': {
@@ -364,6 +370,23 @@ class FwmEngine extends Processor {
         break;
     }
   }
+  param(slot, frame, i, v) {
+    this.x.fwm_param(slot, frame, i, v);
+    if (!this.base.has(slot)) this.base.set(slot, new Map());
+    this.base.get(slot).set(i, v);
+  }
+  /** Timed events due in this block, at their frame (late ones at the start). */
+  runTimed(start, frames) {
+    const x = this.x;
+    while (this.timed.length && this.timed[0].frame < start + frames) {
+      const { frame, m } = this.timed.shift();
+      if (!this.slots.has(m.slot)) continue;
+      const f = Math.max(0, frame - start);
+      if (m.t === 'on') x.fwm_note_on(m.slot, f, m.note, m.vel ?? 0.8);
+      else if (m.t === 'off') x.fwm_note_off(m.slot, f, m.note);
+      else if (m.t === 'param') this.param(m.slot, f, m.i, m.v);
+    }
+  }
   /** Steps into the row at the start of the next block, for "row is `pos` steps in at time `at`". */
   target(m) {
     return (m.pos ?? 0) + (this.next - m.at * sampleRate) * this.seq.stepsPerFrame();
@@ -385,6 +408,7 @@ class FwmEngine extends Processor {
     const frames = out[0].length;
     const x = this.x;
     this.seq.advance(frames, this.emit);
+    this.runTimed(currentFrame, frames);
     x.fwm_render(frames);
     out[0].set(this.view(x.fwm_out_l(), frames));
     if (out[1]) out[1].set(this.view(x.fwm_out_r(), frames));

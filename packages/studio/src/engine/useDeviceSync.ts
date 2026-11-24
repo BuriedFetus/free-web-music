@@ -4,7 +4,7 @@ import { useEffect, useSyncExternalStore } from 'react';
 import type { DeviceId, Engine } from '@fwm/engine';
 import { MAX_ROUTES, type DeviceState, type DeviceStore } from '../model/deviceStore';
 
-export function useDeviceSync(engine: Engine | null, store: DeviceStore, slot: number, device: DeviceId) {
+export function useDeviceSync(engine: Engine | null, store: DeviceStore, slot: number, device: DeviceId, held?: HeldParams | null) {
   useEffect(() => {
     if (!engine) return;
     engine.add(slot, device);
@@ -13,7 +13,8 @@ export function useDeviceSync(engine: Engine | null, store: DeviceStore, slot: n
       const s = store.getState();
       for (const p of store.manifest.params) {
         const v = s.params[p.id];
-        if (!sent || sent.params[p.id] !== v) engine.setParam(slot, p.id, v);
+        // A knob someone is turning live plays from their timed messages; the doc catches up after.
+        if ((!sent || sent.params[p.id] !== v) && !held?.isHeld(slot, p.id)) engine.setParam(slot, p.id, v);
       }
       if (!sent || sent.routes !== s.routes) {
         for (let r = 0; r < MAX_ROUTES; r++) {
@@ -26,11 +27,45 @@ export function useDeviceSync(engine: Engine | null, store: DeviceStore, slot: n
     };
     push();
     const unsub = store.subscribe(push);
+    // When the live turn ends, the knob goes to the doc's value (the last word, in case a message was lost).
+    const unhold = held?.onRelease(slot, (id) => engine.setParam(slot, id, store.getState().params[id]));
     return () => {
       unsub();
+      unhold?.();
       engine.remove(slot);
     };
-  }, [engine, store, slot, device]);
+  }, [engine, store, slot, device, held]);
+}
+
+/** Knobs another person is turning live, per engine slot, until a moment (page ms). */
+export class HeldParams {
+  private until = new Map<string, number>();
+  private timers = new Map<string, ReturnType<typeof setTimeout>>();
+  private release = new Map<number, (id: string) => void>();
+  hold(slot: number, id: string, until: number) {
+    const k = `${slot}:${id}`;
+    this.until.set(k, until);
+    clearTimeout(this.timers.get(k));
+    this.timers.set(k, setTimeout(() => {
+      this.until.delete(k);
+      this.timers.delete(k);
+      this.release.get(slot)?.(id);
+    }, Math.max(0, until - performance.now())));
+  }
+  isHeld(slot: number, id: string) {
+    return this.until.has(`${slot}:${id}`);
+  }
+  onRelease(slot: number, fn: (id: string) => void) {
+    this.release.set(slot, fn);
+    return () => {
+      if (this.release.get(slot) === fn) this.release.delete(slot);
+    };
+  }
+  clear() {
+    for (const t of this.timers.values()) clearTimeout(t);
+    this.timers.clear();
+    this.until.clear();
+  }
 }
 
 /** Subscribe to the device store from React. */

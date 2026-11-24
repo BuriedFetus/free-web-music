@@ -69,16 +69,19 @@ export function connectTabs(room: string) {
 const NAMES = ['Mira', 'Theo', 'Juno', 'Kai', 'Nova', 'Remy', 'Ada', 'Sol'];
 const COLORS = ['#ff4fa3', '#ffb23f', '#7dff6b', '#b48cff', '#3fe0ff', '#ff7a59', '#f5e663', '#59ffcb'];
 
-/** One identity per tab (kept across reloads of that tab). */
-export function tabUser() {
-  try {
-    const j = sessionStorage.getItem('fwm.harness.user');
-    if (j) return JSON.parse(j) as { id: string; name: string; color: string };
-  } catch {
-    /* ignore */
+/** One identity per tab (kept across reloads of that tab); `fresh` = a new one, not kept (?newuser). */
+export function tabUser(fresh = false) {
+  if (!fresh) {
+    try {
+      const j = sessionStorage.getItem('fwm.harness.user');
+      if (j) return JSON.parse(j) as { id: string; name: string; color: string };
+    } catch {
+      /* ignore */
+    }
   }
   const i = Math.floor(Math.random() * NAMES.length);
   const u = { id: 'u' + Math.random().toString(36).slice(2, 9), name: NAMES[i], color: COLORS[i] };
+  if (fresh) return u;
   try {
     sessionStorage.setItem('fwm.harness.user', JSON.stringify(u));
   } catch {

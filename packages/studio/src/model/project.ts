@@ -109,6 +109,16 @@ export class Project {
   private version = 0;
   private listeners = new Set<() => void>();
   private stores = new Map<string, { map: Y.Map<unknown>; store: DeviceStore }>();
+  /** Knob turns made here (not undo, presets or peers): the studio sends their timing to everyone live. */
+  private paramListeners = new Set<(track: string, id: string, v: number) => void>();
+  onLocalParam(fn: (track: string, id: string, v: number) => void) {
+    this.paramListeners.add(fn);
+    return () => this.paramListeners.delete(fn);
+  }
+  /** @internal */
+  localParam(track: string, id: string, v: number) {
+    for (const fn of this.paramListeners) fn(track, id, v);
+  }
 
   constructor(doc: Y.Doc, origin: object = {}) {
     this.doc = doc;
@@ -697,7 +707,7 @@ export class Project {
     // A track brought back by undo (or re-created remotely) is a new Y.Map: rebuild its store then.
     const cached = this.stores.get(track);
     if (cached && cached.map === t) return cached.store;
-    const store = createYDeviceStore(this, t, manifest);
+    const store = createYDeviceStore(this, t, manifest, track);
     this.stores.set(track, { map: t, store });
     return store;
   }
@@ -715,7 +725,7 @@ function clampNote(n: Note): Note {
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
 
-function createYDeviceStore(project: Project, t: Y.Map<unknown>, manifest: DeviceManifest): DeviceStore {
+function createYDeviceStore(project: Project, t: Y.Map<unknown>, manifest: DeviceManifest, track: string): DeviceStore {
   const params = t.get('params') as Y.Map<number>;
   const routes = t.get('routes') as Y.Array<Route>;
   const read = (): DeviceState => ({
@@ -747,6 +757,7 @@ function createYDeviceStore(project: Project, t: Y.Map<unknown>, manifest: Devic
       const v = s.type === 'enum' ? Math.round(value) : clamp01(value);
       if (state.params[id] === v) return;
       project.transact(() => params.set(id, v));
+      project.localParam(track, id, v);
     },
     load(patch, preset = 0) {
       project.transact(() => {

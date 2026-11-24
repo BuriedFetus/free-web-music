@@ -147,8 +147,8 @@ The core does no networking. The host owns providers, persistence and storage.
 
 ### Phase 4 progress (mock-up `design/kit/together.html`, approved 2026-11-24)
 - [x] Slice 1, shared transport (`packages/studio/src/collab/transport.ts`): clock difference per peer from ping / pong (lowest-delay quarter, median); Play starts everyone on the same sample after a short lead (worst recent delay + 30 ms, 60–400 ms, 0 when alone); TRACK clicks and Loop TRACK / SONG reach everyone; the driver (last to press Play / click a TRACK) says where the song is once a second and anyone > 4 ms off seeks (drift, tempo changes, song edits); newcomers ask ("hello") and drop in; **Play alone**. Engine: `playAt / seek / where`, page time ↔ audio time via `getOutputTimestamp`. Tests: `packages/studio/test/transport.test.ts` (simulated network), sequencer start / seek to the sample, browser `?e2e=ta` + `?e2e=tb` (two tabs measured 0.2–2.7 ms apart)
-- [ ] Slice 2, live keys and knob turns in time: timestamps, Even (adaptive buffer) / Tight per person
-- [ ] Slice 3, people chips: delay in ms, in time / far, playing alone / joining
+- [x] Slice 2, live keys and knob turns in time (`collab/liveTiming.ts`): keys and knob turns carry the moment they were heard by their player; **Even** plays them at that moment + a lag (p95 of recent arrivals + 3 ms, measured as arrival − sent so clock estimates can't move it; glides up 2 ms / down 0.5 ms per key), **Tight** on arrival; a release keeps its press's lag; per person (`ws.liveMode`, top bar "Live keys Even / Tight"). The worklet plays timed events to the sample (`{t:'at'}`, `noteOnAt / noteOffAt / setParamAt`). A knob someone turns live is held from the doc's updates until 250 ms after their last turn (`HeldParams`), then set to the doc's value. Play starts no sooner than everyone's sound cards can play it (pings carry each output delay)
+- [x] Slice 3, people chips: "● in time · 45 ms" (network delay from the pings; red "far" above 150 ms), "joining…", "playing alone"; tooltip says the Even lag and the share of late keys
 
 **Phase 0 complete.** Handoff notes for Phase 1: `docs/HANDOFF.md`.
 

@@ -662,6 +662,25 @@ async function runTogether(
       ok(d.ms != null && d.ms < 5, `…in step with B (${fmt(d)})`);
       post('b-stop');
       await until('stopped', () => !isPlaying(), 3000);
+      // Live keys and a knob turn (B listens in Even, then Tight).
+      const key = async (k: string) => {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+        await sleep(120);
+        document.body.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
+        await sleep(130);
+      };
+      post('live');
+      for (let i = 0; i < 12; i++) await key('asdf'[i % 4]);
+      const store = p.deviceStore(id, m)!;
+      for (let i = 1; i <= 10; i++) {
+        store.setParam('cut', 0.3 + i * 0.05);
+        await sleep(40);
+      }
+      post('live-done');
+      await wait('tight');
+      for (let i = 0; i < 6; i++) await key('a');
+      post('tight-done');
+      await wait('b-done');
       post('done');
     } else {
       await until('track from A', () => p.trackIds().length > 0 && p.rows().length >= 2);
@@ -686,6 +705,33 @@ async function runTogether(
       got.delete('b-stop');
       await wait('b-stop');
       btn('■ Stop')!.click();
+      // Live keys from A, Even (the default).
+      await wait('live');
+      let peak = 0;
+      let lit = false;
+      while (!got.has('live-done')) {
+        peak = Math.max(peak, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+        lit ||= !!$('.fwm-keys__w.is-peer, .fwm-keys__b.is-peer');
+        await sleep(20);
+      }
+      ok(peak > 0.02, `Even: hears A's live keys (peak ${peak.toFixed(3)})`);
+      ok(lit, "Even: A's keys light up when they sound");
+      const chip = $('.fwm-plink');
+      ok(!!chip && /in time · (<1|\d+) ms/.test(chip.textContent ?? ''), `A's chip shows the connection ("${chip?.textContent}")`);
+      const lag = Number(/you hear their keys (\d+) ms/.exec(chip?.title ?? '')?.[1] ?? NaN);
+      ok(lag >= 0 && lag < 300, `Even plays A's keys at a steady delay (${lag} ms; "${chip?.title}")`);
+      const id = p.trackIds()[0];
+      await until("A's knob turn", () => Math.abs(p.deviceStore(id, m)!.getState().params.cut - 0.8) < 1e-6, 3000);
+      ok(true, "A's live knob turn arrived (Cutoff 0.8)");
+      btn('Tight')!.click();
+      post('tight');
+      peak = 0;
+      while (!got.has('tight-done')) {
+        peak = Math.max(peak, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+        await sleep(20);
+      }
+      ok(peak > 0.02, `Tight: hears A's live keys on arrival (peak ${peak.toFixed(3)})`);
+      post('b-done');
       await wait('done');
     }
   } catch (e) {

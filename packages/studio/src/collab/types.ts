@@ -8,10 +8,16 @@ export interface StudioUser {
   color: string;
 }
 
-/** Live performance events (keyboard jamming). Small, frequent, never stored. */
+/**
+ * Live performance events (keyboard jamming, knob turns). Small, frequent, never stored.
+ * `from` is the sender's studio session and `at` the moment it was played on the sender's clock
+ * (performance.now() ms, when it was heard there), so others can play it with even timing.
+ */
 export type NoteMessage =
-  | { t: 'on'; track: string; note: number; vel: number; user: string }
-  | { t: 'off'; track: string; note: number; user: string };
+  | { t: 'on'; track: string; note: number; vel: number; user: string; from?: string; at?: number }
+  | { t: 'off'; track: string; note: number; user: string; from?: string; at?: number }
+  /** A knob turned live (the value also goes through the doc; this copy carries its timing). */
+  | { t: 'param'; track: string; id: string; v: number; user: string; from: string; at: number };
 
 /**
  * Shared transport (one Play for everyone). `from` is one open studio (a tab), so the same person
@@ -19,7 +25,7 @@ export type NoteMessage =
  * them with the clock difference it measured (ping / pong).
  */
 export type TransportMessage =
-  | { t: 'ping'; from: string; user: string; a: number; alone: boolean }
+  | { t: 'ping'; from: string; user: string; a: number; alone: boolean; /** output delay, ms */ lat?: number }
   | { t: 'pong'; from: string; to: string; a: number; b: number }
   | { t: 'hello'; from: string }
   | {

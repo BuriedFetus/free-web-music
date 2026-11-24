@@ -166,3 +166,54 @@ describe('TransportSync', () => {
     a.sync.destroy();
   });
 });
+
+describe('LiveTiming: other people\'s keys', () => {
+  it('Even keeps the rhythm steady over a wobbly network; Tight plays on arrival', async () => {
+    const { LiveTiming } = await import('../src/collab/liveTiming');
+    const net = network(40, 20, 11);
+    const a = studio(net, 'ana', 0);
+    const b = studio(net, 'ben', -2222.2);
+    const keysA = net.join();
+    const keysB = net.join();
+    const timing = new LiveTiming(b.sync, () => Date.now() - 2222.2);
+    const heard: Record<string, number[]> = { even: [], tight: [] };
+    let late = 0;
+    keysB.subscribe((m) => {
+      if (m.t !== 'on') return;
+      const sentTrue = m.at!; // A's clock = true time
+      const playLocal = timing.when(m.from!, m.at, 'even', { id: `t:${m.note}:${m.at}`, on: true });
+      heard.even.push(playLocal + 2222.2 - sentTrue);
+      heard.tight.push(Date.now() - sentTrue); // Tight = on arrival
+      if (playLocal <= Date.now() - 2222.2 + 1e-6 && heard.even.length > 40) late++;
+    });
+    vi.advanceTimersByTime(3000);
+    for (let i = 0; i < 400; i++) {
+      keysA.send({ t: 'on', track: 't', note: 60, vel: 1, user: 'ana', from: a.sync.session, at: Date.now() });
+      vi.advanceTimersByTime(125);
+    }
+    vi.advanceTimersByTime(1000);
+    // What the ear hears: how much each note's delay differs from the one before (p90, ms).
+    const wobble = (xs: number[]) => {
+      const d = xs.slice(40).map((x, i, a) => (i ? Math.abs(x - a[i - 1]) : 0)).slice(1).sort((p, q) => p - q);
+      return d[Math.floor(d.length * 0.9)];
+    };
+    expect(wobble(heard.tight)).toBeGreaterThan(25); // the network's wobble, heard as is
+    expect(wobble(heard.even)).toBeLessThan(3); // steady (the lag itself glides by ≤ 2 ms a note)
+    expect(late / (heard.even.length - 40)).toBeLessThan(0.08);
+    a.sync.destroy(); b.sync.destroy();
+  });
+
+  it('a release keeps the delay of its press, so a note never ends before it starts', async () => {
+    const { LiveTiming } = await import('../src/collab/liveTiming');
+    const net = network(30, 5);
+    const a = studio(net, 'ana', 0);
+    const b = studio(net, 'ben', 10);
+    vi.advanceTimersByTime(3000);
+    const timing = new LiveTiming(b.sync, () => Date.now() + 10);
+    const t0 = Date.now() - 40;
+    const on = timing.when(a.sync.session, t0, 'even', { id: 'k', on: true });
+    const off = timing.when(a.sync.session, t0 + 5, 'even', { id: 'k', on: false });
+    expect(off - on).toBeCloseTo(5, 5);
+    a.sync.destroy(); b.sync.destroy();
+  });
+});

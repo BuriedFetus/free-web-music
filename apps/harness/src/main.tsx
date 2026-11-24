@@ -35,7 +35,7 @@ function SkinButtons({ skin, setSkin }: { skin: string; setSkin(s: string): void
 // ---------- the studio, as the friend's app would mount it ----------
 const session = params.has('basalt') ? null : connectTabs('fwm-demo' + (params.get('room') ?? ''));
 const engineRef: { current: Engine | null } = { current: null };
-const me = tabUser();
+const me = tabUser(params.has('newuser'));
 
 /** First visit: start with one Basalt and a bass line so there is something to play. */
 function seed() {
@@ -99,6 +99,13 @@ function StudioPage() {
       return;
     }
     const t = setTimeout(seed, 600); // give other tabs a moment to send their project first
+    // ?ghost: a hidden second person in the same room (screenshots of people chips and shared play).
+    if (params.has('ghost')) {
+      const f = document.createElement('iframe');
+      f.hidden = true;
+      f.src = `${location.pathname}?newuser&room=${encodeURIComponent(params.get('room') ?? '')}`;
+      document.body.appendChild(f);
+    }
     return () => clearTimeout(t);
   }, []);
   return (

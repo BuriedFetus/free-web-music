@@ -63,22 +63,30 @@ export class TransportSync {
   private by = ''; // session of the driver
   private anchor: { row: string; pos: number; at: number } | null = null; // last known place (for an engine that starts later)
   private target: TransportTarget | null = null;
-  private peers = new Map<string, { user: string; samples: Sample[]; seen: number; alone: boolean }>();
+  private peers = new Map<string, { user: string; samples: Sample[]; seen: number; alone: boolean; lat: number }>();
   private listeners = new Set<() => void>();
   private timers: ReturnType<typeof setTimeout>[] = [];
   private unsub: (() => void) | null = null;
   private lastBeat = 0;
   private beatSoon = 0;
   private intervals: ReturnType<typeof setInterval>[] = [];
+  private latency: () => number;
   private now: () => number;
   private onRemote: ((kind: Tp['kind'], user: string, s: TransportState) => void) | null;
 
   constructor(
     private channel: LiveChannel | null,
     private user: string,
-    opts: { loop?: Loop; now?: () => number; onRemote?(kind: Tp['kind'], user: string, s: TransportState): void } = {},
+    opts: {
+      loop?: Loop;
+      now?: () => number;
+      /** This computer's output delay (ms): a Play can't be heard sooner than now + this. */
+      latency?: () => number;
+      onRemote?(kind: Tp['kind'], user: string, s: TransportState): void;
+    } = {},
   ) {
     this.now = opts.now ?? (() => performance.now());
+    this.latency = opts.latency ?? (() => 0);
     this.onRemote = opts.onRemote ?? null;
     this.state = { playing: false, alone: false, loop: opts.loop ?? 'song', by: null };
     if (!channel) return;
@@ -113,6 +121,9 @@ export class TransportSync {
   setTarget(t: TransportTarget | null) {
     this.target = t;
     if (!t || !this.state.playing || !this.anchor) return;
+    // Alone (or nobody else here): sound just came on, so start the song now rather than partway in.
+    const solo = this.state.alone || !this.clocks().some((c) => !c.alone);
+    if (solo && this.anchor.at < this.now() + this.lead()) this.anchor = { ...this.anchor, at: this.now() + this.lead() };
     t.play(this.anchor.row, this.anchor.pos, this.anchor.at);
     if (!this.isDriver()) this.send({ t: 'hello', from: this.session });
   }
@@ -167,11 +178,11 @@ export class TransportSync {
 
   // ---- clocks ----
   private ping() {
-    this.send({ t: 'ping', from: this.session, user: this.user, a: this.now(), alone: this.state.alone });
+    this.send({ t: 'ping', from: this.session, user: this.user, a: this.now(), alone: this.state.alone, lat: this.latency() });
   }
   private peer(id: string, user = '') {
     let p = this.peers.get(id);
-    if (!p) this.peers.set(id, (p = { user, samples: [], seen: this.now(), alone: false }));
+    if (!p) this.peers.set(id, (p = { user, samples: [], seen: this.now(), alone: false, lat: 0 }));
     p.seen = this.now();
     if (user) p.user = user;
     return p;
@@ -197,11 +208,16 @@ export class TransportSync {
         return { session, user: p.user, offset: this.offset(session), delay: q(0.5), delayHigh: q(0.9), alone: p.alone };
       });
   }
-  /** How far ahead Play starts, so the message reaches everyone in time (0 when nobody else is here). */
+  /**
+   * How far ahead Play starts: so it can be heard here (output delay) and, with others, so the message
+   * reaches everyone and their sound cards in time.
+   */
   lead() {
-    const others = this.clocks().filter((c) => !c.alone);
-    if (this.state.alone || !others.length) return 0;
-    return Math.min(400, Math.max(60, Math.max(...others.map((c) => c.delayHigh)) + 30));
+    const mine = this.latency();
+    const others = this.state.alone ? [] : this.clocks().filter((c) => !c.alone);
+    if (!others.length) return mine;
+    const theirs = Math.max(...others.map((c) => c.delayHigh + (this.peers.get(c.session)?.lat ?? 0)));
+    return Math.min(500, Math.max(mine, 60, theirs + 30));
   }
   private toLocal(m: Tp) {
     const off = this.offset(m.from);
@@ -237,11 +253,12 @@ export class TransportSync {
   }
 
   private receive(m: LiveMessage) {
-    if (!('from' in m) || m.from === this.session) return;
+    if (m.t === 'on' || m.t === 'off' || m.t === 'param' || m.from === this.session) return;
     if (m.t === 'ping') {
       const p = this.peer(m.from, m.user);
       const was = p.alone;
       p.alone = m.alone;
+      p.lat = m.lat ?? 0;
       this.send({ t: 'pong', from: this.session, to: m.from, a: m.a, b: this.now() });
       if (was !== m.alone) this.set({}); // chips
       return;

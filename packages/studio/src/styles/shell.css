@@ -10,7 +10,14 @@
 .fwm-hintline { font-size: 13px; color: var(--fwm-mute); white-space: nowrap; }
 .fwm-people { display: flex; gap: 6px; flex-wrap: wrap; }
 .fwm-pchip { display: flex; align-items: center; gap: 8px; padding: 3px 12px 3px 3px; border-radius: 999px; background: var(--fwm-bg); border: 1px solid var(--fwm-line); font-size: 13px; max-width: 340px; }
-.fwm-pchip > span:last-child { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fwm-pchip > span:not(.fwm-av):not(.fwm-plink) { overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+/* Connection to a person: green dot "in time · 45 ms", red "far", grey "joining…" / "playing alone". */
+.fwm-plink { display: inline-flex; align-items: center; gap: 5px; flex: none; white-space: nowrap; color: var(--fwm-mute); }
+.fwm-plink::before { content: ''; width: 8px; height: 8px; border-radius: 50%; background: currentColor; box-shadow: 0 0 calc(6px * var(--fwm-glow)) currentColor; }
+.fwm-plink.is-ok::before { background: var(--fwm-note); box-shadow: 0 0 calc(6px * var(--fwm-glow)) var(--fwm-note); }
+.fwm-plink.is-far { color: var(--fwm-rec); }
+.fwm-plink.is-ok { color: var(--fwm-ink); }
+.fwm-livemode { font-size: 13px; color: var(--fwm-mute); }
 .fwm-app .fwm-av { width: 26px; height: 26px; flex: none; }
 .fwm-av--xs { width: 20px !important; height: 20px !important; font-size: 11px !important; border-width: 1px !important; }
 
