@@ -100,6 +100,7 @@ main{padding:12px max(2vw,12px) 24px;display:grid;gap:12px}
 .ds{display:grid;gap:3px}
 .ds i{height:22px;border-radius:4px;background:var(--fwm-roll2)}
 .ds i.x{background:var(--fwm-note)}
+.ds i.cur{outline:2px solid var(--fwm-roll-ink)}
 .ds i:nth-child(4n+1){box-shadow:inset 2px 0 0 color-mix(in srgb,var(--fwm-roll-ink) 30%,transparent)}
 .note{margin:0 10px 10px;font-size:13px;color:var(--fwm-mute)}
 .notes{font-size:14px;color:var(--fwm-mute);max-width:80ch;margin:0}
@@ -221,7 +222,7 @@ function renderArr() {
   song.tracks.forEach((tr, t) => {
     const L = rowLen(tr);
     const longest = song.inst.find((it) => pat(it, tr[it.id])?.len === L);
-    h += `<div class="row${playing && row === t ? ' now' : ''}" style="--n:${n}">`;
+    h += `<div class="row${playing && row === t ? ' now' : ''}" data-row="${t}" style="--n:${n}">`;
     h += `<button class="tl" data-play="${t}" title="Play from TRACK ${t + 1}"><b>TRACK ${t + 1}</b><small>${bars(L)}${longest ? ' · ' + esc(longest.name) : ''}</small></button>`;
     for (const it of song.inst) {
       const p = tr[it.id], P = pat(it, p), on = sel.t === t && sel.i === it.id;
@@ -230,7 +231,7 @@ function renderArr() {
       const prog = playing && row === t ? ((step % P.len) + 1) / P.len * 100 : 0;
       h += `<button class="cell has${on ? ' on' : ''}" style="--k:${p};--tw:${(P.len / L) * 100}%" data-t="${t}" data-i="${esc(it.id)}" aria-label="TRACK ${t + 1}, ${esc(it.name)}: pattern ${p + 1}">`
         + `<b>P${p + 1}</b><small>${bars(P.len)}</small>${reps > 1 ? `<span class="rep">×${Number.isInteger(reps) ? reps : reps.toFixed(1)}</span>` : ''}`
-        + `<span class="ticks"></span><span class="pr" style="width:${prog}%"></span></button>`;
+        + `<span class="ticks"></span><span class="pr" data-len="${P.len}" style="width:${prog}%"></span></button>`;
     }
     h += `<span class="ra"><button class="ib" data-dup="${t}" title="Duplicate TRACK ${t + 1}" aria-label="Duplicate TRACK ${t + 1}">⧉</button>`
       + `<button class="ib" data-del="${t}" title="Delete TRACK ${t + 1}" aria-label="Delete TRACK ${t + 1}" ${song.tracks.length < 2 ? 'disabled' : ''}>×</button></span></div>`;
@@ -262,7 +263,7 @@ function renderEd() {
   h += `</div>`;
   const now = playing && row === t ? step % P.len : -1;
   if (P.drums) {
-    h += `<div class="drum">` + ['Kick', 'Snare', 'Hat'].map((nm, r) => `<div class="dr"><span>${nm}</span><div class="ds" style="grid-template-columns:repeat(${P.len},minmax(0,1fr))">${Array.from({ length: P.len }, (_, i) => `<i class="${P.drums[r].includes(i) ? 'x' : ''}" ${i === now ? 'style="outline:2px solid var(--fwm-roll-ink)"' : ''}></i>`).join('')}</div><span>${P.len} steps →</span></div>`).join('') + `</div>`;
+    h += `<div class="drum">` + ['Kick', 'Snare', 'Hat'].map((nm, r) => `<div class="dr"><span>${nm}</span><div class="ds" style="grid-template-columns:repeat(${P.len},minmax(0,1fr))">${Array.from({ length: P.len }, (_, i) => `<i class="${P.drums[r].includes(i) ? 'x' : ''}${i === now ? ' cur' : ''}"></i>`).join('')}</div><span>${P.len} steps →</span></div>`).join('') + `</div>`;
     h += `<p class="note">Flint (Phase 5) gets the step grid you liked: one row per drum, each row with its own length and direction.</p>`;
   } else {
     const ms = P.notes.map((n) => n[2]), lo = Math.min(...ms, 99) - 2, hi = Math.max(...ms, 0) + 2, span = Math.max(8, hi - lo);
@@ -270,10 +271,12 @@ function renderEd() {
     for (let s = 0; s < P.len; s++) h += `<span class="${s % 16 ? 'sl' : 'bl'}" style="left:${(s / P.len) * 100}%"></span>`;
     for (let b = 0; b < P.len; b += 16) h += `<span class="lbl" style="left:${(b / P.len) * 100}%">${b / 16 + 1}</span>`;
     h += P.notes.map(([s, l, m]) => `<span class="nt" style="left:${(s / P.len) * 100}%;width:calc(${(l / P.len) * 100}% - 2px);top:${((hi - m) / span) * 130 + 8}px"></span>`).join('');
-    if (now >= 0) h += `<span class="ph2" style="left:${(now / P.len) * 100}%"></span>`;
+    h += `<span class="ph2" style="left:${(Math.max(0, now) / P.len) * 100}%" ${now >= 0 ? '' : 'hidden'}></span>`;
     h += `</div><p class="note">This is the Piano roll for ${esc(it.name)} pattern ${p + 1}${P.notes.length ? '' : ' (empty: draw notes in it)'}. Changing a pattern changes it in every TRACK that uses it.</p>`;
   }
   $('#ed').innerHTML = h;
+  $('#ed').dataset.len = P.len;
+  $('#ed').dataset.t = t;
 }
 
 function render() { renderBar(); renderArr(); renderEd(); }
@@ -291,7 +294,22 @@ function tick() {
     step = 0;
     if (loop === 'song') row = (row + 1) % song.tracks.length;
   }
-  renderBar(); renderArr(); renderEd();
+  paint();
+}
+// Playback only moves things in place: highlight, progress bars, playheads, position.
+// It never rebuilds controls, so an open list (Key, Scale) or a focused button is left alone.
+function paint() {
+  const tr = song.tracks[row];
+  $('#pos').innerHTML = `<b>TRACK ${row + 1}</b> · bar ${Math.floor(step / 16) + 1} of ${Math.ceil(rowLen(tr) / 16)}`;
+  for (const r of document.querySelectorAll('.row[data-row]')) {
+    const here = Number(r.dataset.row) === row;
+    r.classList.toggle('now', here);
+    for (const pr of r.querySelectorAll('.pr')) pr.style.width = here ? (((step % Number(pr.dataset.len)) + 1) / Number(pr.dataset.len)) * 100 + '%' : '0%';
+  }
+  const ed = $('#ed'), len = Number(ed.dataset.len), now = Number(ed.dataset.t) === row ? step % len : -1;
+  const ph = ed.querySelector('.ph2');
+  if (ph) { ph.hidden = now < 0; ph.style.left = (Math.max(0, now) / len) * 100 + '%'; }
+  for (const ds of ed.querySelectorAll('.ds')) [...ds.children].forEach((c, i) => c.classList.toggle('cur', i === now));
 }
 function setPlay(on, from) {
   playing = on;
