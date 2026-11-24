@@ -5,7 +5,7 @@ A collaborative, device-based music studio for the browser. This repo is the **c
 - Plan, phases, progress: `docs/PLAN.md`
 - Theming contract (tokens, skins, replaceable controls): `docs/THEMING.md`
 - Status: **Phases 1–3 built** (engine + Basalt, Yjs collaboration, main sequencer). Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
-- Prototypes (no build step): `design/kit/index.html` (device kit, has a Sound button), `design/kit/workspace.html` (workspace). Serve with `python3 spikes/serve.py`.
+- Prototypes (no build step): `design/kit/index.html` (device kit, has a Sound button), `design/kit/workspace.html` (workspace), `design/kit/arrange.html` (song arrangement mock-up). Serve with `python3 spikes/serve.py`.
 
 ## Commands
 Node comes from nvm: run `. ~/.nvm/nvm.sh` first in a fresh shell if `node` is missing.

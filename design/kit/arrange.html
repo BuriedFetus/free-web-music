@@ -1,0 +1,366 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Song Arrangement</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Figtree:wght@400;600;800&family=VT323&family=Big+Shoulders+Display:wght@800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="skins/app.css">
+<link rel="stylesheet" href="skins/device-base.css">
+<link rel="stylesheet" href="skins/basalt.css">
+<link rel="stylesheet" href="skins/quartz.css">
+<link rel="stylesheet" href="skins/cobalt.css">
+<link rel="stylesheet" href="skins/flint.css">
+<link rel="stylesheet" href="skins/opal.css">
+<style>
+/* VOICE studio tool: calm chrome, the sequencer world in blue, devices carry their own colour
+   IDEA a song sheet for hardware: instruments across the top, song TRACKs down the side, a pattern in every cell
+   PICTURE the arrangement grid playing: each cell's own progress bar shows short patterns repeating inside the longest one
+   COLOUR theme tokens only (skins/*.css): --fwm-roll grid, --fwm-note for patterns, devices own their casings
+   TYPE tokens: display for nameplates and TRACK labels, screen for readouts, ui for everything else
+   LAYOUT top bar (song, BPM, play, loop), arrangement grid, pattern editor below; phone: grid scrolls sideways */
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--fwm-bg);color:var(--fwm-ink);font:15px/1.45 var(--fwm-font-ui);overflow-x:clip}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fwm-me);outline-offset:2px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px max(2vw,12px);background:var(--fwm-panel);border-bottom:1px solid var(--fwm-line)}
+.grow{flex:1}
+.btn{min-height:40px;padding:0 14px;border-radius:calc(9px*var(--fwm-round));border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--fwm-mute)}
+.btn[aria-pressed=true]{background:var(--fwm-me);color:var(--fwm-on-me);border-color:var(--fwm-me)}
+.btn.sm{min-height:34px;padding:0 10px;font-size:14px}
+.btn:disabled{opacity:.4;cursor:default}
+.grp{display:flex;gap:4px;flex-wrap:wrap}
+.lcd{font:24px/1 var(--fwm-font-screen);background:var(--fwm-roll-deep);color:var(--fwm-note);padding:6px 10px;border-radius:7px;white-space:nowrap}
+.bpm{border:1px solid transparent;cursor:text;min-height:40px;min-width:118px;text-align:left}
+.bpm:hover{border-color:var(--fwm-note)}
+.bpmin{width:118px;font:24px/1 var(--fwm-font-screen);background:var(--fwm-roll-deep);color:var(--fwm-note);border:2px solid var(--fwm-note);border-radius:7px;padding:5px 9px;min-height:40px}
+.song{position:relative}
+.songbtn{display:flex;align-items:center;gap:10px}
+.songbtn b{font:900 20px/1 var(--fwm-font-display);letter-spacing:.02em}
+.dirty{color:var(--fwm-mute);font-size:13px;font-weight:400}
+.menu{position:absolute;top:calc(100% + 6px);left:0;z-index:10;width:300px;background:var(--fwm-panel);border:1px solid var(--fwm-line);border-radius:12px;padding:8px;box-shadow:0 12px 30px color-mix(in srgb,var(--fwm-bg) 70%,transparent)}
+.menu[hidden]{display:none}
+.menu h4{margin:6px 8px;font-size:13px;color:var(--fwm-mute);font-weight:600}
+.mi{display:flex;justify-content:space-between;width:100%;text-align:left;min-height:40px;padding:0 10px;border:0;border-radius:8px;background:none;cursor:pointer}
+.mi:hover,.mi.on{background:var(--fwm-bg)}
+.mi small{color:var(--fwm-mute)}
+.sep{height:1px;background:var(--fwm-line);margin:6px 4px}
+.pos{font-size:14px;color:var(--fwm-mute)}
+.pos b{color:var(--fwm-ink)}
+
+main{padding:12px max(2vw,12px) 24px;display:grid;gap:12px}
+.panel{background:var(--fwm-panel);border:1px solid var(--fwm-line);border-radius:calc(12px*var(--fwm-round));overflow:hidden}
+.ph{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 10px;border-bottom:1px solid var(--fwm-line)}
+.ph h2{margin:0;font-size:16px}
+.ph p{margin:0;font-size:13px;color:var(--fwm-mute)}
+.scroll{overflow-x:auto;scrollbar-width:thin}
+.arr{background:var(--fwm-roll);padding:10px;display:grid;gap:6px;width:100%;min-width:max-content}
+.row{display:grid;grid-template-columns:150px repeat(var(--n),minmax(140px,230px)) 120px;gap:6px;align-items:stretch}
+.thumb{height:46px;border-radius:calc(7px*var(--fwm-round));border:0;cursor:pointer;background:var(--dev-texture),linear-gradient(160deg,var(--dev-case),var(--dev-case2));background-size:5px 5px,auto;color:var(--dev-silk);font:900 16px/1 var(--fwm-font-display);letter-spacing:.04em;box-shadow:inset 0 -4px 0 var(--dev-acc);display:grid;place-items:center;padding:0 6px;text-transform:uppercase;overflow:hidden;white-space:nowrap}
+.thumb small{display:block;font:600 11px/1 var(--fwm-font-ui);letter-spacing:0;opacity:.8;text-transform:none;margin-top:3px}
+.thumb.on{outline:2px solid var(--fwm-roll-ink);outline-offset:2px}
+.addi{height:46px;border:2px dashed color-mix(in srgb,var(--fwm-roll-ink) 40%,transparent);background:none;border-radius:8px;color:var(--fwm-roll-ink);cursor:pointer;font-weight:600}
+.tl{display:flex;flex-direction:column;justify-content:center;padding:6px 10px;border-radius:8px;background:var(--fwm-roll2);color:var(--fwm-roll-ink);border:0;cursor:pointer;text-align:left}
+.tl b{font:900 18px/1 var(--fwm-font-display);letter-spacing:.04em}
+.tl small{font-size:12px;opacity:.85;margin-top:3px}
+.row.now .tl{background:var(--fwm-roll-ink);color:var(--fwm-roll-deep)}
+.row.now .cell{box-shadow:inset 0 0 0 2px var(--fwm-roll-ink)}
+.cell{position:relative;height:64px;border-radius:8px;border:0;cursor:pointer;background:var(--fwm-roll2);color:var(--fwm-roll-ink);text-align:left;padding:7px 9px;overflow:hidden}
+.cell:hover{filter:brightness(1.12)}
+.cell.on{outline:3px solid var(--fwm-note);outline-offset:1px}
+.cell.has{background:color-mix(in srgb,var(--fwm-note) calc(18% + var(--k) * 9%),var(--fwm-roll2))}
+.cell b{font:900 22px/1 var(--fwm-font-display);letter-spacing:.03em}
+.cell small{display:block;font-size:12px;opacity:.9}
+.cell .rep{position:absolute;right:8px;top:7px;font-size:12px;font-weight:700;opacity:.9}
+.cell .pr{position:absolute;left:0;bottom:0;height:5px;background:var(--fwm-note);box-shadow:0 0 calc(8px*var(--fwm-glow)) var(--fwm-note)}
+.cell .ticks{position:absolute;left:0;right:0;bottom:0;height:5px;background:repeating-linear-gradient(90deg,transparent 0 calc(var(--tw) - 2px),color-mix(in srgb,var(--fwm-roll-deep) 80%,transparent) calc(var(--tw) - 2px) var(--tw))}
+.empty{opacity:.55;font-size:20px}
+.ra{display:flex;gap:4px;align-items:center}
+.ib{width:36px;height:36px;border-radius:8px;border:1px solid color-mix(in srgb,var(--fwm-roll-ink) 30%,transparent);background:var(--fwm-roll2);color:var(--fwm-roll-ink);cursor:pointer;font-size:15px}
+.ib:hover{background:var(--fwm-roll-btn)}
+.addt{justify-self:start;margin-top:2px}
+
+.ed{display:grid;grid-template-columns:minmax(0,1fr);gap:0}
+.picks{display:flex;flex-wrap:wrap;gap:6px}
+.pk{min-width:52px;min-height:40px;border-radius:8px;border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;font-weight:700}
+.pk[aria-pressed=true]{background:var(--fwm-note);color:var(--fwm-on-note);border-color:var(--fwm-note)}
+.lenbox{display:flex;align-items:center;gap:6px;flex-wrap:wrap}
+.lab{font-size:13px;color:var(--fwm-mute)}
+.mini{position:relative;height:150px;margin:10px;border-radius:8px;background:var(--fwm-roll);overflow:hidden}
+.mini .bl{position:absolute;top:0;bottom:0;width:1px;background:color-mix(in srgb,var(--fwm-roll-ink) 35%,transparent)}
+.mini .sl{position:absolute;top:0;bottom:0;width:1px;background:color-mix(in srgb,var(--fwm-roll-ink) 10%,transparent)}
+.mini .nt{position:absolute;height:9px;border-radius:3px;background:var(--fwm-note);box-shadow:0 0 calc(6px*var(--fwm-glow)) color-mix(in srgb,var(--fwm-note) 50%,transparent)}
+.mini .ph2{position:absolute;top:0;bottom:0;width:2px;background:var(--fwm-roll-ink)}
+.mini .lbl{position:absolute;top:4px;font:15px var(--fwm-font-screen);color:var(--fwm-roll-ink);opacity:.8;padding-left:4px}
+.drum{display:grid;gap:4px;padding:10px;background:var(--fwm-roll);margin:10px;border-radius:8px}
+.dr{display:grid;grid-template-columns:70px minmax(0,1fr) 92px;gap:8px;align-items:center;color:var(--fwm-roll-ink);font-size:13px}
+.ds{display:grid;gap:3px}
+.ds i{height:22px;border-radius:4px;background:var(--fwm-roll2)}
+.ds i.x{background:var(--fwm-note)}
+.ds i:nth-child(4n+1){box-shadow:inset 2px 0 0 color-mix(in srgb,var(--fwm-roll-ink) 30%,transparent)}
+.note{margin:0 10px 10px;font-size:13px;color:var(--fwm-mute)}
+.notes{font-size:14px;color:var(--fwm-mute);max-width:80ch;margin:0}
+.notes li{margin:3px 0}
+.notes b{color:var(--fwm-ink)}
+.toast{position:fixed;left:50%;bottom:20px;transform:translateX(-50%);background:var(--fwm-ink);color:var(--fwm-bg);padding:10px 16px;border-radius:10px;font-weight:600;opacity:0;transition:opacity .2s;pointer-events:none}
+.toast.show{opacity:1}
+@media (prefers-reduced-motion:reduce){.toast{transition:none}}
+@media (max-width:600px){.row{grid-template-columns:104px repeat(var(--n),120px) 92px}.tl b{font-size:15px}.lcd,.bpmin{font-size:20px}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <div class="song">
+    <button class="btn songbtn" id="songbtn" aria-haspopup="true" aria-expanded="false"><span class="lab">Song</span> <b id="songname"></b> <span class="dirty" id="dirty"></span> ▾</button>
+    <div class="menu" id="menu" hidden></div>
+  </div>
+  <button class="btn" id="save">Save</button>
+  <span class="grow"></span>
+  <button class="btn" id="play" aria-pressed="false">▶ Play</button>
+  <span id="bpmwrap"></span>
+  <div class="grp" role="group" aria-label="Loop">
+    <button class="btn sm" id="lt" aria-pressed="false" title="Repeat the TRACK that is playing">⟲ Loop TRACK</button>
+    <button class="btn sm" id="ls" aria-pressed="true" title="Play every TRACK in order, then start again">⟲ Loop SONG</button>
+  </div>
+  <span class="pos" id="pos"></span>
+</div>
+
+<main>
+  <section class="panel" aria-label="Main sequencer: song arrangement">
+    <div class="ph">
+      <h2>Main sequencer · song arrangement</h2>
+      <p>Each cell picks the pattern an instrument plays in that TRACK. A TRACK lasts as long as its longest pattern; shorter ones repeat inside it.</p>
+    </div>
+    <div class="scroll"><div class="arr" id="arr"></div></div>
+  </section>
+
+  <section class="panel ed" aria-label="Pattern editor" id="ed"></section>
+
+  <ul class="notes">
+    <li><b>Mock-up, no sound.</b> Click a cell to pick its pattern below; press Play to watch TRACKs follow each other. Drums and Arp stand in for Flint and Cobalt (Phase 5).</li>
+    <li><b>Patterns belong to an instrument.</b> Scenes A–D are gone: Bass Pattern 2 has nothing to do with Drums Pattern 2.</li>
+    <li><b>Each pattern has its own length</b>, from 1 step to 8 bars, and opens in the Piano roll. The song key is set per instrument too.</li>
+    <li><b>Songs:</b> the Song menu saves, opens and starts a new song from INIT (one empty Basalt, 120 BPM). Saving is done by the host app.</li>
+  </ul>
+</main>
+<div class="toast" id="toast" role="status"></div>
+
+<script>
+{
+const $ = (s) => document.querySelector(s);
+const esc = (v) => String(v).replace(/[&<>"']/g, (c) => ({ '&': '&amp;', '<': '&lt;', '>': '&gt;', '"': '&quot;', "'": '&#39;' })[c]);
+const NN = ['C','C♯','D','D♯','E','F','F♯','G','G♯','A','A♯','B'];
+const SC = { minor: 'Minor', major: 'Major', dorian: 'Dorian', minpent: 'Minor pent.', chromatic: 'No key' };
+
+// sample song
+const bassline = (o) => [[0,2,36+o],[3,1,36+o],[6,2,39+o],[8,1,36+o],[10,1,31+o],[11,1,34+o],[12,3,36+o]];
+const shift = (ns, d) => ns.map(([s,l,m]) => [s+d,l,m]);
+const nightDrive = () => ({
+  name: 'Night Drive', bpm: 118,
+  inst: [
+    { id: 'bass', name: 'Bass', dev: 'basalt', key: [0,'minor'], pats: [
+      { len: 16, notes: bassline(0) },
+      { len: 32, notes: [...bassline(0), ...shift(bassline(3), 16)] },
+      { len: 64, notes: [...bassline(0), ...shift(bassline(-2), 16), ...shift(bassline(3), 32), ...shift(bassline(5), 48)] },
+    ]},
+    { id: 'acid', name: 'Acid', dev: 'basalt', key: [0,'minor'], pats: [
+      { len: 12, notes: [[0,1,48],[2,1,51],[4,1,55],[6,1,58],[8,2,60],[10,1,55]] },
+      { len: 32, notes: [[0,4,60],[4,2,58],[8,4,55],[16,6,51],[24,4,53],[28,4,55]] },
+    ]},
+    { id: 'drums', name: 'Drums', dev: 'flint', key: [0,'chromatic'], pats: [
+      { len: 16, drums: [[0,4,8,12],[4,12],[0,2,4,6,8,10,12,14]] },
+      { len: 16, drums: [[0,3,8,11],[4,12],[2,6,10,14]] },
+    ]},
+    { id: 'arp', name: 'Arp', dev: 'cobalt', key: [0,'minor'], pats: [
+      { len: 8, notes: [[0,1,72],[1,1,75],[2,1,79],[3,1,84],[4,1,79],[5,1,75],[6,1,72],[7,1,67]] },
+    ]},
+  ],
+  tracks: [
+    { bass: 0, acid: null, drums: null, arp: null },
+    { bass: 0, acid: 0, drums: 0, arp: null },
+    { bass: 1, acid: 0, drums: 0, arp: 0 },
+    { bass: 2, acid: 1, drums: 1, arp: 0 },
+    { bass: 0, acid: null, drums: 1, arp: null },
+  ],
+});
+const initSong = () => ({ name: 'Untitled', bpm: 120, inst: [{ id: 'i1', name: 'Basalt', dev: 'basalt', key: [0,'chromatic'], pats: [{ len: 16, notes: [] }] }], tracks: [{ i1: 0 }] });
+const library = { 'Night Drive': nightDrive(), 'Sketch 2': { ...initSong(), name: 'Sketch 2', bpm: 96 } };
+
+let song = structuredClone(library['Night Drive']);
+let dirty = false;
+let sel = { t: 2, i: 'bass' };
+let playing = false, loop = 'song', row = 0, step = 0, timer = null;
+
+const pat = (inst, p) => (p == null ? null : inst.pats[p]);
+const rowLen = (tr) => Math.max(16, ...song.inst.map((it) => pat(it, tr[it.id])?.len ?? 0));
+const bars = (n) => { const b = Math.floor(n / 16), r = n % 16; return (b ? `${b} bar${b > 1 ? 's' : ''}` : '') + (r ? `${b ? ' ' : ''}${r} step${r > 1 ? 's' : ''}` : ''); };
+const touch = () => { dirty = true; render(); };
+const toast = (m) => { const t = $('#toast'); t.textContent = m; t.classList.add('show'); clearTimeout(toast.h); toast.h = setTimeout(() => t.classList.remove('show'), 1800); };
+
+function renderBar() {
+  $('#songname').textContent = song.name;
+  $('#dirty').textContent = dirty ? '• not saved' : '';
+  $('#play').textContent = playing ? '■ Stop' : '▶ Play';
+  $('#play').setAttribute('aria-pressed', playing);
+  $('#lt').setAttribute('aria-pressed', loop === 'track');
+  $('#ls').setAttribute('aria-pressed', loop === 'song');
+  const w = $('#bpmwrap');
+  if (!w.querySelector('input')) w.innerHTML = `<button class="lcd bpm" id="bpm" title="Click to type a tempo">${song.bpm} BPM</button>`;
+  const tr = song.tracks[row];
+  $('#pos').innerHTML = playing ? `<b>TRACK ${row + 1}</b> · bar ${Math.floor(step / 16) + 1} of ${Math.ceil(rowLen(tr) / 16)}` : `${song.tracks.length} TRACKs`;
+}
+
+function renderArr() {
+  const n = song.inst.length;
+  let h = `<div class="row" style="--n:${n}"><span></span>`;
+  h += song.inst.map((it) => `<button class="thumb${sel.i === it.id ? ' on' : ''}" data-device="${it.dev}" data-inst="${esc(it.id)}">${esc(it.name)}<small>${it.dev === 'basalt' ? 'Basalt' : it.dev === 'flint' ? 'Flint · Phase 5' : 'Cobalt · Phase 5'}</small></button>`).join('');
+  h += `<button class="addi" id="addi" title="Bring an instrument in from the Library">+ Instrument</button></div>`;
+  song.tracks.forEach((tr, t) => {
+    const L = rowLen(tr);
+    const longest = song.inst.find((it) => pat(it, tr[it.id])?.len === L);
+    h += `<div class="row${playing && row === t ? ' now' : ''}" style="--n:${n}">`;
+    h += `<button class="tl" data-play="${t}" title="Play from TRACK ${t + 1}"><b>TRACK ${t + 1}</b><small>${bars(L)}${longest ? ' · ' + esc(longest.name) : ''}</small></button>`;
+    for (const it of song.inst) {
+      const p = tr[it.id], P = pat(it, p), on = sel.t === t && sel.i === it.id;
+      if (!P) { h += `<button class="cell${on ? ' on' : ''}" data-t="${t}" data-i="${esc(it.id)}" aria-label="TRACK ${t + 1}, ${esc(it.name)}: silent"><span class="empty">—</span></button>`; continue; }
+      const reps = L / P.len;
+      const prog = playing && row === t ? ((step % P.len) + 1) / P.len * 100 : 0;
+      h += `<button class="cell has${on ? ' on' : ''}" style="--k:${p};--tw:${(P.len / L) * 100}%" data-t="${t}" data-i="${esc(it.id)}" aria-label="TRACK ${t + 1}, ${esc(it.name)}: pattern ${p + 1}">`
+        + `<b>P${p + 1}</b><small>${bars(P.len)}</small>${reps > 1 ? `<span class="rep">×${Number.isInteger(reps) ? reps : reps.toFixed(1)}</span>` : ''}`
+        + `<span class="ticks"></span><span class="pr" style="width:${prog}%"></span></button>`;
+    }
+    h += `<span class="ra"><button class="ib" data-dup="${t}" title="Duplicate TRACK ${t + 1}" aria-label="Duplicate TRACK ${t + 1}">⧉</button>`
+      + `<button class="ib" data-del="${t}" title="Delete TRACK ${t + 1}" aria-label="Delete TRACK ${t + 1}" ${song.tracks.length < 2 ? 'disabled' : ''}>×</button></span></div>`;
+  });
+  h += `<button class="btn sm addt" id="addt">+ Add TRACK</button>`;
+  $('#arr').innerHTML = h;
+}
+
+function renderEd() {
+  const it = song.inst.find((x) => x.id === sel.i) ?? song.inst[0];
+  const t = Math.min(sel.t, song.tracks.length - 1);
+  const p = song.tracks[t][it.id];
+  const P = pat(it, p);
+  let h = `<div class="ph"><h2>${esc(it.name)} · TRACK ${t + 1}</h2><span class="lab">plays</span><div class="picks">`;
+  h += `<button class="pk" data-pick="-1" aria-pressed="${p == null}">—</button>`;
+  h += it.pats.map((_, k) => `<button class="pk" data-pick="${k}" aria-pressed="${p === k}">P${k + 1}</button>`).join('');
+  h += `<button class="pk" data-pick="new" title="New empty pattern">+ New</button><button class="pk" data-pick="copy" ${P ? '' : 'disabled'} title="Copy this pattern into a new one">⧉ Copy</button></div></div>`;
+  if (!P) {
+    h += `<p class="note" style="margin-top:10px">${esc(it.name)} is silent in TRACK ${t + 1}. Pick a pattern above.</p>`;
+    $('#ed').innerHTML = h;
+    return;
+  }
+  h += `<div class="ph"><span class="lab">Pattern ${p + 1} length</span><span class="lenbox">`
+    + `<button class="btn sm" data-len="-1" aria-label="One step shorter">−</button><span class="lcd" style="font-size:20px">${bars(P.len)}</span>`
+    + `<button class="btn sm" data-len="1" aria-label="One step longer">+</button>`
+    + [16, 32, 64, 128].map((v) => `<button class="btn sm" data-lenset="${v}" aria-pressed="${P.len === v}">${v / 16} bar${v > 16 ? 's' : ''}</button>`).join('')
+    + `</span>`;
+  if (it.dev !== 'flint') h += `<span class="lab" style="margin-left:auto">Key (${esc(it.name)})</span><select class="btn sm" id="kr">${NN.map((n, i) => `<option value="${i}" ${it.key[0] === i ? 'selected' : ''}>${n}</option>`).join('')}</select><select class="btn sm" id="ks">${Object.entries(SC).map(([k, v]) => `<option value="${k}" ${it.key[1] === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
+  h += `</div>`;
+  const now = playing && row === t ? step % P.len : -1;
+  if (P.drums) {
+    h += `<div class="drum">` + ['Kick', 'Snare', 'Hat'].map((nm, r) => `<div class="dr"><span>${nm}</span><div class="ds" style="grid-template-columns:repeat(${P.len},minmax(0,1fr))">${Array.from({ length: P.len }, (_, i) => `<i class="${P.drums[r].includes(i) ? 'x' : ''}" ${i === now ? 'style="outline:2px solid var(--fwm-roll-ink)"' : ''}></i>`).join('')}</div><span>${P.len} steps →</span></div>`).join('') + `</div>`;
+    h += `<p class="note">Flint (Phase 5) gets the step grid you liked: one row per drum, each row with its own length and direction.</p>`;
+  } else {
+    const ms = P.notes.map((n) => n[2]), lo = Math.min(...ms, 99) - 2, hi = Math.max(...ms, 0) + 2, span = Math.max(8, hi - lo);
+    h += `<div class="mini" aria-label="Pattern ${p + 1} notes">`;
+    for (let s = 0; s < P.len; s++) h += `<span class="${s % 16 ? 'sl' : 'bl'}" style="left:${(s / P.len) * 100}%"></span>`;
+    for (let b = 0; b < P.len; b += 16) h += `<span class="lbl" style="left:${(b / P.len) * 100}%">${b / 16 + 1}</span>`;
+    h += P.notes.map(([s, l, m]) => `<span class="nt" style="left:${(s / P.len) * 100}%;width:calc(${(l / P.len) * 100}% - 2px);top:${((hi - m) / span) * 130 + 8}px"></span>`).join('');
+    if (now >= 0) h += `<span class="ph2" style="left:${(now / P.len) * 100}%"></span>`;
+    h += `</div><p class="note">This is the Piano roll for ${esc(it.name)} pattern ${p + 1}${P.notes.length ? '' : ' (empty: draw notes in it)'}. Changing a pattern changes it in every TRACK that uses it.</p>`;
+  }
+  $('#ed').innerHTML = h;
+}
+
+function render() { renderBar(); renderArr(); renderEd(); }
+
+function renderMenu() {
+  const m = $('#menu');
+  m.innerHTML = `<button class="mi" data-m="init"><span>New song from INIT</span><small>empty</small></button>`
+    + `<button class="mi" data-m="saveas"><span>Save as copy</span></button><div class="sep"></div><h4>Saved songs</h4>`
+    + Object.values(library).map((s) => `<button class="mi${s.name === song.name ? ' on' : ''}" data-open="${esc(s.name)}"><span>${esc(s.name)}</span><small>${s.tracks.length} TRACKs · ${s.bpm} BPM</small></button>`).join('');
+}
+
+function tick() {
+  step++;
+  if (step >= rowLen(song.tracks[row])) {
+    step = 0;
+    if (loop === 'song') row = (row + 1) % song.tracks.length;
+  }
+  renderBar(); renderArr(); renderEd();
+}
+function setPlay(on, from) {
+  playing = on;
+  clearInterval(timer);
+  if (on) {
+    if (from != null) row = from;
+    step = 0;
+    timer = setInterval(tick, 60000 / song.bpm / 4);
+  }
+  render();
+}
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  const menu = $('#menu');
+  if (!e.target.closest('.song')) { menu.hidden = true; $('#songbtn').setAttribute('aria-expanded', 'false'); }
+  if (!b) return;
+  const d = b.dataset;
+  if (b.id === 'songbtn') { renderMenu(); menu.hidden = !menu.hidden; b.setAttribute('aria-expanded', String(!menu.hidden)); return; }
+  if (d.m === 'init') { setPlay(false); song = initSong(); sel = { t: 0, i: 'i1' }; dirty = false; menu.hidden = true; toast('New song from INIT'); return render(); }
+  if (d.m === 'saveas') { song.name = song.name + ' copy'; library[song.name] = structuredClone(song); dirty = false; menu.hidden = true; toast(`Saved "${song.name}"`); return render(); }
+  if (d.open) { setPlay(false); song = structuredClone(library[d.open]); sel = { t: 0, i: song.inst[0].id }; dirty = false; menu.hidden = true; return render(); }
+  if (b.id === 'save') { library[song.name] = structuredClone(song); dirty = false; toast(`Saved "${song.name}"`); return render(); }
+  if (b.id === 'play') return setPlay(!playing);
+  if (b.id === 'lt') { loop = 'track'; return renderBar(); }
+  if (b.id === 'ls') { loop = 'song'; return renderBar(); }
+  if (b.id === 'bpm') {
+    $('#bpmwrap').innerHTML = `<input class="bpmin" id="bpmin" inputmode="numeric" aria-label="Tempo in BPM" value="${song.bpm}">`;
+    const inp = $('#bpmin'); inp.focus(); inp.select();
+    const done = (ok) => {
+      if (!inp.isConnected) return;
+      const v = Math.round(Number(inp.value));
+      if (ok && v >= 40 && v <= 240 && v !== song.bpm) { song.bpm = v; dirty = true; if (playing) setPlay(true, row); }
+      else if (ok && !(v >= 40 && v <= 240)) toast('Tempo is 40 to 240 BPM');
+      $('#bpmwrap').innerHTML = ''; render();
+    };
+    inp.addEventListener('keydown', (k) => { if (k.key === 'Enter') done(true); if (k.key === 'Escape') done(false); });
+    inp.addEventListener('blur', () => done(true));
+    return;
+  }
+  if (d.inst) { sel = { ...sel, i: d.inst }; return render(); }
+  if (d.t != null) { sel = { t: Number(d.t), i: d.i }; return render(); }
+  if (d.play != null) return setPlay(true, Number(d.play));
+  if (d.dup != null) { const t = Number(d.dup); song.tracks.splice(t + 1, 0, { ...song.tracks[t] }); sel.t = t + 1; return touch(); }
+  if (d.del != null) { const t = Number(d.del); song.tracks.splice(t, 1); if (row >= song.tracks.length) row = 0; sel.t = Math.min(sel.t, song.tracks.length - 1); return touch(); }
+  if (b.id === 'addt') { song.tracks.push(Object.fromEntries(song.inst.map((it) => [it.id, null]))); sel.t = song.tracks.length - 1; return touch(); }
+  if (b.id === 'addi') { const id = 'b' + Date.now(); song.inst.push({ id, name: 'Basalt ' + (song.inst.filter((x) => x.dev === 'basalt').length + 1), dev: 'basalt', key: [0, 'chromatic'], pats: [{ len: 16, notes: [] }] }); song.tracks.forEach((tr) => (tr[id] = null)); sel.i = id; return touch(); }
+  const it = song.inst.find((x) => x.id === sel.i);
+  const tr = song.tracks[sel.t];
+  if (d.pick != null) {
+    if (d.pick === 'new') { it.pats.push({ len: 16, notes: [] }); tr[it.id] = it.pats.length - 1; }
+    else if (d.pick === 'copy') { it.pats.push(structuredClone(it.pats[tr[it.id]])); tr[it.id] = it.pats.length - 1; }
+    else tr[it.id] = d.pick === '-1' ? null : Number(d.pick);
+    return touch();
+  }
+  const P = it && pat(it, tr[it.id]);
+  if (P && d.len) { P.len = Math.max(1, Math.min(128, P.len + Number(d.len))); return touch(); }
+  if (P && d.lenset) { P.len = Number(d.lenset); return touch(); }
+});
+document.addEventListener('change', (e) => {
+  const it = song.inst.find((x) => x.id === sel.i);
+  if (e.target.id === 'kr') { it.key[0] = Number(e.target.value); touch(); }
+  if (e.target.id === 'ks') { it.key[1] = e.target.value; touch(); }
+});
+document.addEventListener('keydown', (e) => {
+  if (e.key === ' ' && !e.target.closest('input,select')) { e.preventDefault(); setPlay(!playing); }
+});
+render();
+}
+</script>
+</body>
+</html>
