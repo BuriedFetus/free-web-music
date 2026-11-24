@@ -27,6 +27,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'switch') return runSwitch(p, engineRef, ok, out);
   if (role === 'roll') return runRoll(p, engineRef, ok, out);
   if (role === 'song') return runSong(p, engineRef, ok, out);
+  if (role === 'songs') return runSongs(p, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
     if (role === 'a') {
@@ -391,6 +392,56 @@ async function runSong(p: Project, engineRef: { current: Engine | null }, ok: (c
     btn('■ Stop')!.click();
   } catch (e) {
     out.push(`FAIL song: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: save the song, start a new one from INIT, open the saved one again, all while playing. */
+async function runSongs(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  const peak = async (ms: number) => {
+    let pk = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      pk = Math.max(pk, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+      await sleep(30);
+    }
+    return pk;
+  };
+  const menu = () => $<HTMLButtonElement>('.fwm-songbtn')!;
+  try {
+    await sleep(300);
+    const id = p.addTrack(m, undefined, 0);
+    for (const st of [0, 4, 8, 12]) p.addNote(id, p.patternList(id)[0].id, { s: st, l: 1, m: 36, v: 0.9 });
+    p.renameSong('E2E song ' + Math.random().toString(36).slice(2, 6));
+    const name = p.songName;
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    btn('▶ Play')!.click();
+    ok((await peak(800)) > 0.02, 'the song plays');
+    btn('Save')!.click();
+    await until('saved', () => !p.unsaved);
+    ok(!menu().textContent!.includes('not saved'), 'Save: "not saved" goes away');
+    // INIT while playing (nothing unsaved, so no question).
+    menu().click();
+    await sleep(100);
+    btn('New song from INIT')!.click();
+    await until('INIT', () => p.songName === 'Untitled');
+    const t = p.trackIds();
+    ok(t.length === 1 && p.notes(t[0], p.patternList(t[0])[0].id).length === 0, 'INIT: one Basalt with an empty P1');
+    ok((await peak(800)) < 0.01, 'INIT is silent (empty pattern), still playing without errors');
+    // Open the saved song again.
+    menu().click();
+    await until('list', () => !!$(`[aria-label="Open ${name}"]`));
+    ($(`[aria-label="Open ${name}"]`) as HTMLButtonElement).click();
+    await until('opened', () => p.songName === name);
+    ok(p.notes(id, p.patternList(id)[0].id).length === 4 && !p.unsaved, 'Open: the saved song is back, notes and all');
+    ok((await peak(1000)) > 0.02, 'and it plays again');
+    btn('■ Stop')!.click();
+  } catch (e) {
+    out.push(`FAIL songs: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

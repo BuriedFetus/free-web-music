@@ -6,7 +6,7 @@ import type { Awareness } from 'y-protocols/awareness';
 import type { Engine } from '@fwm/engine';
 import { stepOf } from '@fwm/engine/worklet';
 import { PresenceModel } from '../collab/presence';
-import type { LiveChannel, LiveMessage, StudioUser } from '../collab/types';
+import type { LiveChannel, LiveMessage, SongLibrary, StudioUser } from '../collab/types';
 import { deviceEntry } from '../devices/registry';
 import { EngineProvider, useEngine } from '../engine/EngineProvider';
 import { useDeviceSync } from '../engine/useDeviceSync';
@@ -22,6 +22,8 @@ export interface StudioProps {
   awareness?: Awareness | null;
   channel?: LiveChannel | null;
   user: StudioUser;
+  /** Where songs are saved and opened from (Song menu). Without it, songs can't be saved. */
+  songs?: SongLibrary | null;
   theme?: StudioTheme;
   className?: string;
   /** Called when the audio engine has started (e.g. for a host-side recorder or tests). */
@@ -47,7 +49,7 @@ function loadWs(key: string): Workspace {
   }
 }
 
-function StudioInner({ doc, awareness = null, channel = null, user }: StudioProps) {
+function StudioInner({ doc, awareness = null, channel = null, songs = null, user }: StudioProps) {
   const project = useMemo(() => new Project(doc, { user: user.id }), [doc, user.id]);
   const presence = useMemo(() => new PresenceModel(awareness, user), [awareness, user]);
   useEffect(() => () => presence.destroy(), [presence]);
@@ -316,7 +318,7 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
   }, [project, playing, setPlaying]);
 
   const ctx: StudioCtx = {
-    project, presence, user, channel, ws, setWs, playing, setPlaying, rec, setRec, slotOf, cueRow,
+    project, presence, user, channel, songs, ws, setWs, playing, setPlaying, rec, setRec, slotOf, cueRow,
     playNote, releaseNote, audition, peerHeld, toast,
   };
 

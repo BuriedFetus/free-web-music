@@ -179,3 +179,23 @@
 .fwm-bpmbtn:hover { border-color: var(--fwm-note); }
 .fwm-bpmin { width: 7ch; border: 2px solid var(--fwm-note); outline: none; }
 .fwm-songkey { display: flex; align-items: center; gap: 6px; font-size: 14px; font-weight: 600; }
+
+/* song menu */
+.fwm-song { position: relative; display: flex; align-items: center; gap: 6px; }
+.fwm-songbtn { display: flex; align-items: center; gap: 8px; min-height: 40px; padding: 0 12px; border-radius: calc(9px * var(--fwm-round)); border: 1px solid var(--fwm-line); background: var(--fwm-bg); cursor: pointer; max-width: 340px; }
+.fwm-songbtn:hover { border-color: var(--fwm-mute); }
+.fwm-songbtn b { font: 900 19px/1 var(--fwm-font-display); letter-spacing: .02em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fwm-songbtn__lab, .fwm-songbtn__dirty { font-size: 13px; color: var(--fwm-mute); white-space: nowrap; }
+.fwm-songmenu { position: absolute; top: calc(100% + 6px); left: 0; z-index: 30; width: 320px; max-width: 90vw; background: var(--fwm-panel); border: 1px solid var(--fwm-line); border-radius: 12px; padding: 8px; box-shadow: 0 12px 30px color-mix(in srgb, var(--fwm-bg) 70%, transparent); display: flex; flex-direction: column; gap: 2px; }
+.fwm-songmenu h4 { margin: 6px 8px; font-size: 13px; color: var(--fwm-mute); font-weight: 600; }
+.fwm-songmenu__name { display: flex; align-items: center; gap: 8px; font-size: 13px; color: var(--fwm-mute); padding: 4px 6px 8px; }
+.fwm-songmenu__name .fwm-tname { flex: 1; }
+.fwm-songmenu__sep { height: 1px; background: var(--fwm-line); margin: 6px 4px; }
+.fwm-songmenu__note { margin: 4px 10px 8px; font-size: 13px; color: var(--fwm-mute); }
+.fwm-mi { display: flex; justify-content: space-between; align-items: center; gap: 8px; width: 100%; text-align: left; min-height: 40px; padding: 0 10px; border: 0; border-radius: 8px; background: none; cursor: pointer; }
+.fwm-mi:hover:not(:disabled), .fwm-mirow.is-on .fwm-mi { background: var(--fwm-bg); }
+.fwm-mi:disabled { opacity: .45; cursor: default; }
+.fwm-mi small { color: var(--fwm-mute); white-space: nowrap; }
+.fwm-mirow { display: flex; align-items: center; gap: 4px; }
+.fwm-confirm { padding: 6px 8px; font-size: 14px; }
+.fwm-confirm p { margin: 0 0 8px; }

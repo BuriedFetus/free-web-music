@@ -226,5 +226,53 @@ describe('Project (undo of structure)', () => {
     you.removeRow(r1);
     expect(you.rows().map((r) => r.id)).toEqual([r1]);
   });
+
+  it('songs: save state is shared, a saved file loads back exactly, INIT starts from scratch, both undo', () => {
+    const [you, mira] = pair();
+    const a = you.addTrack(m);
+    const p1 = you.patternList(a)[0].id;
+    you.addNote(a, p1, { s: 2, l: 1.5, m: 40, v: 0.7 });
+    you.setAutomation(a, p1, 'cut', 3, 0.4);
+    you.deviceStore(a, m)!.setParam('cut', 0.66);
+    you.setSeq(a, { dir: 'pp' });
+    you.setKey({ root: 2, scale: 'minor' });
+    you.renameSong('Night Drive');
+    const r2 = you.addRow();
+    const p2 = you.addPattern(a)!;
+    you.setCell(r2, a, p2);
+    expect(mira.unsaved).toBe(true);
+    you.markSaved('song-1');
+    expect(mira.unsaved).toBe(false); // everyone sees it saved
+    expect(mira.songId).toBe('song-1');
+    const file = JSON.parse(JSON.stringify(mira.toFile()));
+    mira.setBpm(90);
+    expect(you.unsaved).toBe(true);
+
+    // INIT: one Basalt with P1 in TRACK 1, 120 BPM, no key, nothing to save.
+    you.undoManager.stopCapturing();
+    you.initSong(m);
+    expect(mira.songName).toBe('Untitled');
+    expect(mira.tracks().map((t) => t.name)).toEqual(['Basalt']);
+    expect(mira.rows()).toHaveLength(1);
+    expect(mira.patternList(mira.trackIds()[0]).map((p) => p.name)).toEqual(['P1']);
+    expect([mira.bpm, mira.key.scale, mira.songId, mira.unsaved]).toEqual([120, 'chromatic', null, false]);
+    you.undo(); // INIT undone in one step
+    expect(mira.songName).toBe('Night Drive');
+    expect(mira.bpm).toBe(90);
+
+    // Open the saved file: everything comes back, ids and all.
+    you.undoManager.stopCapturing();
+    mira.loadFile(file, { basalt: m }, 'song-1');
+    expect(you.songName).toBe('Night Drive');
+    expect(you.bpm).toBe(120);
+    expect(you.key).toEqual({ root: 2, scale: 'minor' });
+    expect(you.unsaved).toBe(false);
+    expect(you.track(a)!.seq.dir).toBe('pp');
+    expect(you.deviceStore(a, m)!.getState().params.cut).toBe(0.66);
+    expect(you.notes(a, p1).map(([, n]) => n)).toEqual([{ s: 2, l: 1.5, m: 40, v: 0.7 }]);
+    expect(you.automation(a, p1, 'cut')[3]).toBe(0.4);
+    expect(you.cell(you.rows()[1].id, a)).toBe(p2);
+    expect(JSON.stringify(you.toFile())).toBe(JSON.stringify(file));
+  });
 });
 

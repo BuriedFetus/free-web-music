@@ -47,6 +47,33 @@ export interface PatternInfo {
   /** Length in steps (1…MAX_LEN). */
   len: number;
 }
+/** A whole song as a plain object: what a host saves and loads (see SongLibrary). */
+export interface SongFile {
+  schema: number;
+  name: string;
+  bpm: number;
+  swing: number;
+  key: SongKey;
+  tracks: {
+    id: string;
+    device: DeviceId;
+    name: string;
+    preset: number;
+    seq: SeqSettings;
+    params: Record<string, number>;
+    routes: Route[];
+    patterns: { id: string; name: string; len: number; notes: Note[]; auto: Record<string, number> }[];
+  }[];
+  rows: SongRow[];
+}
+
+/** FNV-1a hash of a string (to tell whether the song changed since it was saved, the same on every client). */
+function hash(s: string): string {
+  let h = 0x811c9dc5;
+  for (let i = 0; i < s.length; i++) h = Math.imul(h ^ s.charCodeAt(i), 0x01000193) >>> 0;
+  return h.toString(36);
+}
+
 export interface SongRow {
   id: string;
   /** trackId → patternId; a missing track is silent in this row. */
@@ -150,6 +177,144 @@ export class Project {
     });
   }
 
+  // ---- the song as a whole: name, save state, file, INIT ----
+  get songName(): string {
+    return (this.meta.get('name') as string) || 'Untitled';
+  }
+  renameSong(name: string) {
+    const n = name.trim().slice(0, 60);
+    if (n && n !== this.songName) this.action(() => this.meta.set('name', n));
+  }
+  /** Id of the saved song this is (in the host's song library), or null if never saved. */
+  get songId(): string | null {
+    return (this.meta.get('songId') as string) || null;
+  }
+  /** The song as a plain object (ids kept, so TRACK cells still point at the right patterns). */
+  toFile(): SongFile {
+    return {
+      schema: SCHEMA,
+      name: this.songName,
+      bpm: this.bpm,
+      swing: this.swing,
+      key: this.key,
+      tracks: this.tracks().map((t) => {
+        const m = this.tracksMap.get(t.id)!;
+        return {
+          id: t.id,
+          device: t.device,
+          name: t.name,
+          preset: (m.get('preset') as number) ?? 0,
+          seq: t.seq,
+          params: (m.get('params') as Y.Map<number>).toJSON() as Record<string, number>,
+          routes: (m.get('routes') as Y.Array<Route>).toArray(),
+          patterns: this.patternList(t.id).map((p) => ({
+            ...p,
+            notes: this.notes(t.id, p.id).map(([, n]) => n),
+            auto: (this.autoMap(t.id, p.id)?.toJSON() ?? {}) as Record<string, number>,
+          })),
+        };
+      }),
+      rows: this.rows(),
+    };
+  }
+  private contentHash(file: SongFile = this.toFile()): string {
+    const { name: _n, ...rest } = file;
+    return hash(JSON.stringify(rest));
+  }
+  private hashCache = { version: -1, value: '' };
+  /** True when the song has changed since it was last saved (or opened), as seen by everyone. */
+  get unsaved(): boolean {
+    if (this.hashCache.version !== this.version) this.hashCache = { version: this.version, value: this.contentHash() };
+    return this.hashCache.value !== this.meta.get('savedHash');
+  }
+  /** Record that `file` (from toFile) was saved under `id`. Edits made while saving still count as unsaved. */
+  markSaved(id: string, file: SongFile = this.toFile()) {
+    this.transact(() => {
+      this.meta.set('songId', id);
+      this.meta.set('savedHash', this.contentHash(file));
+    });
+  }
+  /**
+   * Replace the whole song with `file`, for everyone in the session (one undo step). `id` is its id in the
+   * song library (null for a new song). Devices the studio doesn't know are skipped.
+   */
+  loadFile(file: SongFile, manifests: Partial<Record<string, DeviceManifest>>, id: string | null) {
+    this.action(() => {
+      this.replaceAll(file, manifests, id);
+      this.meta.set('savedHash', this.contentHash());
+    });
+    this.stores.clear();
+  }
+  private replaceAll(file: SongFile, manifests: Partial<Record<string, DeviceManifest>>, id: string | null) {
+    {
+      for (const k of [...this.meta.keys()]) if (k !== 'schema') this.meta.delete(k);
+      this.order.delete(0, this.order.length);
+      for (const k of [...this.tracksMap.keys()]) this.tracksMap.delete(k);
+      for (const k of [...this.patterns.keys()]) this.patterns.delete(k);
+      this.song.delete(0, this.song.length);
+      this.meta.set('schema', SCHEMA);
+      this.meta.set('name', file.name || 'Untitled');
+      this.meta.set('bpm', Math.max(40, Math.min(240, Math.round(file.bpm || 120))));
+      this.meta.set('swing', Math.max(0, Math.min(0.6, file.swing || 0)));
+      if (file.key) {
+        this.meta.set('keyRoot', file.key.root);
+        this.meta.set('keyScale', SCALES[file.key.scale] ? file.key.scale : 'chromatic');
+      }
+      const known = new Set<string>();
+      for (const ft of file.tracks ?? []) {
+        const manifest = manifests[ft.device];
+        if (!manifest) continue;
+        known.add(ft.id);
+        const t = new Y.Map<unknown>();
+        t.set('device', ft.device);
+        t.set('name', ft.name);
+        t.set('preset', ft.preset ?? 0);
+        const seq = new Y.Map<unknown>();
+        for (const [k, v] of Object.entries({ ...DEFAULT_SEQ, ...ft.seq })) if (k !== 'len') seq.set(k, v);
+        t.set('seq', seq);
+        const params = new Y.Map<number>();
+        for (const [k, v] of Object.entries({ ...defaults(manifest), ...ft.params })) params.set(k, v);
+        t.set('params', params);
+        const routes = new Y.Array<Route>();
+        routes.push((ft.routes ?? []).filter((r) => canRoute(manifest, r.src, r.target)).slice(0, MAX_ROUTES));
+        t.set('routes', routes);
+        const pats = new Y.Array<string>();
+        t.set('pats', pats);
+        this.tracksMap.set(ft.id, t);
+        this.order.push([ft.id]);
+        for (const fp of ft.patterns ?? []) {
+          const p = new Y.Map<unknown>();
+          p.set('name', fp.name || 'P');
+          p.set('len', clampLen(fp.len || BAR));
+          const notes = new Y.Map<Note>();
+          for (const n of fp.notes ?? []) notes.set(uid('n'), clampNote(n));
+          const auto = new Y.Map<number>();
+          for (const [k, v] of Object.entries(fp.auto ?? {})) auto.set(k, v);
+          p.set('notes', notes);
+          p.set('auto', auto);
+          this.patterns.set(patternKey(ft.id, fp.id), p);
+          pats.push([fp.id]);
+        }
+      }
+      const rows = file.rows?.length ? file.rows : [{ id: uid('r'), cells: {} }];
+      for (const r of rows) {
+        const row = this.makeRow(Object.fromEntries(Object.entries(r.cells).filter(([t]) => known.has(t))));
+        row.set('id', r.id);
+        this.song.push([row]);
+      }
+      if (id) this.meta.set('songId', id);
+    }
+  }
+  /** Start from scratch: one instrument (`manifest`, e.g. Basalt) with an empty P1 in TRACK 1, 120 BPM, no key. */
+  initSong(manifest: DeviceManifest, init?: { params?: Record<string, number>; routes?: Route[] }) {
+    this.action(() => {
+      this.replaceAll({ schema: SCHEMA, name: 'Untitled', bpm: 120, swing: 0, key: { root: 0, scale: 'chromatic' }, tracks: [], rows: [] }, {}, null);
+      this.addTrackRaw(manifest, init, 0, null);
+      this.meta.set('savedHash', this.contentHash());
+    });
+    this.stores.clear();
+  }
+
   // ---- tracks ----
   trackIds(): string[] {
     return this.order.toArray().filter((id) => this.tracksMap.has(id));
@@ -175,9 +340,16 @@ export class Project {
    * Copies of the same device are fine.
    */
   addTrack(manifest: DeviceManifest, init?: { params?: Record<string, number>; routes?: Route[] }, preset = 0, row?: string | null): string {
+    let id = '';
+    this.action(() => {
+      id = this.addTrackRaw(manifest, init, preset, row);
+    });
+    return id;
+  }
+  private addTrackRaw(manifest: DeviceManifest, init?: { params?: Record<string, number>; routes?: Route[] }, preset = 0, row?: string | null): string {
     const id = uid('t');
     const sameKind = this.tracks().filter((t) => t.device === manifest.id).length;
-    this.action(() => {
+    {
       const t = new Y.Map<unknown>();
       t.set('device', manifest.id);
       t.set('name', manifest.name + (sameKind ? ' ' + (sameKind + 1) : ''));
@@ -199,7 +371,7 @@ export class Project {
       if (!this.song.length) this.song.push([this.makeRow()]);
       const r = (row && this.rowMap(row)) || this.song.get(0);
       (r.get('cells') as Y.Map<string>).set(id, pat);
-    });
+    }
     return id;
   }
   /** A new empty pattern (inside a transaction). */

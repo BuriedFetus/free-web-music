@@ -1,17 +1,33 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import * as Y from 'yjs';
-import { Project, Studio } from '../src';
+import { Project, Studio, type SongFile, type SongLibrary } from '../src';
 
 afterEach(() => {
   cleanup();
   localStorage.clear();
 });
 
-function mount() {
+function mount(songs?: SongLibrary) {
   const doc = new Y.Doc();
-  render(<Studio doc={doc} user={{ id: 'u1', name: 'Tester', color: '#4fc3ff' }} theme={{ loadFonts: false }} />);
+  render(<Studio doc={doc} user={{ id: 'u1', name: 'Tester', color: '#4fc3ff' }} theme={{ loadFonts: false }} songs={songs} />);
   return new Project(doc, { test: true });
+}
+
+/** An in-memory song library, standing in for the host's. */
+function memorySongs() {
+  const files = new Map<string, SongFile>();
+  let n = 0;
+  const lib: SongLibrary = {
+    list: async () => [...files].map(([id, f]) => ({ id, name: f.name, updated: 0 })),
+    load: async (id) => structuredClone(files.get(id)!),
+    save: async (f, id) => {
+      const sid = id || 'song' + ++n;
+      files.set(sid, structuredClone(f));
+      return sid;
+    },
+  };
+  return { lib, files };
 }
 
 describe('<Studio>', () => {
@@ -130,6 +146,42 @@ describe('<Studio>', () => {
     // D minor has no C♯ (37 = C♯2) but has D (38).
     expect(roll.querySelector('.fwm-gr[data-m="37"]')).toBeNull();
     expect(roll.querySelector('.fwm-gr[data-m="38"]')).not.toBeNull();
+  });
+
+  it('songs: save, new from INIT (asks first when not saved), open a saved song, undo', async () => {
+    const { lib, files } = memorySongs();
+    const p = mount(lib);
+    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    const id = p.trackIds()[0];
+    act(() => { p.addNote(id, p.patternList(id)[0].id, { s: 0, l: 1, m: 36, v: 1 }); });
+    const songBtn = () => screen.getByRole('button', { name: /^Song/ });
+    expect(songBtn().textContent).toContain('not saved');
+    // Name it, save it.
+    fireEvent.click(songBtn());
+    const name = screen.getByRole('textbox', { name: 'Song name' });
+    fireEvent.focus(name);
+    fireEvent.change(name, { target: { value: 'Night Drive' } });
+    fireEvent.blur(name);
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Save' })); });
+    expect([...files.values()].map((f) => f.name)).toEqual(['Night Drive']);
+    expect(songBtn().textContent).not.toContain('not saved');
+    // Change something, then INIT: it asks first.
+    act(() => { p.setBpm(99); });
+    expect(songBtn().textContent).toContain('not saved');
+    if (!screen.queryByRole('dialog', { name: 'Song' })) fireEvent.click(songBtn());
+    fireEvent.click(screen.getByRole('button', { name: /New song from INIT/ }));
+    expect(screen.getByRole('alertdialog', { name: 'Replace the song?' })).toBeTruthy();
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'New song' })); });
+    expect([p.songName, p.bpm, p.tracks().length, p.notes(p.trackIds()[0], p.patternList(p.trackIds()[0])[0].id).length]).toEqual(['Untitled', 120, 1, 0]);
+    // Open the saved song (INIT is not modified, so no question).
+    fireEvent.click(songBtn());
+    await act(async () => {});
+    await act(async () => { fireEvent.click(screen.getByRole('button', { name: 'Open Night Drive' })); });
+    expect([p.songName, p.bpm, p.unsaved]).toEqual(['Night Drive', 120, false]);
+    expect(p.notes(id, p.patternList(id)[0].id)).toHaveLength(1);
+    // The toast takes you back to the INIT song (undo).
+    fireEvent.click(screen.getByRole('button', { name: 'Back to "Untitled"' }));
+    expect(p.songName).toBe('Untitled');
   });
 });
 

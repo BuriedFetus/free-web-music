@@ -3,6 +3,7 @@ import type { Peer } from '../collab/presence';
 import { useEngine } from '../engine/EngineProvider';
 import { NOTE_NAMES, SCALES } from '../model/scales';
 import { useStudio } from './context';
+import { SongMenu } from './SongMenu';
 
 /** Live position inside the playing TRACK: "row|bar.beat.step", from the engine. */
 function usePosition(): string | null {
@@ -30,6 +31,7 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
 
   return (
     <div className="fwm-topbar">
+      <SongMenu />
       <div className="fwm-transport" role="group" aria-label="Transport">
         <button type="button" className="fwm-tb fwm-tb--play" aria-pressed={playing} onClick={() => setPlaying(!playing)}>
           {playing ? '■ Stop' : '▶ Play'}

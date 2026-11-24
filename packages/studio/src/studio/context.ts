@@ -1,6 +1,6 @@
 import { createContext, useContext } from 'react';
 import type { PresenceModel } from '../collab/presence';
-import type { LiveChannel, StudioUser } from '../collab/types';
+import type { LiveChannel, SongLibrary, StudioUser } from '../collab/types';
 import type { Project } from '../model/project';
 
 export const QUANT: Record<string, number> = { '1/4': 4, '1/8': 2, '1/16': 1, '1/32': 0.5, '1/64': 0.25, Off: 0 };
@@ -24,6 +24,8 @@ export interface StudioCtx {
   presence: PresenceModel;
   user: StudioUser;
   channel: LiveChannel | null;
+  /** The host's song storage, if it has one. */
+  songs: SongLibrary | null;
   ws: Workspace;
   setWs(patch: Partial<Workspace>): void;
   playing: boolean;

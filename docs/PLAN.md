@@ -136,7 +136,10 @@ The core does no networking. The host owns providers, persistence and storage.
 - [x] Main sequencer view: step lanes, playhead, length, direction, rate, mute, clear (undoable), remove track (undoable)
 - [x] Piano roll: add / move / resize / delete, Snap 1/4…1/64/Off, keyboard nudging, quantize, velocity lane, automation lanes for every continuous param, peer edits outlined
 - [x] Live recording: notes (Rec quantize, latency-compensated) and knob moves (as automation) while Rec + Play
-- [x] Scenes A–D (one pattern per track per scene)
+- [x] ~~Scenes A–D~~ replaced after user testing (2026-11-23) by the redesign below
+- [x] Redesign, approved as a mock-up (`design/kit/arrange.html`): patterns belong to each instrument (named, 1 step–8 bars); the main sequencer is the **song arrangement** (instruments × TRACK rows; a TRACK lasts as long as its longest pattern); the audio thread plays the song (Loop TRACK / Loop SONG, jump to a TRACK on the beat); typed BPM; song-wide key
+- [x] Songs: Save, Save as copy, saved-song list, New from INIT, "not saved" shared by everyone; storage through the host's `SongLibrary` (the harness uses localStorage)
+- [ ] Flint (drum machine) reuses the step grid, with a length per drum row (next)
 - [ ] "Own seq": plumbing done (flag reaches the engine), waits for a device with a built-in sequencer (Cobalt, Phase 5)
 - [ ] Play/stop is local per person for now; a shared transport is Phase 4
 

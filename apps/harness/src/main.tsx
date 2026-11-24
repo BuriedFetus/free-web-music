@@ -8,6 +8,7 @@ import basaltManifest from '@fwm/engine/devices/basalt.json';
 import type { DeviceManifest, Engine } from '@fwm/engine';
 import { Basalt, BASALT_PRESETS, EngineProvider, Project, Studio, ThemeRoot, createDeviceStore, useEngine } from '@fwm/studio';
 import '@fwm/studio/skins/host-examples.css';
+import { localSongs } from './songStore';
 import { connectTabs, tabUser } from './tabSync';
 import './harness.css';
 
@@ -45,6 +46,7 @@ function seed() {
   const id = p.addTrack(m, BASALT_PRESETS[0], 0);
   const groove = p.patternList(id)[0].id;
   p.renamePattern(id, groove, 'Groove');
+  p.renameSong('Demo');
   const line: [number, number, number, number][] = [[0, 2, 36, 0.9], [3, 1, 36, 0.6], [6, 2, 39, 0.8], [8, 1, 36, 0.9], [10, 1, 31, 0.7], [11, 1, 34, 0.7], [12, 3, 36, 1]];
   for (const [s, l, n, v] of line) p.addNote(id, groove, { s, l, m: n, v });
   const drift = p.addPattern(id)!;
@@ -82,7 +84,7 @@ function StudioPage() {
         <span className="h-grow" />
         <SkinButtons skin={skin} setSkin={setSkin} />
       </div>
-      <Studio doc={session!.doc} awareness={session!.awareness} channel={session!.channel} user={me}
+      <Studio doc={session!.doc} awareness={session!.awareness} channel={session!.channel} user={me} songs={localSongs}
         onEngine={(e) => (engineRef.current = e)} />
     </div>
   );

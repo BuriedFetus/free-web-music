@@ -1,6 +1,6 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-23): sequencer redesign, slices 1–2 of 3 done
+## START HERE (2026-11-24): sequencer redesign done (3 slices); next: Flint, the drum machine
 The user approved the Song Arrangement mock-up (`design/kit/arrange.html`, published privately). Build plan:
 1. **Done:** scenes A–D are gone. Patterns belong to each instrument (`fwm.tracks[id].pats`, each pattern has a
    name and a length of 1–128 steps). The song is `fwm.song`: rows the UI calls TRACK 1, 2… In code a "track" is
@@ -14,7 +14,11 @@ The user approved the Song Arrangement mock-up (`design/kit/arrange.html`, publi
    selected TRACK; clicking a TRACK name while playing jumps there at once, at the same place in the bar.
    Clicking a cell only selects it for editing. Recording and knob automation go into the playing row's pattern.
    Tests: `packages/engine/test/sequencer.test.ts` (song timing to the sample), browser `?e2e=song`.
-3. **Next:** songs (Save, song list, New from INIT) through a host-provided storage API (the core does no storage).
+3. **Done:** songs. `Project.toFile()/loadFile()/initSong()`, `unsaved` (hash in `fwm.meta.savedHash`, the same
+   for everyone), `markSaved(id, file)`. Host contract: `SongLibrary` (`list/load/save/remove`) passed to
+   `<Studio songs>`; the harness's is `apps/harness/src/songStore.ts` (localStorage). Song menu: `SongMenu.tsx`.
+   Opening a song or INIT replaces it for everyone (asks first when unsaved; one undo step). Test `?e2e=songs`.
+   Was planned as: songs (Save, song list, New from INIT) through a host-provided storage API (the core does no storage).
 Also planned: Flint (drums) reuses the old step grid with a length per row.
 
 ## Earlier (2026-11-22): user testing feedback
@@ -50,7 +54,7 @@ Fixed and pushed this session (each has a browser test):
    publish as artifact) before building it.
 Then Phase 4 (shared transport). The Studio artifact (HEVoA3TExTjSF2bRmVUUei) has NOT been republished with these fixes.
 
-Single-tab e2e runs: `dist/index.html?e2e=multi`, `?e2e=switch`, `?e2e=roll` and `?e2e=song` (one firefox tab, POST to ./log).
+Single-tab e2e runs: `dist/index.html?e2e=multi`, `?e2e=switch`, `?e2e=roll`, `?e2e=song` and `?e2e=songs` (one firefox tab, POST to ./log).
 `?seednow=3` seeds three Basalts for screenshots.
 
 ---
