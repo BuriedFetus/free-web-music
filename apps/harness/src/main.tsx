@@ -58,6 +58,26 @@ function seed() {
   for (const [s, l, n, v] of [[0, 6, 36, 0.8], [8, 6, 31, 0.7], [16, 6, 34, 0.8], [24, 8, 29, 0.7]] as const) p.addNote(id, drift, { s, l, m: n, v });
   const r2 = p.addRow();
   p.setCell(r2, id, drift);
+  // Drums (Flint): "Beat" in TRACK 1, "Fill" in TRACK 2. The rim row runs 12 steps against 16.
+  const dr = p.addTrack(flintManifest as DeviceManifest, FLINT_KITS[0], 0);
+  if (params.has('drumsfirst')) p.order.insert(0, [p.order.get(p.order.length - 1)]), p.order.delete(p.order.length - 1, 1); // screenshots: Drums selected
+  p.renameTrack(dr, 'Drums');
+  const beat = p.patternList(dr)[0].id;
+  p.renamePattern(dr, beat, 'Beat');
+  const hit = (pat: string, pad: number, steps: number[], extra: { a?: number; r?: number; v?: number } = {}) =>
+    steps.forEach((s) => p.addNote(dr, pat, { s, l: 1, m: 36 + pad, v: extra.v ?? (s % 4 === 0 ? 0.9 : 0.7), ...extra }));
+  hit(beat, 0, [0, 8, 10]);
+  hit(beat, 1, [4, 12]);
+  hit(beat, 3, [0, 2, 4, 6, 8, 10, 12, 14], { v: 0.6 });
+  hit(beat, 6, [3, 7, 10], { v: 0.5 });
+  p.setRowLen(dr, beat, 6, 12);
+  const fill = p.addPattern(dr, beat)!;
+  p.renamePattern(dr, fill, 'Fill');
+  hit(fill, 1, [13], { r: 2 });
+  hit(fill, 1, [14], { r: 3 });
+  hit(fill, 1, [15], { r: 4, a: 1 });
+  hit(fill, 5, [10, 11]);
+  p.setCell(r2, dr, fill);
   // ?seednow=3: extra copies, to see several tracks at once.
   for (let i = 1; i < Number(params.get('seednow') || 1); i++) p.addTrack(m, BASALT_PRESETS[i % BASALT_PRESETS.length], 0);
   p.undoManager.clear(); // the demo is not something you can undo

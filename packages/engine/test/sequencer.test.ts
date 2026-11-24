@@ -159,3 +159,35 @@ describe('Sequencer: song (rows of patterns)', () => {
     expect(at(e, 36)).toEqual([]); // row r0 (empty) comes next, at 32
   });
 });
+
+describe('Sequencer: drum patterns (rows with their own length, accent, rolls, pad mute / solo)', () => {
+  // Pad 0 (note 36): hit on step 0 of a 4-step row; pad 1 (37): step 0 of a 3-step row. Pattern = 4 steps.
+  function drums(extra: object = {}) {
+    const seq = new Sequencer(SR);
+    seq.setTrack(0, { pmute: 0, psolo: 0, ...extra });
+    seq.setPat(0, 'd', { len: 4, lens: [4, 3], notes: [{ s: 0, l: 1, m: 36, v: 1 }, { s: 0, l: 1, m: 37, v: 0.5, a: 1 }, { s: 2, l: 1, m: 36, v: 1, r: 3 }] });
+    seq.setSong({ loop: 'track', rows: [{ id: 'r', len: 12, cells: { 0: 'd' } }] });
+    return seq;
+  }
+  const at = (e: Ev[], note: number) => ons(e).filter((x) => x.a === note && x.frame < 12 * STEP).map((x) => Math.round((x.frame / STEP) * 1000) / 1000);
+
+  it('each pad row loops on its own length; accents go 12 notes up; a roll is 3 quick hits in one step', () => {
+    const seq = drums();
+    play(seq);
+    const e = run(seq, 12 * STEP);
+    expect(at(e, 36)).toEqual([0, 2, 2.333, 2.667, 4, 6, 6.333, 6.667, 8, 10, 10.333, 10.667]); // 4-step row with a ×3 roll on step 2
+    expect(at(e, 49)).toEqual([0, 3, 6, 9]); // the accented 3-step row: note 37 + 12
+    expect(at(e, 37)).toEqual([]);
+    const roll = ons(e).filter((x) => x.a === 36 && x.frame > 1.5 * STEP && x.frame < 3 * STEP).map((x) => x.b);
+    expect(roll.map((v) => Math.round(v! * 100) / 100)).toEqual([1, 0.9, 0.8]); // each roll hit a little softer
+  });
+
+  it('muted pads are silent; soloed pads play alone', () => {
+    let e = run((() => { const s = drums({ pmute: 1 }); play(s); return s; })(), 8 * STEP);
+    expect(at(e, 36)).toEqual([]);
+    expect(at(e, 49).length).toBeGreaterThan(0);
+    e = run((() => { const s = drums({ psolo: 1 }); play(s); return s; })(), 8 * STEP);
+    expect(at(e, 36).length).toBeGreaterThan(0);
+    expect(at(e, 49)).toEqual([]);
+  });
+});

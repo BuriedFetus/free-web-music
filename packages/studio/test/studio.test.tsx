@@ -203,5 +203,36 @@ describe('<Studio>', () => {
     expect(dev.querySelector('.fwm-flint__edited')).toBeNull();
     expect(store().getState().params['p1.model']).toBe(1); // Chrome = all Digital
   });
+
+  it('Flint drum grid: draw, accent, roll, row length, mute and solo', () => {
+    const p = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Flint as a new track' }));
+    const id = p.trackIds()[0];
+    const pat = () => p.cell(p.rows()[0].id, id)!;
+    const roll = screen.getByRole('region', { name: 'Piano roll' });
+    const step = (pad: number, n: number) => within(roll).getByRole('button', { name: new RegExp(`^Pad ${pad} step ${n}(,|$)`) });
+    fireEvent.click(step(1, 1));
+    fireEvent.click(step(1, 5));
+    expect(p.notes(id, pat()).map(([, n]) => [n.m, n.s])).toEqual([[36, 0], [36, 4]]);
+    fireEvent.click(within(roll).getByRole('button', { name: 'Accent' }));
+    fireEvent.click(step(1, 5));
+    fireEvent.click(within(roll).getByRole('button', { name: 'Roll ×2 ×3 ×4' }));
+    fireEvent.click(step(2, 9)); // new note with a ×2 roll
+    fireEvent.click(step(2, 9)); // ×3
+    const n = Object.fromEntries(p.notes(id, pat()).map(([, x]) => [`${x.m}@${x.s}`, x]));
+    expect(n['36@4'].a).toBe(1);
+    expect(n['37@8'].r).toBe(3);
+    expect(step(2, 9).getAttribute('aria-label')).toContain('roll ×3');
+    // Row length: pad 8 to 17 steps makes the pattern 17 steps; the other rows stay at 16.
+    fireEvent.click(within(roll).getByRole('button', { name: 'Pad 8 row longer' }));
+    expect(p.rowLens(id, pat())).toEqual([16, 16, 16, 16, 16, 16, 16, 17]);
+    expect(p.patternInfo(id, pat())!.len).toBe(17);
+    fireEvent.click(within(roll).getByRole('button', { name: 'Pad 3 row shorter' }));
+    expect(p.rowLens(id, pat())[2]).toBe(15);
+    // Mute pad 1, solo pad 2: shared settings on the instrument.
+    fireEvent.click(within(roll).getByRole('button', { name: 'Mute pad 1' }));
+    fireEvent.click(within(roll).getByRole('button', { name: 'Solo pad 2' }));
+    expect(p.track(id)!.seq).toMatchObject({ pmute: 1, psolo: 2 });
+  });
 });
 

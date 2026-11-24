@@ -201,3 +201,34 @@
 .fwm-mirow { display: flex; align-items: center; gap: 4px; }
 .fwm-confirm { padding: 6px 8px; font-size: 14px; }
 .fwm-confirm p { margin: 0 0 8px; }
+
+/* drum grid (Piano roll panel, for drum machines) */
+.fwm-dg { display: flex; flex-direction: column; gap: 6px; }
+.fwm-dg__len { font-weight: 700; }
+.fwm-dg__rows { display: grid; gap: 6px; min-width: max-content; }
+.fwm-dg__row { display: grid; grid-template-columns: 118px 66px minmax(var(--w), 1fr) 118px; gap: 8px; align-items: center; }
+.fwm-dg__row.is-off .fwm-dg__cells { opacity: .35; }
+.fwm-dg__name { min-height: 34px; border: 0; border-radius: 8px; background: var(--fwm-roll2); color: var(--fwm-roll-ink); text-align: left; padding: 0 10px; cursor: pointer; font-weight: 700; font-size: 13px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fwm-dg__name.is-sel { box-shadow: inset 0 0 0 2px var(--fwm-note); }
+.fwm-dg__ms { display: flex; gap: 3px; }
+.fwm-dg__ms button { width: 30px; height: 34px; border: 0; border-radius: 7px; background: var(--fwm-roll-btn); color: var(--fwm-roll-ink); font-weight: 800; cursor: pointer; }
+.fwm-dg__ms .is-m[aria-pressed=true] { background: var(--fwm-roll-ink); color: var(--fwm-roll-deep); }
+.fwm-dg__ms .is-s[aria-pressed=true] { background: var(--fwm-note); color: var(--fwm-on-note); }
+.fwm-dg__cells, .fwm-dg__vbars { display: grid; grid-template-columns: repeat(var(--cols), minmax(18px, 1fr)); gap: 3px; }
+.fwm-dc { position: relative; height: 34px; border: 0; border-radius: 5px; cursor: pointer; background: color-mix(in srgb, var(--fwm-roll-ink) 12%, var(--fwm-roll2)); padding: 0; color: var(--fwm-roll-ink); font: 700 11px/1 var(--fwm-font-ui); }
+.fwm-dc.is-beat { box-shadow: inset 2px 0 0 color-mix(in srgb, var(--fwm-roll-ink) 35%, transparent); }
+.fwm-dc.is-on { background: linear-gradient(to top, var(--fwm-note) calc(var(--v) * 100%), color-mix(in srgb, var(--fwm-note) 30%, var(--fwm-roll2)) 0); }
+.fwm-dc.is-acc::after { content: ""; position: absolute; top: 3px; right: 3px; width: 7px; height: 7px; border-radius: 50%; background: var(--fwm-roll-ink); box-shadow: 0 0 0 2px var(--fwm-roll-deep); }
+.fwm-dc.is-out { visibility: hidden; }
+.fwm-dc.is-now { outline: 2px solid var(--fwm-roll-ink); outline-offset: 1px; }
+.fwm-dc__roll { position: absolute; left: 3px; top: 3px; text-shadow: 0 1px 2px var(--fwm-roll-deep); }
+.fwm-dg__lenbox { display: flex; align-items: center; gap: 4px; }
+.fwm-dg__lenbox button { width: 32px; height: 34px; border: 0; border-radius: 8px; background: var(--fwm-roll-btn); color: var(--fwm-roll-ink); cursor: pointer; font-weight: 700; }
+.fwm-dg__lenbox button:disabled { opacity: .4; cursor: default; }
+.fwm-dg__lenbox span { font: 18px/1 var(--fwm-font-screen); background: var(--fwm-roll-deep); color: var(--fwm-note); padding: 6px; border-radius: 6px; min-width: 3.4ch; text-align: center; }
+.fwm-dg__vel { align-items: end; }
+.fwm-dg__vlab { font-size: 13px; font-weight: 700; align-self: center; }
+.fwm-dg__vbars { height: 64px; background: var(--fwm-roll-deep); border-radius: 6px; padding: 3px; touch-action: none; cursor: ns-resize; }
+.fwm-dg__vb { position: relative; border-radius: 3px; background: color-mix(in srgb, var(--fwm-roll-ink) 6%, transparent); }
+.fwm-dg__vb i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 3px; background: var(--fwm-note); }
+.fwm-dg__vb.is-acc i { box-shadow: inset 0 3px 0 var(--fwm-roll-ink); }

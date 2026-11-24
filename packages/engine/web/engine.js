@@ -112,10 +112,10 @@ export async function createEngine({ base, context, manifests } = {}) {
       send({ t: 'transport', playing, bpm, swing, row });
     },
     /** Song mode: one of a slot's patterns, {len, notes, auto: {paramId: (value|null)[]}}. */
-    setPat(slot, id, { len, notes, auto = {} }) {
+    setPat(slot, id, { len, notes, auto = {}, lens }) {
       const byIndex = {};
       for (const k in auto) byIndex[index(slot, k)] = auto[k];
-      send({ t: 'pat', slot, id, len, notes, auto: byIndex });
+      send({ t: 'pat', slot, id, len, notes, auto: byIndex, lens });
     },
     deletePat(slot, id) {
       send({ t: 'patdel', slot, id });

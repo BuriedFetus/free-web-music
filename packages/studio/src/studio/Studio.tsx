@@ -371,9 +371,15 @@ function TrackEngine({ project, track, slot }: { project: Project; track: TrackI
       engine.setTrack(slot, track.seq);
     }
     const seen = new Set<string>();
+    const pads = deviceEntry(track.device)?.layout === 'pads';
     for (const p of project.patternList(track.id)) {
       seen.add(p.id);
-      const data = { len: p.len, notes: project.notes(track.id, p.id).map(([, n]) => n), auto: project.automationAll(track.id, p.id) };
+      const data = {
+        len: p.len,
+        notes: project.notes(track.id, p.id).map(([, n]) => n),
+        auto: project.automationAll(track.id, p.id),
+        ...(pads ? { lens: project.rowLens(track.id, p.id) } : {}),
+      };
       const pk = JSON.stringify(data);
       if (sent.current.get(p.id) === pk) continue;
       sent.current.set(p.id, pk);

@@ -50,12 +50,19 @@ export interface TrackSettings {
   rate: number;
   own: boolean;
   mute: boolean;
+  /** Drum machines: muted / soloed pads as bit masks (bit i = pad i = note 36 + i). */
+  pmute: number;
+  psolo: number;
 }
 export interface SeqNote {
   s: number;
   l: number;
   m: number;
   v: number;
+  /** Accent: the hit is sent as note + 12 (Flint plays it louder). */
+  a?: number;
+  /** Roll: 2–4 quick hits spread over the note's length. */
+  r?: number;
 }
 
 /** The song as the engine plays it: rows of {slot: patternId}; a row lasts `len` steps. */
@@ -81,7 +88,8 @@ export interface Engine {
   setRoute(slot: number, route: number, src: ModSourceId, target: string, depth: number): void;
   clearRoute(slot: number, route: number): void;
   setTransport(t: { playing?: boolean; bpm?: number; swing?: number; row?: number }): void;
-  setPat(slot: number, id: string, pattern: { len: number; notes: SeqNote[]; auto?: Record<string, (number | null)[]> }): void;
+  /** `lens`: drum patterns, one length per pad row (pad i = note 36 + i); rows loop on their own. */
+  setPat(slot: number, id: string, pattern: { len: number; notes: SeqNote[]; auto?: Record<string, (number | null)[]>; lens?: number[] }): void;
   deletePat(slot: number, id: string): void;
   setSong(song: SongPlan | null): void;
   cue(row: number): void;

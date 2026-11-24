@@ -12,6 +12,7 @@ import { noteName } from '../../primitives/Keys';
 import { QUANT, useStudio } from '../context';
 import { usePlayRow, usePlayStep } from './common';
 import { lenLabel } from './SeqView';
+import { DrumGrid } from './DrumGrid';
 import { NameInput } from './TrackName';
 
 const RH = 14; // row height (px)
@@ -84,6 +85,21 @@ export function RollView({ peers }: { peers: Peer[] }) {
       <div className="fwm-rl">
         {patternBar}
         <p className="fwm-empty">{t.name} is silent in {rowName}. Pick a pattern above, or + New.</p>
+      </div>
+    );
+  // Drum machines get the drum grid (one row per pad) instead of the piano roll.
+  if (entry.layout === 'pads')
+    return (
+      <div className="fwm-rl">
+        {patternBar}
+        <div className="fwm-rtb">
+          <label>
+            Name
+            <NameInput key={pat} value={info.name} label={`Rename pattern ${info.name}`} maxLength={24} className="fwm-pname"
+              onCommit={(v) => project.renamePattern(t.id, pat, v)} />
+          </label>
+        </div>
+        <DrumGrid track={t} pat={pat} />
       </div>
     );
   const L = info.len;

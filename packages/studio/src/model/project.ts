@@ -28,13 +28,25 @@ export const BAR = 16;
 /** Longest pattern: 8 bars. */
 export const MAX_LEN = 128;
 
-export interface Note extends SeqNote {}
+/** A note. Drum hits may also carry an accent (`a: 1`) and a roll (`r`: 2–4 quick hits). */
+export interface Note extends SeqNote {
+  a?: number;
+  r?: number;
+}
 export interface SeqSettings {
   dir: Direction;
   rate: number;
   own: boolean;
   mute: boolean;
+  /** Drum machines: muted pads and soloed pads, as bit masks (bit i = pad i). */
+  pmute: number;
+  psolo: number;
 }
+/** Drum pads: pad i plays note PAD_NOTE + i. */
+export const PAD_NOTE = 36;
+export const PADS = 8;
+/** Longest drum row. */
+export const MAX_ROW = 64;
 export interface TrackInfo {
   id: string;
   device: DeviceId;
@@ -62,7 +74,7 @@ export interface SongFile {
     seq: SeqSettings;
     params: Record<string, number>;
     routes: Route[];
-    patterns: { id: string; name: string; len: number; notes: Note[]; auto: Record<string, number> }[];
+    patterns: { id: string; name: string; len: number; notes: Note[]; auto: Record<string, number>; lens?: Record<string, number> }[];
   }[];
   rows: SongRow[];
 }
@@ -80,7 +92,7 @@ export interface SongRow {
   cells: Record<string, string>;
 }
 
-const DEFAULT_SEQ: SeqSettings = { dir: 'fwd', rate: 1, own: false, mute: false };
+const DEFAULT_SEQ: SeqSettings = { dir: 'fwd', rate: 1, own: false, mute: false, pmute: 0, psolo: 0 };
 const uid = (p: string) => p + Math.random().toString(36).slice(2, 10);
 export const patternKey = (track: string, pat: string) => `${track}|${pat}`;
 const clampLen = (v: number) => Math.max(1, Math.min(MAX_LEN, Math.round(v)));
@@ -211,6 +223,7 @@ export class Project {
             ...p,
             notes: this.notes(t.id, p.id).map(([, n]) => n),
             auto: (this.autoMap(t.id, p.id)?.toJSON() ?? {}) as Record<string, number>,
+            ...(this.lensMap(t.id, p.id)?.size ? { lens: this.lensMap(t.id, p.id)!.toJSON() as Record<string, number> } : {}),
           })),
         };
       }),
@@ -290,8 +303,11 @@ export class Project {
           for (const n of fp.notes ?? []) notes.set(uid('n'), clampNote(n));
           const auto = new Y.Map<number>();
           for (const [k, v] of Object.entries(fp.auto ?? {})) auto.set(k, v);
+          const lens = new Y.Map<number>();
+          for (const [k, v] of Object.entries(fp.lens ?? {})) lens.set(k, Math.max(1, Math.min(MAX_ROW, Math.round(v))));
           p.set('notes', notes);
           p.set('auto', auto);
+          p.set('lens', lens);
           this.patterns.set(patternKey(ft.id, fp.id), p);
           pats.push([fp.id]);
         }
@@ -382,12 +398,15 @@ export class Project {
     p.set('len', clampLen(len));
     const notes = new Y.Map<Note>();
     const auto = new Y.Map<number>();
+    const lens = new Y.Map<number>();
     if (from) {
       for (const v of (from.get('notes') as Y.Map<Note>).values()) notes.set(uid('n'), v);
       for (const [k, v] of (from.get('auto') as Y.Map<number>).entries()) auto.set(k, v);
+      for (const [k, v] of ((from.get('lens') as Y.Map<number> | undefined)?.entries() ?? [])) lens.set(k, v);
     }
     p.set('notes', notes);
     p.set('auto', auto);
+    p.set('lens', lens);
     this.patterns.set(patternKey(track, id), p);
     pats.push([id]);
     return id;
@@ -483,6 +502,33 @@ export class Project {
   }
   private notesMap(track: string, pat: string) {
     return this.patMap(track, pat)?.get('notes') as Y.Map<Note> | undefined;
+  }
+  private lensMap(track: string, pat: string) {
+    return this.patMap(track, pat)?.get('lens') as Y.Map<number> | undefined;
+  }
+  /** Drum patterns: the length of each pad row (rows never set follow the pattern length). */
+  rowLens(track: string, pat: string): number[] {
+    const len = this.patternInfo(track, pat)?.len ?? BAR;
+    const m = this.lensMap(track, pat);
+    return Array.from({ length: PADS }, (_, i) => m?.get(String(i)) ?? len);
+  }
+  /** Set one pad row's length (1…MAX_ROW). The pattern is as long as its longest row. */
+  setRowLen(track: string, pat: string, pad: number, len: number) {
+    const p = this.patMap(track, pat);
+    if (!p) return;
+    const v = Math.max(1, Math.min(MAX_ROW, Math.round(len)));
+    const cur = this.rowLens(track, pat);
+    if (cur[pad] === v) return;
+    cur[pad] = v;
+    this.action(() => {
+      let m = p.get('lens') as Y.Map<number> | undefined;
+      if (!m) {
+        m = new Y.Map<number>();
+        p.set('lens', m);
+      }
+      cur.forEach((l, i) => m!.get(String(i)) !== l && m!.set(String(i), l)); // fix every row, so they no longer follow the pattern length
+      p.set('len', Math.max(...cur));
+    });
   }
   private autoMap(track: string, pat: string) {
     return this.patMap(track, pat)?.get('auto') as Y.Map<number> | undefined;
@@ -661,7 +707,10 @@ function clampNote(n: Note): Note {
   const r3 = (x: number) => Math.round(x * 1000) / 1000;
   const s = r3(Math.max(0, Math.min(MAX_LEN - 1 / 64, n.s)));
   const l = r3(Math.max(1 / 64, Math.min(MAX_LEN - s, n.l)));
-  return { s, l, m: Math.max(0, Math.min(127, Math.round(n.m))), v: Math.max(0.05, Math.min(1, n.v)) };
+  const out: Note = { s, l, m: Math.max(0, Math.min(127, Math.round(n.m))), v: Math.max(0.05, Math.min(1, n.v)) };
+  if (n.a) out.a = 1;
+  if (n.r && n.r > 1) out.r = Math.min(4, Math.round(n.r));
+  return out;
 }
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));

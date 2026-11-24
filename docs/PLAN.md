@@ -139,7 +139,8 @@ The core does no networking. The host owns providers, persistence and storage.
 - [x] ~~Scenes A–D~~ replaced after user testing (2026-11-23) by the redesign below
 - [x] Redesign, approved as a mock-up (`design/kit/arrange.html`): patterns belong to each instrument (named, 1 step–8 bars); the main sequencer is the **song arrangement** (instruments × TRACK rows; a TRACK lasts as long as its longest pattern); the audio thread plays the song (Loop TRACK / Loop SONG, jump to a TRACK on the beat); typed BPM; song-wide key
 - [x] Songs: Save, Save as copy, saved-song list, New from INIT, "not saved" shared by everyone; storage through the host's `SongLibrary` (the harness uses localStorage)
-- [ ] Flint (drum machine) reuses the step grid, with a length per drum row (next)
+- [x] Flint (drum machine), pulled forward from Phase 5 at the user's request: synthesized 8-pad kits (8 drum types × 4 characters), kit presets, drum grid in the Piano roll panel with a length per pad row, accent, rolls, velocity, pad mute / solo
+- [ ] Flint: sample pads (later; goal: no download from a server for everyone)
 - [ ] "Own seq": plumbing done (flag reaches the engine), waits for a device with a built-in sequencer (Cobalt, Phase 5)
 - [ ] Play/stop is local per person for now; a shared transport is Phase 4
 

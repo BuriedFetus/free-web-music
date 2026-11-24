@@ -15,6 +15,8 @@
 // Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport}.
 // MessagePort is used everywhere for now; a SharedArrayBuffer ring comes later behind the same API.
 const UI_EVERY = 6; // blocks between UI snapshots (~16 ms at 48 kHz)
+const PAD_NOTE = 36; // drum machines: pad i = note 36 + i
+const ACCENT = 12; // accented drum hits are sent 12 notes up
 
 /** Deterministic hash for the Random direction (same on every client). */
 function hash(n, k) {
@@ -64,7 +66,7 @@ export class Sequencer {
   }
   setPat(slot, id, p) {
     if (!this.pats.has(slot)) this.pats.set(slot, new Map());
-    this.pats.get(slot).set(id, { len: Math.max(1, p.len | 0), notes: p.notes || [], auto: p.auto || {} });
+    this.pats.get(slot).set(id, { len: Math.max(1, p.len | 0), notes: p.notes || [], auto: p.auto || {}, lens: p.lens || null });
   }
   delPat(slot, id) {
     this.pats.get(slot)?.delete(id);
@@ -99,7 +101,7 @@ export class Sequencer {
   track(slot) {
     let t = this.tracks.get(slot);
     if (!t) {
-      t = { len: 16, dir: 'fwd', rate: 1, own: false, mute: false, notes: [], auto: {}, step: -1 };
+      t = { len: 16, dir: 'fwd', rate: 1, own: false, mute: false, pmute: 0, psolo: 0, notes: [], auto: {}, step: -1 };
       this.tracks.set(slot, t);
     }
     return t;
@@ -203,11 +205,27 @@ export class Sequencer {
         }
         if (t.own || t.mute) continue;
         for (const note of pat.notes) {
-          if (Math.floor(note.s) !== idx) continue;
-          const on = tickStart + (note.s - idx);
-          if (on < t0 - 1e-9 || on >= t1 - 1e-9) continue;
-          const gOn = base + on / r;
-          events.push({ pos: gOn, kind: 'on', slot, a: note.m, b: note.v, off: gOn + Math.max(0.05, note.l * 0.98) / r });
+          // Drum patterns: each pad row loops on its own length; muted / not-soloed pads are skipped.
+          let ix = idx;
+          if (pat.lens) {
+            const pad = note.m - PAD_NOTE;
+            if (pad >= 0 && pad < 32) {
+              if ((t.pmute >> pad) & 1 || (t.psolo && !((t.psolo >> pad) & 1))) continue;
+              ix = stepOf(n, pat.lens[pad] || pat.len, t.dir, slot + 1);
+            }
+          }
+          if (Math.floor(note.s) !== ix) continue;
+          const m = note.a ? note.m + ACCENT : note.m;
+          const hits = note.r > 1 ? Math.min(4, note.r) : 1;
+          const span = hits > 1 ? Math.min(note.l, 1) / hits : note.l; // a roll fits in one step
+          for (let k = 0; k < hits; k++) {
+            const on = tickStart + (note.s - ix) + k * span;
+            if (on < t0 - 1e-9 || on >= t1 - 1e-9) continue;
+            const gOn = base + on / r;
+            const v = note.v * (1 - 0.1 * k);
+            const hold = hits > 1 ? span * 0.9 : note.l * 0.98;
+            events.push({ pos: gOn, kind: 'on', slot, a: m, b: v, off: gOn + Math.max(0.05, hold) / r });
+          }
         }
       }
     }

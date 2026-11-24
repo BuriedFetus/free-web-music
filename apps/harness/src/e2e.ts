@@ -29,6 +29,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'song') return runSong(p, engineRef, ok, out);
   if (role === 'songs') return runSongs(p, engineRef, ok, out);
   if (role === 'flint') return runFlint(p, engineRef, ok, out);
+  if (role === 'drums') return runDrums(p, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
     if (role === 'a') {
@@ -497,6 +498,51 @@ async function runFlint(_p: Project, engineRef: { current: Engine | null }, ok: 
     ok(kp > 0.02 && $('.fwm-pad[data-pad="2"]')!.classList.contains('is-hit') !== undefined, `key D plays pad 3 (peak ${kp.toFixed(2)})`);
   } catch (e) {
     out.push(`FAIL flint: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: a drum pattern plays in the song; rows with different lengths show their own playheads. */
+async function runDrums(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  try {
+    await sleep(300);
+    ($('[aria-label="Add Flint as a new track"]') as HTMLButtonElement).click();
+    await sleep(200);
+    const id = p.trackIds()[0];
+    const pat = p.patternList(id)[0].id;
+    for (const st of [0, 4, 8, 12]) p.addNote(id, pat, { s: st, l: 1, m: 36, v: 0.9 });
+    p.addNote(id, pat, { s: 0, l: 1, m: 42, v: 0.9 });
+    p.setRowLen(id, pat, 6, 5); // rim row: 5 steps
+    p.setBpm(240);
+    await sleep(200);
+    ok(document.querySelectorAll('.fwm-dg__row').length === 9, 'the Piano roll panel shows the drum grid (8 rows + velocity)');
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    btn('▶ Play')!.click();
+    let pk = 0;
+    const pairs = new Set<string>();
+    const t0 = performance.now();
+    while (performance.now() - t0 < 2500) {
+      pk = Math.max(pk, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+      const rows = [...document.querySelectorAll('.fwm-dg__cells')];
+      const kick = [...rows[0].children].findIndex((c) => c.classList.contains('is-now'));
+      const rim = [...rows[6].children].findIndex((c) => c.classList.contains('is-now'));
+      if (kick >= 0 && rim >= 0) pairs.add(`${kick}:${rim}`);
+      await sleep(30);
+    }
+    ok(pk > 0.05, `the drum pattern plays in the song (peak ${pk.toFixed(2)})`);
+    const drift = [...pairs].some((x) => { const [a, b] = x.split(':').map(Number); return a !== b; });
+    ok(drift && [...pairs].every((x) => Number(x.split(':')[1]) < 5), `the 5-step rim row has its own playhead (${[...pairs].slice(0, 8).join(' ')})`);
+    // Mute the kick: still playing, no errors.
+    ($('[aria-label="Mute pad 1"]') as HTMLButtonElement).click();
+    await sleep(300);
+    ok(p.track(id)!.seq.pmute === 1, 'mute pad 1 is shared on the instrument');
+    btn('■ Stop')!.click();
+  } catch (e) {
+    out.push(`FAIL drums: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

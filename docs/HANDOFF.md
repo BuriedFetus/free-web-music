@@ -1,6 +1,23 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-24): sequencer redesign done (3 slices); next: Flint, the drum machine
+## START HERE (2026-11-24): Flint (drum machine) built in 3 slices, waiting for the user's review
+The user approved the Flint mock-up (`design/kit/flint.html`) and asked to build all three slices and commit;
+they test and review next. Built:
+1. **Sound** (`packages/engine/src/devices/flint.rs`, `devices/flint.json`, tests `tests/flint.rs`): device kind 2,
+   8 pads × (8 drum types × 4 characters: Analog / Digital / Noise / Vintage), Tune / Decay / Tone / Level per
+   pad, Accent and Level. Pad i = note 36 + i, accented = 48 + i. Closed hat chokes open hats. No samples
+   (user: a later goal is samples "without people needing to download from a server").
+2. **Device** (`packages/studio/src/devices/flint/`): kits (8 presets, "edited" when changed), pads, sound editor;
+   keys A S D F G H J K play the pads (`useComputerKeys` layout 'pads', registry `layout: 'pads'`).
+3. **Drum grid** (`studio/views/DrumGrid.tsx`): the Piano roll panel shows it for pad devices. Per-row lengths
+   (`Project.rowLens/setRowLen`, pattern `lens` map; pattern len = longest row), tools Draw / Accent (`note.a`) /
+   Roll (`note.r` 2–4), velocity lane, playhead per row, pad mute / solo (`seq.pmute/psolo` bit masks, shared).
+   The worklet loops each pad row on its own length, sends accents as note + 12 and splits rolls.
+Demo song (`?seednow`) now has Drums ("Beat" with a 12-step rim row, "Fill" with snare rolls). Browser tests
+`?e2e=flint`, `?e2e=drums`. Screenshot with Drums selected: `?seednow&drumsfirst`.
+Open: the user's review of how the 32 sounds feel (they were tuned by tests and measurements, not by ear).
+
+## Earlier (2026-11-24): sequencer redesign done (3 slices)
 The user approved the Song Arrangement mock-up (`design/kit/arrange.html`, published privately). Build plan:
 1. **Done:** scenes A–D are gone. Patterns belong to each instrument (`fwm.tracks[id].pats`, each pattern has a
    name and a length of 1–128 steps). The song is `fwm.song`: rows the UI calls TRACK 1, 2… In code a "track" is
@@ -54,7 +71,7 @@ Fixed and pushed this session (each has a browser test):
    publish as artifact) before building it.
 Then Phase 4 (shared transport). The Studio artifact (HEVoA3TExTjSF2bRmVUUei) has NOT been republished with these fixes.
 
-Single-tab e2e runs: `dist/index.html?e2e=multi`, `?e2e=switch`, `?e2e=roll`, `?e2e=song` and `?e2e=songs` (one firefox tab, POST to ./log).
+Single-tab e2e runs: `dist/index.html?e2e=multi`, `?e2e=switch`, `?e2e=roll`, `?e2e=song`, `?e2e=songs`, `?e2e=flint` and `?e2e=drums` (one firefox tab, POST to ./log).
 `?seednow=3` seeds three Basalts for screenshots.
 
 ---

@@ -4,7 +4,7 @@ A collaborative, device-based music studio for the browser. This repo is the **c
 
 - Plan, phases, progress: `docs/PLAN.md`
 - Theming contract (tokens, skins, replaceable controls): `docs/THEMING.md`
-- Status: **Phases 1–3 built**, including the redesigned sequencer (song arrangement, per-instrument patterns, songs). Next: Flint (drums). See HANDOFF START HERE. Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
+- Status: **Phases 1–3 built**, including the redesigned sequencer (song arrangement, per-instrument patterns, songs) and **Flint** (drum machine). Waiting for the user's review. See HANDOFF START HERE. Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
 - Words: in code a **track** is an instrument lane; the song's rows (TRACK 1, TRACK 2… in the UI) are **rows**.
 - Prototypes (no build step): `design/kit/index.html` (device kit, has a Sound button), `design/kit/workspace.html` (workspace), `design/kit/arrange.html` (song arrangement mock-up), `design/kit/flint.html` (Flint drum machine mock-up, with rough WebAudio preview sounds). Serve with `python3 spikes/serve.py`.
 

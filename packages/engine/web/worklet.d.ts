@@ -10,7 +10,7 @@ export class Sequencer {
   setPattern(slot: number, notes: { s: number; l: number; m: number; v: number }[], auto?: Record<number, (number | null)[]>): void;
   removeTrack(slot: number): void;
   setTransport(t: { playing?: boolean; bpm?: number; swing?: number; row?: number }): boolean;
-  setPat(slot: number, id: string, p: { len: number; notes?: { s: number; l: number; m: number; v: number }[]; auto?: Record<number, (number | null)[]> }): void;
+  setPat(slot: number, id: string, p: { len: number; notes?: { s: number; l: number; m: number; v: number; a?: number; r?: number }[]; auto?: Record<number, (number | null)[]>; lens?: number[] }): void;
   delPat(slot: number, id: string): void;
   setSong(song: { rows: { id: string; len: number; cells: Record<number, string> }[]; loop: 'track' | 'song' } | null): void;
   cue(row: number): void;
