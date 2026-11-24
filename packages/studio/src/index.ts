@@ -13,6 +13,7 @@ export * from './primitives';
 export { ThemeRoot, useDeviceTokens, usePrimitives, type StudioTheme } from './theme/Theme';
 export { Studio, type StudioProps } from './studio/Studio';
 export { Project, SCENES, STEPS, patternKey, type Note, type SeqSettings, type TrackInfo } from './model/project';
+export { DEFAULT_KEY, NOTE_NAMES, SCALES, inKey, isRoot, keyLabel, type SongKey } from './model/scales';
 export { PresenceModel, type Peer, type PresenceState, type Touch } from './collab/presence';
 export type { LiveChannel, LiveMessage, StudioUser } from './collab/types';
 export type { DeviceHost } from './devices/basalt/Basalt';

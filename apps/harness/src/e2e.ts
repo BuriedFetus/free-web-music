@@ -25,6 +25,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   const p = new Project(s.doc, { e2e: role });
   if (role === 'multi') return runMulti(p, engineRef, ok, out);
   if (role === 'switch') return runSwitch(p, engineRef, ok, out);
+  if (role === 'roll') return runRoll(p, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
     if (role === 'a') {
@@ -236,5 +237,90 @@ async function runSwitch(p: Project, engineRef: { current: Engine | null }, ok: 
     out.push(`FAIL switch: ${String(e)} | ${errs.join(' | ')}`);
   }
   out.push(`INFO errors: ${errs.length}`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: edit notes in the piano roll with real hit-testing (elementFromPoint), as a mouse would. */
+async function runRoll(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  // Pointer at a grid position: step (0..16) and pitch.
+  const ptr = (type: string, x: number, y: number, buttons = 1) => {
+    const el = document.elementFromPoint(x, y)!;
+    el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 0, pointerType: 'mouse', button: 0, buttons, isPrimary: true }));
+    return el;
+  };
+  try {
+    await sleep(300);
+    const id = p.addTrack(m, undefined, 0);
+    await sleep(200);
+    const grid = $('.fwm-grid')!;
+    const rowOf = (pitch: number) => $(`.fwm-gr[data-m="${pitch}"]`)!;
+    const at = (step: number, pitch: number) => {
+      const g = grid.getBoundingClientRect();
+      const r = rowOf(pitch).getBoundingClientRect();
+      return [g.left + (step / 16) * g.width, r.top + r.height / 2] as const;
+    };
+    rowOf(36).scrollIntoView({ block: 'center' });
+    await sleep(100);
+    // Draw C2 across 16 steps.
+    let [x, y] = at(0.5, 36);
+    ptr('pointerdown', x, y);
+    [x, y] = at(15.9, 36);
+    ptr('pointermove', x, y);
+    ptr('pointerup', x, y, 0);
+    await sleep(100);
+    const ns = () => p.notes(id, 0).map(([, n]) => n);
+    ok(ns().length === 1 && ns()[0].l === 16, `draw one 16-step note (${JSON.stringify(ns())})`);
+    // Press and hold in the middle of it, drag up two semitones: it moves, no new note.
+    [x, y] = at(8, 36);
+    const hit = ptr('pointerdown', x, y);
+    [x, y] = at(8, 38);
+    ptr('pointermove', x, y);
+    ptr('pointerup', x, y, 0);
+    await sleep(100);
+    ok(ns().length === 1, `holding the note grabs it (hit ${hit.className}; notes ${JSON.stringify(ns())})`);
+    ok(ns()[0]?.m === 38, `dragging moves it up (pitch ${ns()[0]?.m})`);
+    // From an empty spot, draw a note across an existing one on the same pitch: no stacked notes.
+    p.addNote(id, 0, { s: 8, l: 1, m: 41, v: 0.8 });
+    await sleep(100);
+    [x, y] = at(2.5, 41);
+    ptr('pointerdown', x, y);
+    [x, y] = at(11.9, 41);
+    ptr('pointermove', x, y);
+    ptr('pointerup', x, y, 0);
+    await sleep(100);
+    const same = ns().filter((n) => n.m === 41);
+    ok(same.length === 1 && same[0].s === 2 && same[0].l === 10, `drawing across a note replaces it, no overlap (${JSON.stringify(same)})`);
+    // Grid lines follow Snap.
+    const snapSel = $<HTMLSelectElement>('[aria-label="Snap when editing"]')!;
+    const setSnap = async (v: string) => {
+      snapSel.value = v;
+      snapSel.dispatchEvent(new Event('change', { bubbles: true }));
+      await sleep(80);
+      return getComputedStyle(grid, '::after').backgroundSize.split(',')[0].trim();
+    };
+    const g8 = await setSnap('1/8');
+    const g32 = await setSnap('1/32');
+    await setSnap('1/16');
+    ok(g8 !== g32 && parseFloat(g8) > parseFloat(g32), `grid cell size follows Snap (1/8: ${g8}, 1/32: ${g32})`);
+    // Piano keys sound when pressed.
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    await sleep(300);
+    const k = $(`.fwm-pkr[data-key="36"]`)!;
+    const kr = k.getBoundingClientRect();
+    ptr('pointerdown', kr.left + 10, kr.top + kr.height / 2);
+    let env = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 500) { env = Math.max(env, engineRef.current!.last!.devices[0]?.mods[1] ?? 0); await sleep(20); }
+    ptr('pointerup', kr.left + 10, kr.top + kr.height / 2, 0);
+    await sleep(1200);
+    const after = engineRef.current!.last!.devices[0]?.mods[1] ?? 1;
+    ok(env > 0.1 && after < 0.05, `pressing a piano key plays it, releasing stops it (env ${env.toFixed(2)} → ${after.toFixed(3)})`);
+  } catch (e) {
+    out.push(`FAIL roll: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
 }

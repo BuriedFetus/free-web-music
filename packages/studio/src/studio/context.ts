@@ -11,6 +11,8 @@ export interface Workspace {
   scene: number;
   snap: string;
   recQuant: string;
+  /** Piano roll shows only the rows in the song key. */
+  fold: boolean;
 }
 
 export interface StudioCtx {

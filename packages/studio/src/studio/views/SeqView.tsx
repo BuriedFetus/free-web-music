@@ -1,11 +1,13 @@
 // Main sequencer: one row per track, all following the same clock. Length, direction and rate are
 // per track, so a 12-step ping-pong line can run against a 16-step one.
+import { useState } from 'react';
 import type { Direction } from '@fwm/engine';
 import type { Peer } from '../../collab/presence';
 import { deviceEntry } from '../../devices/registry';
 import { SCENES, STEPS, type TrackInfo } from '../../model/project';
 import { useStudio } from '../context';
 import { usePlayStep } from './common';
+import { TrackNameInput } from './TrackName';
 
 const DIRS: [Direction, string, string][] = [['fwd', '→', 'Forward'], ['rev', '←', 'Reverse'], ['pp', '↔', 'Ping-pong'], ['rnd', '?', 'Random']];
 const RATES: [number, string][] = [[0.5, '½×'], [1, '1×'], [2, '2×']];
@@ -31,7 +33,8 @@ export function SeqView({ peers }: { peers: Peer[] }) {
         <SeqRow key={t.id} track={t} peers={peers.filter((p) => p.track === t.id)} />
       ))}
       <p className="fwm-sqnote">
-        Every track follows this clock. Click a step to switch a note on or off; open the Piano roll for pitch, length and
+        Every track follows this clock. Click a step to switch a note on or off (a lit step held over by a long note ends that note there); ✎ or
+        double-click a name to rename the track. Open the Piano roll for pitch, length and
         micro-timing. "Own seq" lets a device run its built-in sequencer (Cobalt's arpeggiator, coming in Phase 5).
       </p>
     </div>
@@ -45,29 +48,47 @@ function SeqRow({ track: t, peers }: { track: TrackInfo; peers: Peer[] }) {
   const step = usePlayStep(slotOf(t.id));
   const q = t.seq;
   const hasOwnSeq = false; // no device with a built-in sequencer yet
+  const [renaming, setRenaming] = useState(false);
+  // A note lights the step it starts on and, dimmer, every step it is held over.
+  const startsAt = (i: number) => notes.filter(([, n]) => Math.floor(n.s) === i);
+  const holdsOver = (i: number) => notes.filter(([, n]) => Math.floor(n.s) < i && n.s + n.l > i + 1e-6);
   const toggle = (i: number) => {
     project.undoManager.stopCapturing();
-    const here = notes.filter(([, n]) => Math.floor(n.s) === i);
+    const here = startsAt(i);
+    const held = holdsOver(i);
     if (here.length) project.transact(() => here.forEach(([id]) => project.deleteNote(t.id, ws.scene, id)));
-    else {
+    else if (held.length) {
+      // Clicking a held step ends the note there (the step goes dark), instead of stacking a new note on it.
+      project.transact(() => held.forEach(([id, n]) => project.updateNote(t.id, ws.scene, id, { l: i - n.s })));
+    } else {
       const last = notes.filter(([, n]) => n.s < i).pop()?.[1] ?? notes[0]?.[1];
       project.addNote(t.id, ws.scene, { s: i, l: 1, m: last?.m ?? entry?.rootNote ?? 48, v: 0.85 });
     }
   };
   return (
     <div className={'fwm-sqr' + (t.id === ws.track ? ' is-sel' : '')}>
-      <button type="button" className="fwm-thumb fwm-thumb--sm" data-device={t.device} onClick={() => setWs({ track: t.id })}
-        aria-label={`Select ${t.name}`} aria-pressed={t.id === ws.track}>
-        {t.name.toUpperCase()}
-        {peers.map((p) => (
-          <span key={p.clientId} className="fwm-av fwm-av--xs" style={{ background: p.user.color }} title={p.user.name}>{p.user.name[0]}</span>
-        ))}
-      </button>
+      <span className="fwm-sqname">
+        {renaming ? (
+          <TrackNameInput track={t.id} name={t.name} autoFocus onDone={() => setRenaming(false)} className="fwm-thumb fwm-thumb--sm" />
+        ) : (
+          <button type="button" className="fwm-thumb fwm-thumb--sm" data-device={t.device} onClick={() => setWs({ track: t.id })}
+            onDoubleClick={() => setRenaming(true)} aria-label={`Select ${t.name}`} aria-pressed={t.id === ws.track}>
+            {t.name.toUpperCase()}
+            {peers.map((p) => (
+              <span key={p.clientId} className="fwm-av fwm-av--xs" style={{ background: p.user.color }} title={p.user.name}>{p.user.name[0]}</span>
+            ))}
+          </button>
+        )}
+        {!renaming && (
+          <button type="button" className="fwm-tb fwm-tb--xs fwm-rename" aria-label={`Rename ${t.name}`} title="Rename"
+            onClick={() => setRenaming(true)}>✎</button>
+        )}
+      </span>
       <div className={'fwm-lane16' + (q.own ? ' is-own' : '')}>
         {Array.from({ length: STEPS }, (_, i) => (
           <button key={i} type="button" aria-label={`${t.name} step ${i + 1}`}
-            aria-pressed={notes.some(([, n]) => Math.floor(n.s) === i)}
-            className={'fwm-c' + (i >= q.len ? ' is-off' : '') + (step === i ? ' is-now' : '')}
+            aria-pressed={startsAt(i).length > 0}
+            className={'fwm-c' + (i >= q.len ? ' is-off' : '') + (step === i ? ' is-now' : '') + (!startsAt(i).length && holdsOver(i).length ? ' is-held' : '')}
             onClick={() => toggle(i)} />
         ))}
       </div>

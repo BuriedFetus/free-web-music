@@ -38,7 +38,7 @@ export function Studio(props: StudioProps) {
   );
 }
 
-const WS_DEFAULT: Workspace = { track: null, scene: 0, snap: '1/16', recQuant: '1/16' };
+const WS_DEFAULT: Workspace = { track: null, scene: 0, snap: '1/16', recQuant: '1/16', fold: false };
 function loadWs(key: string): Workspace {
   try {
     return { ...WS_DEFAULT, ...JSON.parse(localStorage.getItem(key) || '{}') };

@@ -123,4 +123,42 @@ describe('Project (undo of structure)', () => {
     mira.deviceStore(id, m)!.setParam('res', 0.3);
     expect(you.deviceStore(id, m)!.getState().params.res).toBe(0.3);
   });
+
+  it('notes on the same pitch never overlap: the note you edit wins', () => {
+    const [you] = pair();
+    const id = you.addTrack(m);
+    const long = you.addNote(id, 0, { s: 0, l: 16, m: 36, v: 0.8 })!;
+    const mid = you.addNote(id, 0, { s: 8, l: 2, m: 36, v: 0.8 })!;
+    you.addNote(id, 0, { s: 9, l: 1, m: 40, v: 0.8 }); // other pitch: untouched
+    you.resolveOverlaps(id, 0, mid);
+    const get = (k: string) => you.notes(id, 0).find(([n]) => n === k)?.[1];
+    expect(get(long)?.l).toBe(8); // cut short where the new note starts
+    expect(you.notes(id, 0)).toHaveLength(3);
+    // Drag the long one over the middle one: the middle one goes.
+    you.updateNote(id, 0, long, { l: 16 });
+    you.resolveOverlaps(id, 0, long);
+    expect(get(mid)).toBeUndefined();
+    expect(you.notes(id, 0).map(([, n]) => n.m)).toEqual([36, 40]);
+  });
+
+  it('quantize never leaves stacked notes', () => {
+    const [you] = pair();
+    const id = you.addTrack(m);
+    you.addNote(id, 0, { s: 3.8, l: 1, m: 36, v: 0.8 });
+    you.addNote(id, 0, { s: 4.1, l: 1, m: 36, v: 0.8 });
+    you.quantize(id, 0, 1);
+    expect(you.notes(id, 0)).toHaveLength(1);
+  });
+
+  it('the song key and track names are shared; blank names are ignored', () => {
+    const [you, mira] = pair();
+    const id = you.addTrack(m);
+    expect(mira.key).toEqual({ root: 0, scale: 'chromatic' });
+    you.setKey({ root: 2, scale: 'minor' });
+    expect(mira.key).toEqual({ root: 2, scale: 'minor' });
+    mira.renameTrack(id, '  Bassline  ');
+    expect(you.track(id)!.name).toBe('Bassline');
+    you.renameTrack(id, '   ');
+    expect(mira.track(id)!.name).toBe('Bassline');
+  });
 });

@@ -15,6 +15,15 @@ Fixed and pushed this session (each has a browser test):
   play/stop; Space is now always play/stop outside text fields (capture phase, keyup default prevented).
   Test: `?e2e=switch`.
 
+- 2026-11-23, second round of user feedback, done: piano keys play when pressed (slide = glissando); song key
+  (root + scale, shared in `fwm.meta`) highlights in-key rows, "Fold to key" (per user, `ws.fold`) hides the rest;
+  piano-roll grid lines follow Snap; notes on the same pitch never overlap (`Project.resolveOverlaps`, the edited
+  note wins; quantize too); main sequencer lights steps held by long notes and clicking a held step ends the note
+  there; rename a track with ✎ / double-click in the sequencer or the "Track name" field in the Device panel.
+  Test: `?e2e=roll`. Screenshot with a key: `?seednow=3&key=0,minor`.
+  Open question: "Snap should change the Sequencer limiter" was read as "grid lines follow Snap" (piano roll).
+  If they meant the main step sequencer's cells, ask.
+
 **Still open, waiting on the user's answers** (asked, not answered yet):
 1. Any other bugs they hit (they say "sometimes": if switching still breaks, get exact steps; it could be
    two-tab specific, which `?e2e=switch` doesn't cover).
@@ -24,7 +33,7 @@ Fixed and pushed this session (each has a browser test):
    publish as artifact) before building it.
 Then Phase 4 (shared transport). The Studio artifact (HEVoA3TExTjSF2bRmVUUei) has NOT been republished with these fixes.
 
-Single-tab e2e runs: `dist/index.html?e2e=multi` and `?e2e=switch` (one firefox tab, POST to ./log).
+Single-tab e2e runs: `dist/index.html?e2e=multi`, `?e2e=switch` and `?e2e=roll` (one firefox tab, POST to ./log).
 `?seednow=3` seeds three Basalts for screenshots.
 
 ---

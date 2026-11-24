@@ -1,7 +1,7 @@
 // The shared project, stored in the host's Yjs doc. Everything here is seen by every collaborator.
 //
 // Layout (top-level types never conflict when two people start at once):
-//   fwm.meta       Y.Map    { schema, bpm, swing }
+//   fwm.meta       Y.Map    { schema, bpm, swing, keyRoot, keyScale }
 //   fwm.order      Y.Array  track ids, in display order
 //   fwm.tracks     Y.Map    trackId → Y.Map { device, name, seq: Y.Map{len,dir,rate,own,mute},
 //                                              params: Y.Map<paramId, number>, routes: Y.Array<Route> }
@@ -12,6 +12,7 @@
 import * as Y from 'yjs';
 import type { DeviceId, DeviceManifest, Direction, SeqNote } from '@fwm/engine';
 import { canRoute, defaults, MAX_ROUTES, type DeviceState, type DeviceStore, type Route } from './deviceStore';
+import { DEFAULT_KEY, SCALES, type SongKey } from './scales';
 
 export const SCHEMA = 1;
 export const SCENES = ['A', 'B', 'C', 'D'] as const;
@@ -113,6 +114,19 @@ export class Project {
     this.transact(() => this.meta.set('swing', Math.max(0, Math.min(0.6, v))));
   }
 
+  /** The song key, shared: everyone sees the same highlighted rows. */
+  get key(): SongKey {
+    const root = this.meta.get('keyRoot') as number | undefined;
+    const scale = this.meta.get('keyScale') as string | undefined;
+    return { root: root ?? DEFAULT_KEY.root, scale: scale && SCALES[scale] ? scale : DEFAULT_KEY.scale };
+  }
+  setKey(k: Partial<SongKey>) {
+    this.action(() => {
+      if (k.root != null) this.meta.set('keyRoot', ((Math.round(k.root) % 12) + 12) % 12);
+      if (k.scale != null && SCALES[k.scale]) this.meta.set('keyScale', k.scale);
+    });
+  }
+
   // ---- tracks ----
   trackIds(): string[] {
     return this.order.toArray().filter((id) => this.tracksMap.has(id));
@@ -172,8 +186,12 @@ export class Project {
     this.stores.delete(id);
   }
 
+  /** Rename a track (the name shows on the device, the sequencer and the tabs). Blank names are ignored. */
   renameTrack(id: string, name: string) {
-    this.transact(() => this.tracksMap.get(id)?.set('name', name.slice(0, 40)));
+    const n = name.trim().slice(0, 40);
+    const t = this.tracksMap.get(id);
+    if (!n || !t || t.get('name') === n) return;
+    this.action(() => t.set('name', n));
   }
 
   setSeq(id: string, patch: Partial<SeqSettings>) {
@@ -220,6 +238,40 @@ export class Project {
     const m = this.notesMap(track, scene);
     if (m?.has(id)) this.transact(() => m.delete(id));
   }
+  /**
+   * One note per pitch at a time: notes on the same pitch never overlap. The note `keep` (the one just drawn,
+   * moved or resized) wins: a note that starts before it is cut short where it begins, a note that starts
+   * under it is removed. With no `keep`, later notes win (used after quantize).
+   */
+  resolveOverlaps(track: string, scene: number, keep?: string) {
+    const m = this.notesMap(track, scene);
+    if (!m) return;
+    const EPS = 1e-6;
+    const edits: [string, Note | null][] = [];
+    const k = keep ? m.get(keep) : undefined;
+    if (keep && k) {
+      for (const [id, n] of m.entries()) {
+        if (id === keep || n.m !== k.m) continue;
+        if (n.s < k.s - EPS && n.s + n.l > k.s + EPS) edits.push([id, k.s - n.s >= 1 / 64 ? { ...n, l: k.s - n.s } : null]);
+        else if (n.s >= k.s - EPS && n.s < k.s + k.l - EPS) edits.push([id, null]);
+      }
+    } else {
+      const byPitch = new Map<number, [string, Note][]>();
+      for (const e of m.entries()) (byPitch.get(e[1].m) ?? byPitch.set(e[1].m, []).get(e[1].m)!).push(e);
+      for (const list of byPitch.values()) {
+        list.sort((a, b) => a[1].s - b[1].s);
+        for (let i = 0; i < list.length - 1; i++) {
+          const [id, n] = list[i];
+          const next = list[i + 1][1];
+          if (n.s + n.l > next.s + EPS) edits.push([id, next.s - n.s >= 1 / 64 ? { ...n, l: next.s - n.s } : null]);
+        }
+      }
+    }
+    if (!edits.length) return;
+    this.transact(() => {
+      for (const [id, n] of edits) n ? m.set(id, clampNote(n)) : m.delete(id);
+    });
+  }
   /** Remove every note (and automation) of one pattern. Undo brings it back. */
   clearPattern(track: string, scene: number) {
     const m = this.notesMap(track, scene);
@@ -240,6 +292,7 @@ export class Project {
         m.set(id, clampNote({ ...n, s, l }));
       }
     });
+    this.resolveOverlaps(track, scene);
   }
 
   /** Automation lane values per step (null = no point), for one param. */

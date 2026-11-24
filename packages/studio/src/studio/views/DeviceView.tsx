@@ -5,6 +5,7 @@ import { deviceEntry } from '../../devices/registry';
 import { useEngine } from '../../engine/EngineProvider';
 import { useStudio } from '../context';
 import { toPresence } from './common';
+import { TrackNameInput } from './TrackName';
 
 export function DeviceView({ peers }: { peers: Peer[] }) {
   const st = useStudio();
@@ -39,6 +40,10 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
   const C = entry.Component;
   return (
     <div className="fwm-devwrap">
+      <label className="fwm-devname">
+        Track name
+        <TrackNameInput key={t.id} track={t.id} name={t.name} />
+      </label>
       <C key={t.id} store={store} host={host} slot={slot ?? 0} computerKeys={false} />
       <p className="fwm-devnote">
         Notes come from the main sequencer (scene {'ABCD'[st.ws.scene]}), edited in the Piano roll. Keys you play are heard by

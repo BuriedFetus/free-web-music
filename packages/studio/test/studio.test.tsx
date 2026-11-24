@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import * as Y from 'yjs';
 import { Project, Studio } from '../src';
 
@@ -65,4 +65,53 @@ describe('<Studio>', () => {
     expect(JSON.parse(localStorage.getItem('fwm.layout.u1')!).views[3]).toBe('seq');
     expect(JSON.stringify(p.doc.toJSON())).not.toContain('layout');
   });
+
+  it('a long note lights the steps it holds; clicking a held step ends it there instead of stacking a note', () => {
+    const p = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    const id = p.trackIds()[0];
+    act(() => { p.addNote(id, 0, { s: 0, l: 16, m: 36, v: 0.8 }); });
+    expect(screen.getByRole('button', { name: 'Basalt step 6' }).className).toContain('is-held');
+    fireEvent.click(screen.getByRole('button', { name: 'Basalt step 6' }));
+    expect(p.notes(id, 0).map(([, n]) => [n.s, n.l])).toEqual([[0, 5]]);
+  });
+
+  it('rename a track from the sequencer (✎) or the Device panel', () => {
+    const p = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    const id = p.trackIds()[0];
+    const seq = screen.getByRole('region', { name: 'Main sequencer' });
+    fireEvent.click(within(seq).getByRole('button', { name: 'Rename Basalt' }));
+    const input = within(seq).getByRole('textbox', { name: 'Rename Basalt' });
+    fireEvent.change(input, { target: { value: 'Bass' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    fireEvent.blur(input);
+    expect(p.track(id)!.name).toBe('Bass');
+    const dev = within(screen.getByRole('region', { name: 'Device' })).getByRole('textbox', { name: 'Rename Bass' });
+    fireEvent.focus(dev);
+    fireEvent.change(dev, { target: { value: 'Sub bass' } });
+    fireEvent.blur(dev);
+    expect(p.track(id)!.name).toBe('Sub bass');
+    expect(within(screen.getByRole('region', { name: 'Device' })).getByText(/Mono bass synth · Sub bass$/)).toBeTruthy();
+  });
+
+  it('piano roll: pick a key, fold to it', () => {
+    const p = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    const roll = screen.getByRole('region', { name: 'Piano roll' });
+    const rows = () => roll.querySelectorAll('.fwm-gr').length;
+    const all = rows();
+    expect((within(roll).getByRole('button', { name: 'Fold to key' }) as HTMLButtonElement).disabled).toBe(true);
+    fireEvent.change(within(roll).getByRole('combobox', { name: 'Scale' }), { target: { value: 'minor' } });
+    fireEvent.change(within(roll).getByRole('combobox', { name: 'Key root note' }), { target: { value: '2' } });
+    expect(p.key).toEqual({ root: 2, scale: 'minor' });
+    expect(roll.querySelectorAll('.fwm-gr.is-out').length).toBeGreaterThan(0);
+    fireEvent.click(within(roll).getByRole('button', { name: 'Fold to key' }));
+    expect(rows()).toBeLessThan(all);
+    expect(roll.querySelectorAll('.fwm-gr.is-out').length).toBe(0);
+    // D minor has no C♯ (37 = C♯2) but has D (38).
+    expect(roll.querySelector('.fwm-gr[data-m="37"]')).toBeNull();
+    expect(roll.querySelector('.fwm-gr[data-m="38"]')).not.toBeNull();
+  });
 });
+

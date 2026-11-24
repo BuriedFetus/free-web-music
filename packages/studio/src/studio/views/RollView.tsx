@@ -4,6 +4,7 @@ import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } fr
 import type { Peer } from '../../collab/presence';
 import { deviceEntry } from '../../devices/registry';
 import { formatParam } from '../../model/params';
+import { inKey, isRoot, keyLabel, NOTE_NAMES, SCALES } from '../../model/scales';
 import { STEPS, type Note } from '../../model/project';
 import { noteName } from '../../primitives/Keys';
 import { QUANT, useStudio } from '../context';
@@ -34,18 +35,30 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const [sel, setSel] = useState<string | null>(null);
   const [autoParam, setAutoParam] = useState('cut');
   const prw = useRef<HTMLDivElement>(null);
+  const keyHeld = useRef<number | null>(null); // piano key being pressed
   // Open centred on the pattern's notes (or the device's root note) when the track or scene changes.
   useEffect(() => {
     if (!t || !entry || !prw.current) return;
     const ns = project.notes(t.id, ws.scene).map(([, n]) => n.m);
     const centre = ns.length ? (Math.min(...ns) + Math.max(...ns)) / 2 : entry.rootNote;
-    prw.current.scrollTop = (entry.roll.high - centre) * RH - prw.current.clientHeight / 2;
-  }, [t?.id, ws.scene]); // eslint-disable-line react-hooks/exhaustive-deps
+    const k = project.key;
+    const fold = ws.fold && k.scale !== 'chromatic';
+    let row = 0;
+    for (let m = entry.roll.high; m > centre; m--) if (!fold || inKey(m, k)) row++;
+    prw.current.scrollTop = row * RH - prw.current.clientHeight / 2;
+  }, [t?.id, ws.scene, ws.fold]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!t || !entry?.manifest) return <p className="fwm-empty">No track selected. Add a device from the Library.</p>;
   const { low, high } = entry.roll;
-  const rows = high - low + 1;
+  const key = project.key;
+  const keyed = key.scale !== 'chromatic';
+  const folded = keyed && ws.fold;
+  // Rows top to bottom. Folded: only the pitches in the song key.
+  const pitches = Array.from({ length: high - low + 1 }, (_, r) => high - r).filter((m) => !folded || inKey(m, key));
+  const rows = pitches.length;
+  const rowOf = (m: number) => pitches.indexOf(m);
   const notes = project.notes(t.id, ws.scene);
+  const hidden = folded ? notes.filter(([, n]) => n.m >= low && n.m <= high && !inKey(n.m, key)).length : 0;
   const q = QUANT[ws.snap] ?? 1;
   const manifest = entry.manifest;
   const autoSpecs = manifest.params.filter((p) => p.type === 'float' && p.mod);
@@ -57,13 +70,13 @@ export function RollView({ peers }: { peers: Peer[] }) {
     const r = grid.current!.getBoundingClientRect();
     const x = Math.max(0, Math.min(STEPS, ((e.clientX - r.left) / r.width) * STEPS));
     const row = Math.max(0, Math.min(rows - 1, Math.floor((e.clientY - r.top) / RH)));
-    return { x, row, m: high - row };
+    return { x, row, m: pitches[row] };
   };
   const touch = (id: string | null) => st.presence.set({ touch: id ? { track: t.id, control: 'note:' + id } : null });
 
   const down = (e: PointerEvent<HTMLDivElement>) => {
     if (e.button !== 0) return;
-    grid.current!.setPointerCapture(e.pointerId);
+    try { grid.current!.setPointerCapture(e.pointerId); } catch { /* synthetic pointer (tests) */ }
     const c = at(e);
     const el = (e.target as HTMLElement).closest<HTMLElement>('[data-note]');
     project.undoManager.stopCapturing(); // each edit gesture is its own undo step
@@ -98,7 +111,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
     } else {
       const dx = c.x - d.x0;
       const s = Math.max(0, Math.min(STEPS - n.l, d.s0 + (q ? Math.round(dx / q) * q : dx)));
-      const m = Math.max(low, Math.min(high, d.m0 - (c.row - d.row0)));
+      const m = pitches[Math.max(0, Math.min(rows - 1, rowOf(d.m0) + (c.row - d.row0)))];
       project.updateNote(t.id, ws.scene, d.id, { s, m });
       if (m !== d.pitch) {
         st.audition(t.id, d.pitch, false);
@@ -113,21 +126,22 @@ export function RollView({ peers }: { peers: Peer[] }) {
     st.audition(t.id, d.pitch, false);
     drag.current = null;
     touch(null);
+    project.resolveOverlaps(t.id, ws.scene, d.id); // the note you just edited wins: no stacked notes
     project.undoManager.stopCapturing();
   };
   const remove = (id: string) => {
     project.deleteNote(t.id, ws.scene, id);
     if (sel === id) setSel(null);
   };
-  const key = (e: KeyboardEvent<HTMLDivElement>) => {
+  const onKey = (e: KeyboardEvent<HTMLDivElement>) => {
     const n = sel ? notes.find(([k]) => k === sel)?.[1] : null;
     if (!sel || !n) return;
     const g = q || 1 / 16;
     const patch: Partial<Note> | null =
       e.key === 'ArrowLeft' ? (e.shiftKey ? { l: Math.max(g, n.l - g) } : { s: Math.max(0, n.s - g) })
       : e.key === 'ArrowRight' ? (e.shiftKey ? { l: n.l + g } : { s: Math.min(STEPS - n.l, n.s + g) })
-      : e.key === 'ArrowUp' ? { m: Math.min(high, n.m + 1) }
-      : e.key === 'ArrowDown' ? { m: Math.max(low, n.m - 1) }
+      : e.key === 'ArrowUp' ? { m: pitches[Math.max(0, rowOf(n.m) - 1)] ?? n.m }
+      : e.key === 'ArrowDown' ? { m: pitches[Math.min(rows - 1, rowOf(n.m) + 1)] ?? n.m }
       : null;
     if (e.key === 'Delete' || e.key === 'Backspace') {
       remove(sel);
@@ -137,6 +151,38 @@ export function RollView({ peers }: { peers: Peer[] }) {
     if (!patch) return;
     e.preventDefault();
     project.updateNote(t.id, ws.scene, sel, patch);
+    project.resolveOverlaps(t.id, ws.scene, sel);
+  };
+
+  // Piano keys: press to hear the note, slide to play the next ones.
+  const keyAt = (e: PointerEvent<HTMLDivElement>) => {
+    const r = e.currentTarget.getBoundingClientRect();
+    return pitches[Math.max(0, Math.min(rows - 1, Math.floor((e.clientY - r.top) / RH)))];
+  };
+  const keyOff = () => {
+    if (keyHeld.current != null) st.audition(t.id, keyHeld.current, false);
+    keyHeld.current = null;
+  };
+  const keyCol = {
+    onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
+      if (e.button !== 0) return;
+      try { e.currentTarget.setPointerCapture(e.pointerId); } catch { /* synthetic pointer (tests) */ }
+      keyOff();
+      keyHeld.current = keyAt(e);
+      st.audition(t.id, keyHeld.current, true);
+      e.preventDefault();
+    },
+    onPointerMove: (e: PointerEvent<HTMLDivElement>) => {
+      if (keyHeld.current == null) return;
+      const m = keyAt(e);
+      if (m === keyHeld.current) return;
+      st.audition(t.id, keyHeld.current, false);
+      keyHeld.current = m;
+      st.audition(t.id, m, true);
+    },
+    onPointerUp: keyOff,
+    onPointerCancel: keyOff,
+    onLostPointerCapture: keyOff,
   };
 
   // Velocity + automation lanes: drag across steps to draw.
@@ -179,6 +225,22 @@ export function RollView({ peers }: { peers: Peer[] }) {
             {Object.keys(QUANT).map((k) => <option key={k}>{k}</option>)}
           </select>
         </label>
+        <label title="Song key, shared with everyone in the session">
+          Key
+          <select value={key.root} aria-label="Key root note" disabled={!keyed}
+            onChange={(e) => { project.setKey({ root: Number(e.target.value) }); e.target.blur(); }}>
+            {NOTE_NAMES.map((n, i) => <option key={n} value={i}>{n}</option>)}
+          </select>
+          <select value={key.scale} aria-label="Scale"
+            onChange={(e) => { project.setKey({ scale: e.target.value }); e.target.blur(); }}>
+            {Object.entries(SCALES).map(([id, s]) => <option key={id} value={id}>{s.label}</option>)}
+          </select>
+        </label>
+        <button type="button" className="fwm-tb fwm-tb--xs" aria-pressed={folded} disabled={!keyed}
+          title={keyed ? `Show only the notes in ${keyLabel(key)}` : 'Pick a key first'}
+          onClick={() => setWs({ fold: !ws.fold })}>
+          Fold to key
+        </button>
         <button type="button" className="fwm-tb fwm-tb--xs" disabled={!q} onClick={() => project.quantize(t.id, ws.scene, q)}>
           Quantize notes to {ws.snap}
         </button>
@@ -194,29 +256,30 @@ export function RollView({ peers }: { peers: Peer[] }) {
         {Array.from({ length: STEPS }, (_, i) => <span key={i}>{i % 4 === 0 ? `1.${i / 4 + 1}` : ''}</span>)}
       </div>
       <div ref={prw} className="fwm-prw" style={{ gridTemplateColumns: `${KEYW}px minmax(0,1fr)` }}>
-        <div>
-          {Array.from({ length: rows }, (_, r) => {
-            const m = high - r;
+        <div className="fwm-pkeys" aria-label="Piano keys: press to hear a note" {...keyCol}>
+          {pitches.map((m) => {
+            const cls = (isBlack(m) ? ' is-b' : '') + (keyed && !inKey(m, key) ? ' is-out' : '') + (isRoot(m, key) ? ' is-root' : '');
             return (
-              <div key={r} className={'fwm-pkr' + (isBlack(m) ? ' is-b' : '')} style={{ height: RH, lineHeight: RH + 'px' }}>
-                {m % 12 === 0 ? noteName(m) : ''}
+              <div key={m} data-key={m} className={'fwm-pkr' + cls} style={{ height: RH, lineHeight: RH + 'px' }} title={noteName(m)}>
+                {folded || m % 12 === 0 || isRoot(m, key) ? noteName(m) : ''}
               </div>
             );
           })}
         </div>
-        <div ref={grid} className="fwm-grid" style={{ height: rows * RH }} tabIndex={0} aria-label={`Piano roll, ${t.name}`}
-          onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onKeyDown={key}
+        <div ref={grid} className="fwm-grid" style={{ height: rows * RH, '--fwm-snapw': `${((q || 1) / STEPS) * 100}%` } as React.CSSProperties} tabIndex={0} aria-label={`Piano roll, ${t.name}`}
+          onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onKeyDown={onKey}
           onDoubleClick={(e) => { const el = (e.target as HTMLElement).closest<HTMLElement>('[data-note]'); if (el) remove(el.dataset.note!); }}
           onContextMenu={(e) => { const el = (e.target as HTMLElement).closest<HTMLElement>('[data-note]'); if (el) { e.preventDefault(); remove(el.dataset.note!); } }}>
-          {Array.from({ length: rows }, (_, r) => {
-            const m = high - r;
-            return <div key={r} className={'fwm-gr' + (isBlack(m) ? ' is-b' : '') + (m % 12 === 0 ? ' is-c' : '')} style={{ height: RH }} />;
+          {pitches.map((m) => {
+            const cls = (isBlack(m) ? ' is-b' : '') + (m % 12 === 0 ? ' is-c' : '') + (keyed && !inKey(m, key) ? ' is-out' : '') + (isRoot(m, key) ? ' is-root' : '');
+            return <div key={m} data-m={m} className={'fwm-gr' + cls} style={{ height: RH }} />;
           })}
           {Array.from({ length: STEPS - t.seq.len }, (_, i) => (
             <div key={'off' + i} className="fwm-gridoff" style={{ left: `${((t.seq.len + i) / STEPS) * 100}%`, width: `${100 / STEPS}%` }} />
           ))}
           {notes.map(([id, n]) => {
-            if (n.m < low || n.m > high) return null;
+            const row = rowOf(n.m);
+            if (row < 0) return null;
             const peer = peerNote(id);
             const playingNow = step >= 0 && Math.floor(n.s) === step;
             return (
@@ -224,7 +287,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
                 className={'fwm-nt' + (sel === id ? ' is-sel' : '') + (peer ? ' is-peer' : '') + (playingNow ? ' is-hit' : '')}
                 style={{
                   left: `calc(${(n.s / STEPS) * 100}% + 1px)`, width: `calc(${(n.l / STEPS) * 100}% - 2px)`,
-                  top: (high - n.m) * RH + 1, height: RH - 3, opacity: 0.45 + 0.55 * n.v,
+                  top: row * RH + 1, height: RH - 3, opacity: 0.45 + 0.55 * n.v,
                   ...(peer ? { '--fwm-who': peer.user.color } : {}),
                 } as React.CSSProperties} />
             );
@@ -232,6 +295,12 @@ export function RollView({ peers }: { peers: Peer[] }) {
           {step >= 0 && <div className="fwm-phd" style={{ left: `${(step / STEPS) * 100}%` }} />}
         </div>
       </div>
+      {hidden > 0 && (
+        <p className="fwm-hint" role="status">
+          {hidden} note{hidden > 1 ? 's' : ''} outside {keyLabel(key)} hidden while folded.{' '}
+          <button type="button" className="fwm-tb fwm-tb--xs" onClick={() => setWs({ fold: false })}>Unfold</button>
+        </p>
+      )}
       <div className="fwm-lanehead" style={{ marginLeft: KEYW }}>Velocity</div>
       <div className="fwm-abars" style={{ marginLeft: KEYW }} aria-label="Velocity lane" {...lane('vel')}>
         {Array.from({ length: STEPS }, (_, i) => {
@@ -261,8 +330,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
         ))}
       </div>
       <p className="fwm-hint">
-        Click to add, drag right for length · drag to move or change pitch · drag the right edge to resize · double-click to
-        delete · arrows nudge the selected note (Shift = length) · Snap Off places notes between steps · lanes: drag to draw,
+        Press a piano key to hear it · grid lines follow Snap · click to add, drag right for length · drag to move or change pitch · drag the right edge to resize · double-click to
+        delete · notes on the same pitch never overlap (the one you edit wins) · arrows nudge the selected note (Shift = length) · Snap Off places notes between steps · lanes: drag to draw,
         Alt-drag or right-drag erases automation · with Rec + Play, knob moves are recorded here.
       </p>
     </div>

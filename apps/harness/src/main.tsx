@@ -47,6 +47,9 @@ function seed() {
   for (const [s, l, n, v] of [[0, 6, 36, 0.8], [8, 6, 31, 0.7]] as const) p.addNote(id, 1, { s, l, m: n, v });
   // ?seednow=3: extra copies, to see several tracks at once.
   for (let i = 1; i < Number(params.get('seednow') || 1); i++) p.addTrack(m, BASALT_PRESETS[i % BASALT_PRESETS.length], 0);
+  // ?key=0,minor: start with a song key set (the demo line is in C minor).
+  const k = params.get('key')?.split(',');
+  if (k) p.setKey({ root: Number(k[0]), scale: k[1] });
 }
 
 if (params.has('seednow')) seed(); // screenshots: start with the demo track already there
