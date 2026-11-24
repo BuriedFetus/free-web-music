@@ -49,6 +49,9 @@ button,select,input{font:inherit;color:inherit}
 .mi small{color:var(--fwm-mute)}
 .sep{height:1px;background:var(--fwm-line);margin:6px 4px}
 .pos{font-size:14px;color:var(--fwm-mute)}
+.keyb{display:flex;align-items:center;gap:6px}
+.pname{color:var(--fwm-ink);width:150px;min-height:34px;padding:0 10px;border-radius:8px;border:1px solid var(--fwm-line);background:var(--fwm-bg);font-weight:700;font-size:16px}
+.pname:hover{border-color:var(--fwm-mute)}
 .pos b{color:var(--fwm-ink)}
 
 main{padding:12px max(2vw,12px) 24px;display:grid;gap:12px}
@@ -72,7 +75,7 @@ main{padding:12px max(2vw,12px) 24px;display:grid;gap:12px}
 .cell:hover{filter:brightness(1.12)}
 .cell.on{outline:3px solid var(--fwm-note);outline-offset:1px}
 .cell.has{background:color-mix(in srgb,var(--fwm-note) calc(18% + var(--k) * 9%),var(--fwm-roll2))}
-.cell b{font:900 22px/1 var(--fwm-font-display);letter-spacing:.03em}
+.cell b{display:block;font:900 22px/1 var(--fwm-font-display);letter-spacing:.03em;white-space:nowrap;overflow:hidden;text-overflow:ellipsis;padding-right:30px}
 .cell small{display:block;font-size:12px;opacity:.9}
 .cell .rep{position:absolute;right:8px;top:7px;font-size:12px;font-weight:700;opacity:.9}
 .cell .pr{position:absolute;left:0;bottom:0;height:5px;background:var(--fwm-note);box-shadow:0 0 calc(8px*var(--fwm-glow)) var(--fwm-note)}
@@ -122,6 +125,8 @@ main{padding:12px max(2vw,12px) 24px;display:grid;gap:12px}
   <span class="grow"></span>
   <button class="btn" id="play" aria-pressed="false">▶ Play</button>
   <span id="bpmwrap"></span>
+  <label class="keyb" title="Song key: the Piano roll highlights or folds to it, for every instrument"><span class="lab">Key</span>
+    <select class="btn sm" id="kr" aria-label="Song key root note"></select><select class="btn sm" id="ks" aria-label="Song scale"></select></label>
   <div class="grp" role="group" aria-label="Loop">
     <button class="btn sm" id="lt" aria-pressed="false" title="Repeat the TRACK that is playing">⟲ Loop TRACK</button>
     <button class="btn sm" id="ls" aria-pressed="true" title="Play every TRACK in order, then start again">⟲ Loop SONG</button>
@@ -143,7 +148,8 @@ main{padding:12px max(2vw,12px) 24px;display:grid;gap:12px}
   <ul class="notes">
     <li><b>Mock-up, no sound.</b> Click a cell to pick its pattern below; press Play to watch TRACKs follow each other. Drums and Arp stand in for Flint and Cobalt (Phase 5).</li>
     <li><b>Patterns belong to an instrument.</b> Scenes A–D are gone: Bass Pattern 2 has nothing to do with Drums Pattern 2.</li>
-    <li><b>Each pattern has its own length</b>, from 1 step to 8 bars, and opens in the Piano roll. The song key is set per instrument too.</li>
+    <li><b>Each pattern has its own length</b>, from 1 step to 8 bars, and opens in the Piano roll. Click its name below the grid to rename it (Intro, Verse, Drop…). New patterns start as P1, P2…</li>
+    <li><b>The key is for the whole song</b> (top bar): every instrument's Piano roll highlights or folds to it.</li>
     <li><b>Songs:</b> the Song menu saves, opens and starts a new song from INIT (one empty Basalt, 120 BPM). Saving is done by the host app.</li>
   </ul>
 </main>
@@ -160,22 +166,22 @@ const SC = { minor: 'Minor', major: 'Major', dorian: 'Dorian', minpent: 'Minor p
 const bassline = (o) => [[0,2,36+o],[3,1,36+o],[6,2,39+o],[8,1,36+o],[10,1,31+o],[11,1,34+o],[12,3,36+o]];
 const shift = (ns, d) => ns.map(([s,l,m]) => [s+d,l,m]);
 const nightDrive = () => ({
-  name: 'Night Drive', bpm: 118,
+  name: 'Night Drive', bpm: 118, key: [0, 'minor'],
   inst: [
-    { id: 'bass', name: 'Bass', dev: 'basalt', key: [0,'minor'], pats: [
-      { len: 16, notes: bassline(0) },
-      { len: 32, notes: [...bassline(0), ...shift(bassline(3), 16)] },
-      { len: 64, notes: [...bassline(0), ...shift(bassline(-2), 16), ...shift(bassline(3), 32), ...shift(bassline(5), 48)] },
+    { id: 'bass', name: 'Bass', dev: 'basalt', pats: [
+      { name: 'Intro', len: 16, notes: bassline(0) },
+      { name: 'Verse', len: 32, notes: [...bassline(0), ...shift(bassline(3), 16)] },
+      { name: 'Drop', len: 64, notes: [...bassline(0), ...shift(bassline(-2), 16), ...shift(bassline(3), 32), ...shift(bassline(5), 48)] },
     ]},
-    { id: 'acid', name: 'Acid', dev: 'basalt', key: [0,'minor'], pats: [
+    { id: 'acid', name: 'Acid', dev: 'basalt', pats: [
       { len: 12, notes: [[0,1,48],[2,1,51],[4,1,55],[6,1,58],[8,2,60],[10,1,55]] },
       { len: 32, notes: [[0,4,60],[4,2,58],[8,4,55],[16,6,51],[24,4,53],[28,4,55]] },
     ]},
-    { id: 'drums', name: 'Drums', dev: 'flint', key: [0,'chromatic'], pats: [
-      { len: 16, drums: [[0,4,8,12],[4,12],[0,2,4,6,8,10,12,14]] },
-      { len: 16, drums: [[0,3,8,11],[4,12],[2,6,10,14]] },
+    { id: 'drums', name: 'Drums', dev: 'flint', pats: [
+      { name: 'Straight', len: 16, drums: [[0,4,8,12],[4,12],[0,2,4,6,8,10,12,14]] },
+      { name: 'Broken', len: 16, drums: [[0,3,8,11],[4,12],[2,6,10,14]] },
     ]},
-    { id: 'arp', name: 'Arp', dev: 'cobalt', key: [0,'minor'], pats: [
+    { id: 'arp', name: 'Arp', dev: 'cobalt', pats: [
       { len: 8, notes: [[0,1,72],[1,1,75],[2,1,79],[3,1,84],[4,1,79],[5,1,75],[6,1,72],[7,1,67]] },
     ]},
   ],
@@ -187,7 +193,7 @@ const nightDrive = () => ({
     { bass: 0, acid: null, drums: 1, arp: null },
   ],
 });
-const initSong = () => ({ name: 'Untitled', bpm: 120, inst: [{ id: 'i1', name: 'Basalt', dev: 'basalt', key: [0,'chromatic'], pats: [{ len: 16, notes: [] }] }], tracks: [{ i1: 0 }] });
+const initSong = () => ({ name: 'Untitled', bpm: 120, key: [0, 'chromatic'], inst: [{ id: 'i1', name: 'Basalt', dev: 'basalt', pats: [{ len: 16, notes: [] }] }], tracks: [{ i1: 0 }] });
 const library = { 'Night Drive': nightDrive(), 'Sketch 2': { ...initSong(), name: 'Sketch 2', bpm: 96 } };
 
 let song = structuredClone(library['Night Drive']);
@@ -195,6 +201,7 @@ let dirty = false;
 let sel = { t: 2, i: 'bass' };
 let playing = false, loop = 'song', row = 0, step = 0, timer = null;
 
+const pn = (inst, k) => inst.pats[k].name || `P${k + 1}`;
 const pat = (inst, p) => (p == null ? null : inst.pats[p]);
 const rowLen = (tr) => Math.max(16, ...song.inst.map((it) => pat(it, tr[it.id])?.len ?? 0));
 const bars = (n) => { const b = Math.floor(n / 16), r = n % 16; return (b ? `${b} bar${b > 1 ? 's' : ''}` : '') + (r ? `${b ? ' ' : ''}${r} step${r > 1 ? 's' : ''}` : ''); };
@@ -203,6 +210,8 @@ const toast = (m) => { const t = $('#toast'); t.textContent = m; t.classList.add
 
 function renderBar() {
   $('#songname').textContent = song.name;
+  $('#kr').value = song.key[0];
+  $('#ks').value = song.key[1];
   $('#dirty').textContent = dirty ? '• not saved' : '';
   $('#play').textContent = playing ? '■ Stop' : '▶ Play';
   $('#play').setAttribute('aria-pressed', playing);
@@ -229,8 +238,8 @@ function renderArr() {
       if (!P) { h += `<button class="cell${on ? ' on' : ''}" data-t="${t}" data-i="${esc(it.id)}" aria-label="TRACK ${t + 1}, ${esc(it.name)}: silent"><span class="empty">—</span></button>`; continue; }
       const reps = L / P.len;
       const prog = playing && row === t ? ((step % P.len) + 1) / P.len * 100 : 0;
-      h += `<button class="cell has${on ? ' on' : ''}" style="--k:${p};--tw:${(P.len / L) * 100}%" data-t="${t}" data-i="${esc(it.id)}" aria-label="TRACK ${t + 1}, ${esc(it.name)}: pattern ${p + 1}">`
-        + `<b>P${p + 1}</b><small>${bars(P.len)}</small>${reps > 1 ? `<span class="rep">×${Number.isInteger(reps) ? reps : reps.toFixed(1)}</span>` : ''}`
+      h += `<button class="cell has${on ? ' on' : ''}" style="--k:${p};--tw:${(P.len / L) * 100}%" data-t="${t}" data-i="${esc(it.id)}" aria-label="TRACK ${t + 1}, ${esc(it.name)}: ${esc(pn(it, p))}">`
+        + `<b>${esc(pn(it, p))}</b><small>${bars(P.len)}</small>${reps > 1 ? `<span class="rep">×${Number.isInteger(reps) ? reps : reps.toFixed(1)}</span>` : ''}`
         + `<span class="ticks"></span><span class="pr" data-len="${P.len}" style="width:${prog}%"></span></button>`;
     }
     h += `<span class="ra"><button class="ib" data-dup="${t}" title="Duplicate TRACK ${t + 1}" aria-label="Duplicate TRACK ${t + 1}">⧉</button>`
@@ -247,19 +256,19 @@ function renderEd() {
   const P = pat(it, p);
   let h = `<div class="ph"><h2>${esc(it.name)} · TRACK ${t + 1}</h2><span class="lab">plays</span><div class="picks">`;
   h += `<button class="pk" data-pick="-1" aria-pressed="${p == null}">—</button>`;
-  h += it.pats.map((_, k) => `<button class="pk" data-pick="${k}" aria-pressed="${p === k}">P${k + 1}</button>`).join('');
+  h += it.pats.map((_, k) => `<button class="pk" data-pick="${k}" aria-pressed="${p === k}">${esc(pn(it, k))}</button>`).join('');
   h += `<button class="pk" data-pick="new" title="New empty pattern">+ New</button><button class="pk" data-pick="copy" ${P ? '' : 'disabled'} title="Copy this pattern into a new one">⧉ Copy</button></div></div>`;
   if (!P) {
     h += `<p class="note" style="margin-top:10px">${esc(it.name)} is silent in TRACK ${t + 1}. Pick a pattern above.</p>`;
     $('#ed').innerHTML = h;
     return;
   }
-  h += `<div class="ph"><span class="lab">Pattern ${p + 1} length</span><span class="lenbox">`
+  h += `<div class="ph"><label class="lab" style="display:flex;align-items:center;gap:6px">Name <input class="pname" id="pname" maxlength="16" spellcheck="false" value="${esc(pn(it, p))}" title="Rename this pattern, then Enter"></label>`
+    + `<span class="lab">Length</span><span class="lenbox">`
     + `<button class="btn sm" data-len="-1" aria-label="One step shorter">−</button><span class="lcd" style="font-size:20px">${bars(P.len)}</span>`
     + `<button class="btn sm" data-len="1" aria-label="One step longer">+</button>`
     + [16, 32, 64, 128].map((v) => `<button class="btn sm" data-lenset="${v}" aria-pressed="${P.len === v}">${v / 16} bar${v > 16 ? 's' : ''}</button>`).join('')
     + `</span>`;
-  if (it.dev !== 'flint') h += `<span class="lab" style="margin-left:auto">Key (${esc(it.name)})</span><select class="btn sm" id="kr">${NN.map((n, i) => `<option value="${i}" ${it.key[0] === i ? 'selected' : ''}>${n}</option>`).join('')}</select><select class="btn sm" id="ks">${Object.entries(SC).map(([k, v]) => `<option value="${k}" ${it.key[1] === k ? 'selected' : ''}>${v}</option>`).join('')}</select>`;
   h += `</div>`;
   const now = playing && row === t ? step % P.len : -1;
   if (P.drums) {
@@ -267,12 +276,12 @@ function renderEd() {
     h += `<p class="note">Flint (Phase 5) gets the step grid you liked: one row per drum, each row with its own length and direction.</p>`;
   } else {
     const ms = P.notes.map((n) => n[2]), lo = Math.min(...ms, 99) - 2, hi = Math.max(...ms, 0) + 2, span = Math.max(8, hi - lo);
-    h += `<div class="mini" aria-label="Pattern ${p + 1} notes">`;
+    h += `<div class="mini" aria-label="${esc(pn(it, p))} notes">`;
     for (let s = 0; s < P.len; s++) h += `<span class="${s % 16 ? 'sl' : 'bl'}" style="left:${(s / P.len) * 100}%"></span>`;
     for (let b = 0; b < P.len; b += 16) h += `<span class="lbl" style="left:${(b / P.len) * 100}%">${b / 16 + 1}</span>`;
     h += P.notes.map(([s, l, m]) => `<span class="nt" style="left:${(s / P.len) * 100}%;width:calc(${(l / P.len) * 100}% - 2px);top:${((hi - m) / span) * 130 + 8}px"></span>`).join('');
     h += `<span class="ph2" style="left:${(Math.max(0, now) / P.len) * 100}%" ${now >= 0 ? '' : 'hidden'}></span>`;
-    h += `</div><p class="note">This is the Piano roll for ${esc(it.name)} pattern ${p + 1}${P.notes.length ? '' : ' (empty: draw notes in it)'}. Changing a pattern changes it in every TRACK that uses it.</p>`;
+    h += `</div><p class="note">This is the Piano roll for ${esc(it.name)} · ${esc(pn(it, p))}${P.notes.length ? '' : ' (empty: draw notes in it)'}. Changing a pattern changes it in every TRACK that uses it.</p>`;
   }
   $('#ed').innerHTML = h;
   $('#ed').dataset.len = P.len;
@@ -356,12 +365,12 @@ document.addEventListener('click', (e) => {
   if (d.dup != null) { const t = Number(d.dup); song.tracks.splice(t + 1, 0, { ...song.tracks[t] }); sel.t = t + 1; return touch(); }
   if (d.del != null) { const t = Number(d.del); song.tracks.splice(t, 1); if (row >= song.tracks.length) row = 0; sel.t = Math.min(sel.t, song.tracks.length - 1); return touch(); }
   if (b.id === 'addt') { song.tracks.push(Object.fromEntries(song.inst.map((it) => [it.id, null]))); sel.t = song.tracks.length - 1; return touch(); }
-  if (b.id === 'addi') { const id = 'b' + Date.now(); song.inst.push({ id, name: 'Basalt ' + (song.inst.filter((x) => x.dev === 'basalt').length + 1), dev: 'basalt', key: [0, 'chromatic'], pats: [{ len: 16, notes: [] }] }); song.tracks.forEach((tr) => (tr[id] = null)); sel.i = id; return touch(); }
+  if (b.id === 'addi') { const id = 'b' + Date.now(); song.inst.push({ id, name: 'Basalt ' + (song.inst.filter((x) => x.dev === 'basalt').length + 1), dev: 'basalt', pats: [{ len: 16, notes: [] }] }); song.tracks.forEach((tr) => (tr[id] = null)); sel.i = id; return touch(); }
   const it = song.inst.find((x) => x.id === sel.i);
   const tr = song.tracks[sel.t];
   if (d.pick != null) {
     if (d.pick === 'new') { it.pats.push({ len: 16, notes: [] }); tr[it.id] = it.pats.length - 1; }
-    else if (d.pick === 'copy') { it.pats.push(structuredClone(it.pats[tr[it.id]])); tr[it.id] = it.pats.length - 1; }
+    else if (d.pick === 'copy') { const c = structuredClone(it.pats[tr[it.id]]); c.name = pn(it, tr[it.id]) + ' 2'; it.pats.push(c); tr[it.id] = it.pats.length - 1; }
     else tr[it.id] = d.pick === '-1' ? null : Number(d.pick);
     return touch();
   }
@@ -370,13 +379,24 @@ document.addEventListener('click', (e) => {
   if (P && d.lenset) { P.len = Number(d.lenset); return touch(); }
 });
 document.addEventListener('change', (e) => {
-  const it = song.inst.find((x) => x.id === sel.i);
-  if (e.target.id === 'kr') { it.key[0] = Number(e.target.value); touch(); }
-  if (e.target.id === 'ks') { it.key[1] = e.target.value; touch(); }
+  if (e.target.id === 'kr') { song.key[0] = Number(e.target.value); dirty = true; renderBar(); }
+  if (e.target.id === 'ks') { song.key[1] = e.target.value; dirty = true; renderBar(); }
+});
+// Pattern name: saved when you press Enter or leave the box.
+document.addEventListener('focusout', (e) => {
+  if (e.target.id !== 'pname') return;
+  const it = song.inst.find((x) => x.id === sel.i), k = song.tracks[sel.t][it.id], v = e.target.value.trim();
+  if (k == null || v === pn(it, k)) return;
+  if (v) it.pats[k].name = v; else delete it.pats[k].name;
+  setTimeout(touch); // after the blur finishes, so the click that moved focus still lands
 });
 document.addEventListener('keydown', (e) => {
+  if (e.key === 'Enter' && e.target.id === 'pname') e.target.blur();
+  if (e.key === 'Escape' && e.target.id === 'pname') { const it = song.inst.find((x) => x.id === sel.i); e.target.value = pn(it, song.tracks[sel.t][it.id]); e.target.blur(); }
   if (e.key === ' ' && !e.target.closest('input,select')) { e.preventDefault(); setPlay(!playing); }
 });
+$('#kr').innerHTML = NN.map((n, i) => `<option value="${i}">${n}</option>`).join('');
+$('#ks').innerHTML = Object.entries(SC).map(([k, v]) => `<option value="${k}">${v}</option>`).join('');
 render();
 }
 </script>
