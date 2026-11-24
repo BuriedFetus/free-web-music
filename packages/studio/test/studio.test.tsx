@@ -234,5 +234,26 @@ describe('<Studio>', () => {
     fireEvent.click(within(roll).getByRole('button', { name: 'Solo pad 2' }));
     expect(p.track(id)!.seq).toMatchObject({ pmute: 1, psolo: 2 });
   });
+
+  it('choosing an instrument is per person: it never changes what another person has selected', () => {
+    // Two people on one shared song (two Y.Docs kept in sync), each with their own studio.
+    const a = new Y.Doc();
+    const b = new Y.Doc();
+    a.on('update', (u: Uint8Array, o: unknown) => o !== 'remote' && Y.applyUpdate(b, u, 'remote'));
+    b.on('update', (u: Uint8Array, o: unknown) => o !== 'remote' && Y.applyUpdate(a, u, 'remote'));
+    const ra = render(<Studio doc={a} user={{ id: 'ann', name: 'Ann', color: '#f80' }} theme={{ loadFonts: false }} />);
+    const rb = render(<Studio doc={b} user={{ id: 'bob', name: 'Bob', color: '#08f' }} theme={{ loadFonts: false }} />);
+    const A = within(ra.container);
+    const B = within(rb.container);
+    fireEvent.click(A.getByRole('button', { name: 'Add Basalt as a new track' }));
+    fireEvent.click(A.getByRole('button', { name: 'Add Flint as a new track' }));
+    const tab = (W: typeof A, name: string) => within(W.getByRole('region', { name: 'Device' })).getByRole('tab', { name: new RegExp(name) });
+    // Bob picks Basalt; Ann then clicks Flint in her sequencer.
+    fireEvent.click(tab(B, 'Basalt'));
+    fireEvent.click(A.getByRole('button', { name: 'Select Flint' }));
+    expect(tab(A, 'Flint').getAttribute('aria-selected')).toBe('true'); // Ann's own panels follow her click
+    expect(tab(B, 'Basalt').getAttribute('aria-selected')).toBe('true'); // Bob's stay where he left them
+    expect(within(B.getByRole('region', { name: 'Device' })).getByText(/Mono bass synth/)).toBeTruthy();
+  });
 });
 
