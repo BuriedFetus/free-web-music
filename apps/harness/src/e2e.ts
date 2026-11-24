@@ -28,6 +28,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'roll') return runRoll(p, engineRef, ok, out);
   if (role === 'song') return runSong(p, engineRef, ok, out);
   if (role === 'songs') return runSongs(p, engineRef, ok, out);
+  if (role === 'flint') return runFlint(p, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
     if (role === 'a') {
@@ -442,6 +443,60 @@ async function runSongs(p: Project, engineRef: { current: Engine | null }, ok: (
     btn('■ Stop')!.click();
   } catch (e) {
     out.push(`FAIL songs: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: Flint from the Library; its pads sound in the real engine; a pad's settings reach the engine. */
+async function runFlint(_p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  const peak = async (ms: number) => {
+    let pk = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      pk = Math.max(pk, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+      await sleep(20);
+    }
+    return pk;
+  };
+  const press = async (i: number) => {
+    const pad = $(`.fwm-pad[data-pad="${i}"]`)!;
+    pad.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, button: 0, pointerId: 1 }));
+    pad.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, pointerId: 1 }));
+  };
+  try {
+    await sleep(300);
+    ($('[aria-label="Add Flint as a new track"]') as HTMLButtonElement).click();
+    await sleep(200);
+    ok(!!$('.fwm-flint'), 'Flint shows in the Device panel');
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    await sleep(300);
+    const levels: string[] = [];
+    let all = true;
+    for (let i = 0; i < 8; i++) {
+      await press(i);
+      const pk = await peak(250);
+      levels.push(pk.toFixed(2));
+      if (pk < 0.02) all = false;
+      await sleep(250);
+    }
+    ok(all, `all 8 pads make sound in the browser (peaks ${levels.join(' ')})`);
+    // Pad 1 → Noise character: the engine's value follows.
+    await press(0);
+    btn('Noise')!.click();
+    const slot = Number(Object.keys(engineRef.current!.last!.devices)[0]);
+    await until('engine param', () => engineRef.current!.last!.devices[slot].eff[1] === 2, 2000);
+    ok(true, 'changing a pad character reaches the engine');
+    // Keys A S D F play pads 1–4.
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    const kp = await peak(250);
+    document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'd', bubbles: true }));
+    ok(kp > 0.02 && $('.fwm-pad[data-pad="2"]')!.classList.contains('is-hit') !== undefined, `key D plays pad 3 (peak ${kp.toFixed(2)})`);
+  } catch (e) {
+    out.push(`FAIL flint: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

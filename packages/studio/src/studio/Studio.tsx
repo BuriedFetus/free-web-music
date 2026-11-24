@@ -271,9 +271,11 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   const [octave, setOctave] = useState(0);
   const keyTrack = useRef(new Map<number, string>());
   const entry = selTrack ? deviceEntry(selTrack.device) : null;
+  const padLayout = entry?.layout === 'pads';
   useComputerKeys({
     enabled: !!selTrack,
-    base: (entry?.rootNote ?? 48) + octave * 12,
+    base: padLayout ? entry!.rootNote : (entry?.rootNote ?? 48) + octave * 12,
+    layout: padLayout ? 'pads' : 'piano',
     // A key is released on the track it started on, even if you switched track while holding it.
     onNoteOn: (n, v) => {
       if (!selTrack) return;

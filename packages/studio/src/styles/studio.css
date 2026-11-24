@@ -128,3 +128,30 @@
 @media (max-width: 1000px) { .fwm-secs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
 @media (max-width: 600px) { .fwm-secs { grid-template-columns: 1fr; } .fwm-preset { margin-left: 0; } .fwm-keys { height: 96px; } .fwm-plate b { font-size: 32px; } }
 @media (prefers-reduced-motion: reduce) { .fwm-root * { transition: none !important; } }
+
+/* ---- Flint (drum machine) ---- */
+.fwm-flint { container-type: inline-size; }
+.fwm-flint__body { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 1.25fr); gap: 10px; }
+@container (max-width: 860px) { .fwm-flint__body { grid-template-columns: minmax(0, 1fr); } }
+.fwm-pads { display: grid; grid-template-columns: repeat(4, minmax(0, 1fr)); gap: 10px; margin-bottom: 10px; }
+.fwm-pad { position: relative; height: 84px; border: 0; border-radius: calc(12px * var(--fwm-round)); cursor: pointer; touch-action: none;
+  background: linear-gradient(160deg, var(--dev-btn), var(--dev-btn2)); color: var(--dev-btnink);
+  box-shadow: inset 0 calc(-5px * var(--fwm-depth)) 0 var(--dev-btnedge); display: flex; flex-direction: column; justify-content: flex-end;
+  align-items: flex-start; padding: 22px 8px 8px; text-align: left; font: inherit; overflow: hidden; }
+.fwm-pad:active { transform: translateY(2px); }
+.fwm-pad b { font: 800 13px/1.1 var(--fwm-font-ui); text-transform: uppercase; max-width: 100%; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fwm-pad small { font-size: 12px; opacity: .8; }
+.fwm-pad__n { position: absolute; top: 6px; left: 8px; font: 700 12px var(--fwm-font-ui); opacity: .6; }
+.fwm-pad__led { position: absolute; top: 8px; right: 8px; width: 10px; height: 10px; border-radius: 50%; background: color-mix(in srgb, var(--dev-acc) 25%, var(--dev-btn2)); }
+.fwm-pad.is-sel { outline: 3px solid var(--dev-acc); outline-offset: 2px; }
+.fwm-pad.is-hit { background: linear-gradient(160deg, color-mix(in srgb, var(--dev-acc) 35%, var(--dev-btn)), var(--dev-btn2)); }
+.fwm-pad.is-hit .fwm-pad__led { background: var(--dev-acc); box-shadow: 0 0 calc(10px * var(--fwm-glow)) var(--dev-acc); }
+.fwm-flint__line { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 10px; margin-bottom: 8px; }
+.fwm-flint__line > .fwm-silk { min-width: 72px; }
+.fwm-flint__line .fwm-seg { margin-bottom: 0; flex: 1; }
+.fwm-seg--wrap { flex-wrap: wrap; }
+.fwm-seg--wrap > .fwm-btn--seg { flex: 0 0 auto; padding: 0 12px; }
+/* light casing: segment buttons tinted with the device ink instead of black, so the ink reads on them */
+.fwm-flint .fwm-btn--seg { background: color-mix(in srgb, var(--dev-silk) 12%, transparent); font-size: 13px; }
+.fwm-flint__edited { opacity: .7; font-size: .75em; }
+.fwm-flint__later { margin: 10px 0 0; padding: 8px 10px; border: 2px dashed color-mix(in srgb, var(--dev-silk) 35%, transparent); border-radius: 10px; font-size: 13px; }

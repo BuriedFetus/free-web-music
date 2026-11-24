@@ -5,8 +5,9 @@
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import basaltManifest from '@fwm/engine/devices/basalt.json';
+import flintManifest from '@fwm/engine/devices/flint.json';
 import type { DeviceManifest, Engine } from '@fwm/engine';
-import { Basalt, BASALT_PRESETS, EngineProvider, Project, Studio, ThemeRoot, createDeviceStore, useEngine } from '@fwm/studio';
+import { Basalt, BASALT_PRESETS, FLINT_KITS, EngineProvider, Project, Studio, ThemeRoot, createDeviceStore, useEngine } from '@fwm/studio';
 import '@fwm/studio/skins/host-examples.css';
 import { localSongs } from './songStore';
 import { connectTabs, tabUser } from './tabSync';
@@ -43,6 +44,8 @@ function seed() {
   if (p.trackIds().length) return;
   const m = basaltManifest as DeviceManifest;
   // A small song: TRACK 1 plays the bass line "Groove", TRACK 2 a slower 2-bar "Drift".
+  // ?flint=first: Flint is the first (selected) instrument (screenshots).
+  if (params.get('flint') === 'first') p.addTrack(flintManifest as DeviceManifest, FLINT_KITS[0], 0);
   const id = p.addTrack(m, BASALT_PRESETS[0], 0);
   const groove = p.patternList(id)[0].id;
   p.renamePattern(id, groove, 'Groove');
@@ -58,6 +61,8 @@ function seed() {
   // ?seednow=3: extra copies, to see several tracks at once.
   for (let i = 1; i < Number(params.get('seednow') || 1); i++) p.addTrack(m, BASALT_PRESETS[i % BASALT_PRESETS.length], 0);
   p.undoManager.clear(); // the demo is not something you can undo
+  // ?flint: add a Flint too (screenshots).
+  if (params.has('flint') && params.get('flint') !== 'first') p.addTrack(flintManifest as DeviceManifest, FLINT_KITS[0], 0);
   // ?key=0,minor: start with a song key set (the demo line is in C minor).
   const k = params.get('key')?.split(',');
   if (k) p.setKey({ root: Number(k[0]), scale: k[1] });

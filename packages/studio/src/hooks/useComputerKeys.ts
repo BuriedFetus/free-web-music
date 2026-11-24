@@ -3,6 +3,8 @@
 import { useEffect, useRef } from 'react';
 
 export const KEY_MAP = ['a', 'w', 's', 'e', 'd', 'f', 't', 'g', 'y', 'h', 'u', 'j', 'k', 'o', 'l', 'p', ';'];
+/** Pads (drum machines): one row, A S D F G H J K = pads 1–8 (base + 0…7). */
+export const PAD_MAP = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k'];
 
 export function useComputerKeys(opts: {
   enabled: boolean;
@@ -10,6 +12,8 @@ export function useComputerKeys(opts: {
   onNoteOn(note: number, velocity: number): void;
   onNoteOff(note: number): void;
   onOctave?(delta: number): void;
+  /** 'pads': A S D F G H J K play base + 0…7 and Z/X do nothing. */
+  layout?: 'piano' | 'pads';
 }) {
   const ref = useRef(opts);
   ref.current = opts;
@@ -23,11 +27,12 @@ export function useComputerKeys(opts: {
     const kd = (e: KeyboardEvent) => {
       if (e.repeat || e.ctrlKey || e.metaKey || e.altKey || typing(e)) return;
       const k = e.key.toLowerCase();
-      if (k === 'z' || k === 'x') {
+      const pads = ref.current.layout === 'pads';
+      if (!pads && (k === 'z' || k === 'x')) {
         ref.current.onOctave?.(k === 'z' ? -1 : 1);
         return;
       }
-      const i = KEY_MAP.indexOf(k);
+      const i = (pads ? PAD_MAP : KEY_MAP).indexOf(k);
       if (i < 0 || down.has(k)) return;
       const note = ref.current.base + i;
       down.set(k, note);

@@ -41,6 +41,9 @@ export interface DeviceHost {
   subtitle?: string;
 }
 
+/** Props every device front panel takes (Basalt, Flint…). */
+export type DeviceProps = BasaltProps;
+
 export interface BasaltProps {
   store: DeviceStore;
   host?: DeviceHost;

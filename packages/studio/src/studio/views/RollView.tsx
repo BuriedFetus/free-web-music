@@ -102,8 +102,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const q = QUANT[ws.snap] ?? 1;
   const manifest = entry.manifest;
   const autoSpecs = manifest.params.filter((p) => p.type === 'float' && p.mod);
-  const autoSpec = autoSpecs.find((p) => p.id === autoParam) ?? autoSpecs[0];
-  const auto = project.automation(t.id, pat, autoSpec.id);
+  const autoSpec = autoSpecs.find((p) => p.id === autoParam) ?? autoSpecs[0]; // none for devices without knobs to automate
+  const auto = autoSpec ? project.automation(t.id, pat, autoSpec.id) : [];
   const peerNote = (id: string) => peers.find((p) => p.touch?.track === t.id && p.touch.control === 'note:' + id);
 
   const at = (e: { clientX: number; clientY: number }) => {
@@ -235,7 +235,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
         project.transact(() => {
           for (const [id, n] of project.notes(t.id, pat)) if (Math.floor(n.s) === i) project.updateNote(t.id, pat, id, { v: Math.max(0.05, v) });
         });
-      } else project.setAutomation(t.id, pat, autoSpec.id, i, e.altKey || e.buttons === 2 ? null : v);
+      } else if (autoSpec) project.setAutomation(t.id, pat, autoSpec.id, i, e.altKey || e.buttons === 2 ? null : v);
     };
     return {
       onPointerDown: (e: PointerEvent<HTMLDivElement>) => {
@@ -375,6 +375,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
           return <div key={i} className="fwm-ab is-vel"><i style={{ height: `${n ? Math.round(n.v * 100) : 0}%` }} /></div>;
         })}
       </div>
+{autoSpec && (<>
       <div className="fwm-lanehead" style={{ marginLeft: KEYW }}>
         <label>
           Automation
@@ -396,6 +397,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
           </div>
         ))}
       </div>
+</>)}
       </div>
       </div>
       <p className="fwm-hint">

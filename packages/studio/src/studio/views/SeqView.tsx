@@ -21,10 +21,9 @@ export function SeqView({ peers }: { peers: Peer[] }) {
   const { project, ws, setWs, toast } = st;
   const tracks = project.tracks();
   const rows = project.rows();
-  const basalt = LIBRARY.find((d) => d.id === 'basalt');
-  const addInstrument = () => {
-    if (!basalt?.manifest) return;
-    const id = project.addTrack(basalt.manifest, basalt.presets?.[0], 0, ws.row);
+  const addable = LIBRARY.filter((d) => d.available && d.manifest);
+  const addInstrument = (d: (typeof addable)[number]) => {
+    const id = project.addTrack(d.manifest!, d.presets?.[0], 0, ws.row);
     setWs({ track: id });
     toast(`${project.track(id)?.name} added, playing P1 in this TRACK`);
   };
@@ -47,9 +46,13 @@ export function SeqView({ peers }: { peers: Peer[] }) {
           <div className="fwm-arow" style={cols}>
             <span />
             {tracks.map((t) => <InstrumentHead key={t.id} track={t} peers={peers.filter((p) => p.track === t.id)} />)}
-            <button type="button" className="fwm-addi" onClick={addInstrument} title="Add a Basalt to the song (more instruments in the Library later)">
-              + Instrument
-            </button>
+            <span className="fwm-addis">
+              {addable.map((d) => (
+                <button key={d.id} type="button" className="fwm-addi" onClick={() => addInstrument(d)} title={`Add a ${d.name} (${d.kind}) to the song`}>
+                  + {d.name}
+                </button>
+              ))}
+            </span>
           </div>
           {rows.map((r, i) => (
             <Row key={r.id} row={r} index={i} tracks={tracks} peers={peers.filter((p) => p.row === r.id)} canDelete={rows.length > 1} />

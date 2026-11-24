@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import * as Y from 'yjs';
-import { Project, Studio, type SongFile, type SongLibrary } from '../src';
+import { deviceEntry, Project, Studio, type SongFile, type SongLibrary } from '../src';
 
 afterEach(() => {
   cleanup();
@@ -182,6 +182,26 @@ describe('<Studio>', () => {
     // The toast takes you back to the INIT song (undo).
     fireEvent.click(screen.getByRole('button', { name: 'Back to "Untitled"' }));
     expect(p.songName).toBe('Untitled');
+  });
+
+  it('Flint: add it, hit pads, change a pad drum and character, switch kits ("edited" when changed)', () => {
+    const p = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Add Flint as a new track' }));
+    const id = p.trackIds()[0];
+    const dev = screen.getByRole('region', { name: 'Device' });
+    expect(within(dev).getByText(/Drum machine · Flint/)).toBeTruthy();
+    const store = () => p.deviceStore(id, deviceEntry('flint')!.manifest!)!;
+    fireEvent.pointerDown(within(dev).getByRole('button', { name: /^Pad 4: Closed hat, Analog/ }), { button: 0 });
+    expect(within(dev).getByText('Pad 4 sound')).toBeTruthy();
+    fireEvent.click(within(dev).getByRole('button', { name: 'Noise' }));
+    fireEvent.click(within(dev).getByRole('button', { name: 'Kick' }));
+    expect(store().getState().params).toMatchObject({ 'p4.type': 0, 'p4.model': 2 });
+    expect(within(dev).getByRole('button', { name: /^Pad 4: Kick, Noise/ })).toBeTruthy();
+    expect(dev.querySelector('.fwm-flint__edited')).not.toBeNull();
+    fireEvent.click(within(dev).getByRole('button', { name: 'Next kit' }));
+    expect(within(dev).getByText(/02 Chrome/)).toBeTruthy();
+    expect(dev.querySelector('.fwm-flint__edited')).toBeNull();
+    expect(store().getState().params['p1.model']).toBe(1); // Chrome = all Digital
   });
 });
 

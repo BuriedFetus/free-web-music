@@ -2,6 +2,7 @@ import { useState, useSyncExternalStore } from 'react';
 import type { Peer } from '../collab/presence';
 import { useEngine } from '../engine/EngineProvider';
 import { NOTE_NAMES, SCALES } from '../model/scales';
+import { deviceEntry } from '../devices/registry';
 import { useStudio } from './context';
 import { SongMenu } from './SongMenu';
 
@@ -89,8 +90,10 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
         ))}
       </div>
       <div className="fwm-grow" />
-      <span className="fwm-hintline" title="Computer keyboard plays the selected track">
-        Keys A–; · Z/X octave {octave >= 0 ? '+' : ''}{octave} · Space play
+      <span className="fwm-hintline" title="Computer keyboard plays the selected instrument">
+        {deviceEntry(ws.track ? project.track(ws.track)?.device ?? '' : '')?.layout === 'pads'
+          ? 'Pads A S D F G H J K · Space play'
+          : `Keys A–; · Z/X octave ${octave >= 0 ? '+' : ''}${octave} · Space play`}
       </span>
       <button type="button" className="fwm-btn-ui" aria-pressed={status === 'on'}
         onClick={() => (status === 'on' ? stop() : start())}>

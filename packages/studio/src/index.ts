@@ -1,7 +1,9 @@
 // @fwm/studio public API.
 import './styles/studio.css';
 
-export { Basalt, type BasaltProps } from './devices/basalt/Basalt';
+export { Basalt, type BasaltProps, type DeviceProps } from './devices/basalt/Basalt';
+export { Flint } from './devices/flint/Flint';
+export { FLINT_KITS, DRUM_TYPES, CHARACTERS } from './devices/flint/kits';
 export { BASALT_PRESETS, type Preset } from './devices/basalt/presets';
 export { Scope } from './devices/Scope';
 export { EngineProvider, useEngine, type EngineStatus } from './engine/EngineProvider';

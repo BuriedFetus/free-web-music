@@ -63,6 +63,7 @@
 .fwm-thumb { min-width: 80px; height: 42px; flex: none; border-radius: calc(6px * var(--fwm-round)); border: 0; cursor: pointer; padding: 0 8px; position: relative;
   background: var(--dev-texture), linear-gradient(160deg, var(--dev-case), var(--dev-case2)); background-size: 5px 5px, auto; color: var(--dev-silk);
   font: 900 16px/1 var(--fwm-font-display); letter-spacing: .04em; box-shadow: inset 0 -4px 0 var(--dev-acc); display: grid; place-items: center; }
+.fwm-app .fwm-thumb { color: var(--dev-silk); } /* device ink wins over the generic button colour */
 .fwm-thumb--sm { min-width: 96px; height: 36px; font-size: 14px; }
 .fwm-thumb[aria-pressed=true] { outline: 2px solid var(--fwm-me); outline-offset: 2px; }
 .fwm-thumb .fwm-av { position: absolute; top: -8px; right: -6px; }
@@ -83,7 +84,8 @@
 .fwm-ithumb.is-on { outline: 2px solid var(--fwm-roll-ink); outline-offset: 2px; }
 .fwm-ithumb.fwm-tname { width: 100%; text-transform: none; }
 .fwm-ihead__btns { display: flex; gap: 4px; justify-content: center; }
-.fwm-addi { white-space: nowrap; min-height: 46px; padding: 0 12px; border: 2px dashed color-mix(in srgb, var(--fwm-roll-ink) 40%, transparent); background: none; border-radius: 8px; color: var(--fwm-roll-ink); cursor: pointer; font-weight: 600; align-self: start; }
+.fwm-addis { display: flex; flex-direction: column; gap: 4px; align-self: start; }
+.fwm-addi { white-space: nowrap; min-height: 36px; padding: 0 12px; border: 2px dashed color-mix(in srgb, var(--fwm-roll-ink) 40%, transparent); background: none; border-radius: 8px; color: var(--fwm-roll-ink); cursor: pointer; font-weight: 600; align-self: start; }
 .fwm-tl { position: relative; display: flex; flex-direction: column; justify-content: center; padding: 6px 10px; border-radius: 8px; background: var(--fwm-roll2); color: var(--fwm-roll-ink); border: 0; cursor: pointer; text-align: left; }
 .fwm-tl b { font: 900 17px/1 var(--fwm-font-display); letter-spacing: .04em; }
 .fwm-tl small { font-size: 12px; opacity: .85; margin-top: 3px; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
