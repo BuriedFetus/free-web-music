@@ -1,12 +1,20 @@
 // The shared project, stored in the host's Yjs doc. Everything here is seen by every collaborator.
 //
+// Words: a "track" in this code is one instrument lane (shown as the instrument). The song is a list of
+// rows that the UI calls TRACK 1, TRACK 2…; here they are "rows", to keep the two apart.
+//
 // Layout (top-level types never conflict when two people start at once):
 //   fwm.meta       Y.Map    { schema, bpm, swing, keyRoot, keyScale }
 //   fwm.order      Y.Array  track ids, in display order
-//   fwm.tracks     Y.Map    trackId → Y.Map { device, name, seq: Y.Map{len,dir,rate,own,mute},
-//                                              params: Y.Map<paramId, number>, routes: Y.Array<Route> }
-//   fwm.patterns   Y.Map    `${trackId}|${scene}` → Y.Map { notes: Y.Map<noteId, Note>, auto: Y.Map<`${param}@${step}`, number> }
-// Nested maps are created together with their track, so two people never race to create the same one.
+//   fwm.tracks     Y.Map    trackId → Y.Map { device, name, seq: Y.Map{dir,rate,own,mute},
+//                                              params: Y.Map<paramId, number>, routes: Y.Array<Route>,
+//                                              pats: Y.Array<patternId> (this instrument's patterns, in order) }
+//   fwm.patterns   Y.Map    `${trackId}|${patternId}` → Y.Map { name, len, notes: Y.Map<noteId, Note>,
+//                                                               auto: Y.Map<`${param}@${step}`, number> }
+//   fwm.song       Y.Array  rows: Y.Map { id, cells: Y.Map<trackId, patternId> } (no entry = silent)
+// Patterns belong to one instrument. A row plays, for each instrument, the pattern in its cell; it lasts as
+// long as its longest pattern and shorter ones repeat inside it.
+// Nested maps are created together with their parent, so two people never race to create the same one.
 //
 // Every local edit is tagged with this user's `origin`, so the UndoManager only undoes your own changes.
 import * as Y from 'yjs';
@@ -14,13 +22,14 @@ import type { DeviceId, DeviceManifest, Direction, SeqNote } from '@fwm/engine';
 import { canRoute, defaults, MAX_ROUTES, type DeviceState, type DeviceStore, type Route } from './deviceStore';
 import { DEFAULT_KEY, SCALES, type SongKey } from './scales';
 
-export const SCHEMA = 1;
-export const SCENES = ['A', 'B', 'C', 'D'] as const;
-export const STEPS = 16;
+export const SCHEMA = 2;
+/** Steps (16th notes) in a bar. */
+export const BAR = 16;
+/** Longest pattern: 8 bars. */
+export const MAX_LEN = 128;
 
 export interface Note extends SeqNote {}
 export interface SeqSettings {
-  len: number;
   dir: Direction;
   rate: number;
   own: boolean;
@@ -32,10 +41,22 @@ export interface TrackInfo {
   name: string;
   seq: SeqSettings;
 }
+export interface PatternInfo {
+  id: string;
+  name: string;
+  /** Length in steps (1…MAX_LEN). */
+  len: number;
+}
+export interface SongRow {
+  id: string;
+  /** trackId → patternId; a missing track is silent in this row. */
+  cells: Record<string, string>;
+}
 
-const DEFAULT_SEQ: SeqSettings = { len: 16, dir: 'fwd', rate: 1, own: false, mute: false };
+const DEFAULT_SEQ: SeqSettings = { dir: 'fwd', rate: 1, own: false, mute: false };
 const uid = (p: string) => p + Math.random().toString(36).slice(2, 10);
-export const patternKey = (track: string, scene: number) => `${track}|${scene}`;
+export const patternKey = (track: string, pat: string) => `${track}|${pat}`;
+const clampLen = (v: number) => Math.max(1, Math.min(MAX_LEN, Math.round(v)));
 
 export class Project {
   readonly doc: Y.Doc;
@@ -44,6 +65,7 @@ export class Project {
   readonly order: Y.Array<string>;
   readonly tracksMap: Y.Map<Y.Map<unknown>>;
   readonly patterns: Y.Map<Y.Map<unknown>>;
+  readonly song: Y.Array<Y.Map<unknown>>;
   readonly undoManager: Y.UndoManager;
   private version = 0;
   private listeners = new Set<() => void>();
@@ -56,7 +78,8 @@ export class Project {
     this.order = doc.getArray('fwm.order');
     this.tracksMap = doc.getMap('fwm.tracks');
     this.patterns = doc.getMap('fwm.patterns');
-    this.undoManager = new Y.UndoManager([this.meta, this.order, this.tracksMap, this.patterns], {
+    this.song = doc.getArray('fwm.song');
+    this.undoManager = new Y.UndoManager([this.meta, this.order, this.tracksMap, this.patterns, this.song], {
       trackedOrigins: new Set([origin]),
       captureTimeout: 400, // a knob drag or a note drag is one undo step
     });
@@ -64,7 +87,7 @@ export class Project {
       this.version++;
       for (const fn of this.listeners) fn();
     };
-    for (const t of [this.meta, this.order, this.tracksMap, this.patterns]) t.observeDeep(bump);
+    for (const t of [this.meta, this.order, this.tracksMap, this.patterns, this.song]) t.observeDeep(bump);
     this.undoManager.on('stack-item-added', bump);
     this.undoManager.on('stack-item-popped', bump);
   }
@@ -146,8 +169,12 @@ export class Project {
     return this.trackIds().map((id) => this.track(id)!);
   }
 
-  /** Bring a device in from the library: this creates a track. Copies of the same device are fine. */
-  addTrack(manifest: DeviceManifest, init?: { params?: Record<string, number>; routes?: Route[] }, preset = 0): string {
+  /**
+   * Bring a device in from the library: this creates a track (an instrument) with one empty pattern, P1,
+   * placed in song row `row` (default: the first row; a first row is made if the song has none).
+   * Copies of the same device are fine.
+   */
+  addTrack(manifest: DeviceManifest, init?: { params?: Record<string, number>; routes?: Route[] }, preset = 0, row?: string | null): string {
     const id = uid('t');
     const sameKind = this.tracks().filter((t) => t.device === manifest.id).length;
     this.action(() => {
@@ -164,24 +191,51 @@ export class Project {
       const routes = new Y.Array<Route>();
       routes.push((init?.routes ?? []).filter((r) => canRoute(manifest, r.src, r.target)).slice(0, MAX_ROUTES));
       t.set('routes', routes);
+      const pats = new Y.Array<string>();
+      t.set('pats', pats);
       this.tracksMap.set(id, t);
       this.order.push([id]);
-      SCENES.forEach((_, s) => {
-        const p = new Y.Map<unknown>();
-        p.set('notes', new Y.Map<Note>());
-        p.set('auto', new Y.Map<number>());
-        this.patterns.set(patternKey(id, s), p);
-      });
+      const pat = this.makePattern(id, pats, 'P1', BAR);
+      if (!this.song.length) this.song.push([this.makeRow()]);
+      const r = (row && this.rowMap(row)) || this.song.get(0);
+      (r.get('cells') as Y.Map<string>).set(id, pat);
     });
     return id;
+  }
+  /** A new empty pattern (inside a transaction). */
+  private makePattern(track: string, pats: Y.Array<string>, name: string, len: number, from?: Y.Map<unknown>): string {
+    const id = uid('p');
+    const p = new Y.Map<unknown>();
+    p.set('name', name);
+    p.set('len', clampLen(len));
+    const notes = new Y.Map<Note>();
+    const auto = new Y.Map<number>();
+    if (from) {
+      for (const v of (from.get('notes') as Y.Map<Note>).values()) notes.set(uid('n'), v);
+      for (const [k, v] of (from.get('auto') as Y.Map<number>).entries()) auto.set(k, v);
+    }
+    p.set('notes', notes);
+    p.set('auto', auto);
+    this.patterns.set(patternKey(track, id), p);
+    pats.push([id]);
+    return id;
+  }
+  private makeRow(cells?: Record<string, string>): Y.Map<unknown> {
+    const r = new Y.Map<unknown>();
+    r.set('id', uid('r'));
+    const c = new Y.Map<string>();
+    for (const [k, v] of Object.entries(cells ?? {})) c.set(k, v);
+    r.set('cells', c);
+    return r;
   }
 
   removeTrack(id: string) {
     this.action(() => {
       const i = this.order.toArray().indexOf(id);
       if (i >= 0) this.order.delete(i, 1);
+      for (const p of this.patternIds(id)) this.patterns.delete(patternKey(id, p));
       this.tracksMap.delete(id);
-      SCENES.forEach((_, s) => this.patterns.delete(patternKey(id, s)));
+      for (const r of this.song.toArray()) (r.get('cells') as Y.Map<string>).delete(id);
     });
     this.stores.delete(id);
   }
@@ -198,44 +252,90 @@ export class Project {
     const seq = this.tracksMap.get(id)?.get('seq') as Y.Map<unknown> | undefined;
     if (!seq) return;
     this.action(() => {
-      for (const [k, v] of Object.entries(patch)) {
-        if (k === 'len') seq.set(k, Math.max(1, Math.min(STEPS, Math.round(v as number))));
-        else seq.set(k, v);
-      }
+      for (const [k, v] of Object.entries(patch)) seq.set(k, v);
     });
   }
 
-  // ---- patterns ----
-  private pattern(track: string, scene: number) {
-    return this.patterns.get(patternKey(track, scene));
+  // ---- patterns (each belongs to one instrument) ----
+  private patternIds(track: string): string[] {
+    const pats = this.tracksMap.get(track)?.get('pats') as Y.Array<string> | undefined;
+    return pats ? pats.toArray() : [];
   }
-  private notesMap(track: string, scene: number) {
-    return this.pattern(track, scene)?.get('notes') as Y.Map<Note> | undefined;
+  /** An instrument's patterns, in order. */
+  patternList(track: string): PatternInfo[] {
+    return this.patternIds(track).map((p) => this.patternInfo(track, p)).filter((p): p is PatternInfo => !!p);
   }
-  private autoMap(track: string, scene: number) {
-    return this.pattern(track, scene)?.get('auto') as Y.Map<number> | undefined;
+  patternInfo(track: string, pat: string | null | undefined): PatternInfo | null {
+    const m = pat ? this.patMap(track, pat) : undefined;
+    if (!m || !pat) return null;
+    return { id: pat, name: (m.get('name') as string) || 'P?', len: (m.get('len') as number) || BAR };
+  }
+  /** New pattern for an instrument: empty, or a copy of `copyOf`. Named P<n> (or "<name> 2" for a copy). */
+  addPattern(track: string, copyOf?: string): string | null {
+    const pats = this.tracksMap.get(track)?.get('pats') as Y.Array<string> | undefined;
+    if (!pats) return null;
+    const from = copyOf ? this.patMap(track, copyOf) : undefined;
+    const taken = new Set(this.patternList(track).map((p) => p.name));
+    let name: string;
+    if (from) {
+      const base = (from.get('name') as string) || 'P';
+      let k = 2;
+      while (taken.has(`${base} ${k}`)) k++;
+      name = `${base} ${k}`;
+    } else {
+      let k = this.patternIds(track).length + 1;
+      while (taken.has(`P${k}`)) k++;
+      name = `P${k}`;
+    }
+    let id = '';
+    this.action(() => {
+      id = this.makePattern(track, pats, name, (from?.get('len') as number) ?? BAR, from);
+    });
+    return id;
+  }
+  renamePattern(track: string, pat: string, name: string) {
+    const m = this.patMap(track, pat);
+    const n = name.trim().slice(0, 24);
+    if (!m || !n || m.get('name') === n) return;
+    this.action(() => m.set('name', n));
+  }
+  /** Pattern length in steps, 1…MAX_LEN. Notes past the end are kept (silent) in case it grows again. */
+  setPatternLen(track: string, pat: string, len: number) {
+    const m = this.patMap(track, pat);
+    if (!m || m.get('len') === clampLen(len)) return;
+    this.action(() => m.set('len', clampLen(len)));
   }
 
-  notes(track: string, scene: number): [string, Note][] {
-    const m = this.notesMap(track, scene);
+  private patMap(track: string, pat: string) {
+    return this.patterns.get(patternKey(track, pat));
+  }
+  private notesMap(track: string, pat: string) {
+    return this.patMap(track, pat)?.get('notes') as Y.Map<Note> | undefined;
+  }
+  private autoMap(track: string, pat: string) {
+    return this.patMap(track, pat)?.get('auto') as Y.Map<number> | undefined;
+  }
+
+  notes(track: string, pat: string): [string, Note][] {
+    const m = this.notesMap(track, pat);
     if (!m) return [];
     return [...m.entries()].sort((a, b) => a[1].s - b[1].s || a[1].m - b[1].m);
   }
-  addNote(track: string, scene: number, note: Note): string | null {
-    const m = this.notesMap(track, scene);
+  addNote(track: string, pat: string, note: Note): string | null {
+    const m = this.notesMap(track, pat);
     if (!m) return null;
     const id = uid('n');
     this.transact(() => m.set(id, clampNote(note)));
     return id;
   }
-  updateNote(track: string, scene: number, id: string, patch: Partial<Note>) {
-    const m = this.notesMap(track, scene);
+  updateNote(track: string, pat: string, id: string, patch: Partial<Note>) {
+    const m = this.notesMap(track, pat);
     const n = m?.get(id);
     if (!m || !n) return;
     this.transact(() => m.set(id, clampNote({ ...n, ...patch })));
   }
-  deleteNote(track: string, scene: number, id: string) {
-    const m = this.notesMap(track, scene);
+  deleteNote(track: string, pat: string, id: string) {
+    const m = this.notesMap(track, pat);
     if (m?.has(id)) this.transact(() => m.delete(id));
   }
   /**
@@ -243,8 +343,8 @@ export class Project {
    * moved or resized) wins: a note that starts before it is cut short where it begins, a note that starts
    * under it is removed. With no `keep`, later notes win (used after quantize).
    */
-  resolveOverlaps(track: string, scene: number, keep?: string) {
-    const m = this.notesMap(track, scene);
+  resolveOverlaps(track: string, pat: string, keep?: string) {
+    const m = this.notesMap(track, pat);
     if (!m) return;
     const EPS = 1e-6;
     const edits: [string, Note | null][] = [];
@@ -273,58 +373,97 @@ export class Project {
     });
   }
   /** Remove every note (and automation) of one pattern. Undo brings it back. */
-  clearPattern(track: string, scene: number) {
-    const m = this.notesMap(track, scene);
-    const a = this.autoMap(track, scene);
+  clearPattern(track: string, pat: string) {
+    const m = this.notesMap(track, pat);
+    const a = this.autoMap(track, pat);
     this.action(() => {
       m?.clear();
       a?.clear();
     });
   }
   /** Snap starts and lengths of all notes to a grid (in steps; 0 = leave as is). */
-  quantize(track: string, scene: number, grid: number) {
-    const m = this.notesMap(track, scene);
+  quantize(track: string, pat: string, grid: number) {
+    const m = this.notesMap(track, pat);
     if (!m || !grid) return;
+    const len = this.patternInfo(track, pat)?.len ?? MAX_LEN;
     this.action(() => {
       for (const [id, n] of m.entries()) {
         const l = Math.max(grid, Math.round(n.l / grid) * grid);
-        const s = Math.max(0, Math.min(STEPS - l, Math.round(n.s / grid) * grid));
+        const s = Math.max(0, Math.min(len - grid, Math.round(n.s / grid) * grid)); // the start stays inside the pattern
         m.set(id, clampNote({ ...n, s, l }));
       }
     });
-    this.resolveOverlaps(track, scene);
+    this.resolveOverlaps(track, pat);
   }
 
-  /** Automation lane values per step (null = no point), for one param. */
-  automation(track: string, scene: number, param: string): (number | null)[] {
-    const a = this.autoMap(track, scene);
-    return Array.from({ length: STEPS }, (_, i) => (a?.get(`${param}@${i}`) as number | undefined) ?? null);
+  /** Automation lane values per step of the pattern (null = no point), for one param. */
+  automation(track: string, pat: string, param: string): (number | null)[] {
+    const a = this.autoMap(track, pat);
+    const len = this.patternInfo(track, pat)?.len ?? BAR;
+    return Array.from({ length: len }, (_, i) => (a?.get(`${param}@${i}`) as number | undefined) ?? null);
   }
   /** All automated params of a pattern → lanes. */
-  automationAll(track: string, scene: number): Record<string, (number | null)[]> {
-    const a = this.autoMap(track, scene);
+  automationAll(track: string, pat: string): Record<string, (number | null)[]> {
+    const a = this.autoMap(track, pat);
     const out: Record<string, (number | null)[]> = {};
     if (!a) return out;
     for (const [k, v] of a.entries()) {
       const [param, step] = k.split('@');
-      (out[param] ??= Array(STEPS).fill(null))[Number(step)] = v;
+      (out[param] ??= Array(MAX_LEN).fill(null))[Number(step)] = v;
     }
     return out;
   }
-  setAutomation(track: string, scene: number, param: string, step: number, value: number | null) {
-    const a = this.autoMap(track, scene);
-    if (!a || step < 0 || step >= STEPS) return;
+  setAutomation(track: string, pat: string, param: string, step: number, value: number | null) {
+    const a = this.autoMap(track, pat);
+    if (!a || step < 0 || step >= MAX_LEN) return;
     this.transact(() => {
       if (value == null) a.delete(`${param}@${step}`);
       else a.set(`${param}@${step}`, Math.max(0, Math.min(1, value)));
     });
   }
-  clearAutomation(track: string, scene: number, param: string) {
-    const a = this.autoMap(track, scene);
+  clearAutomation(track: string, pat: string, param: string) {
+    const a = this.autoMap(track, pat);
     if (!a) return;
     this.action(() => {
       for (const k of [...a.keys()]) if (k.startsWith(param + '@')) a.delete(k);
     });
+  }
+
+  // ---- song: rows (TRACK 1, TRACK 2… in the UI) ----
+  private rowMap(id: string) {
+    return this.song.toArray().find((r) => r.get('id') === id);
+  }
+  rows(): SongRow[] {
+    return this.song.toArray().map((r) => ({ id: r.get('id') as string, cells: (r.get('cells') as Y.Map<string>).toJSON() as Record<string, string> }));
+  }
+  /** The pattern an instrument plays in a row (null = silent). */
+  cell(row: string | null | undefined, track: string): string | null {
+    const r = row ? this.rowMap(row) : undefined;
+    const p = (r?.get('cells') as Y.Map<string> | undefined)?.get(track);
+    return p && this.patMap(track, p) ? p : null;
+  }
+  setCell(row: string, track: string, pat: string | null) {
+    const c = this.rowMap(row)?.get('cells') as Y.Map<string> | undefined;
+    if (!c) return;
+    this.action(() => (pat ? c.set(track, pat) : c.delete(track)));
+  }
+  /** How long a row plays, in steps: its longest pattern (one bar when it is empty). */
+  rowLen(row: string): number {
+    const lens = this.trackIds().map((t) => this.patternInfo(t, this.cell(row, t))?.len ?? 0);
+    return Math.max(0, ...lens) || BAR;
+  }
+  /** Add an empty row after `after` (default: at the end), or a copy of it with `copy`. Returns its id. */
+  addRow(after?: string | null, copy = false): string {
+    const i = after ? this.song.toArray().findIndex((r) => r.get('id') === after) : -1;
+    const src = after && copy ? this.rows()[i]?.cells : undefined;
+    const r = this.makeRow(src);
+    this.action(() => this.song.insert(i >= 0 ? i + 1 : this.song.length, [r]));
+    return r.get('id') as string;
+  }
+  removeRow(id: string) {
+    const i = this.song.toArray().findIndex((r) => r.get('id') === id);
+    if (i < 0 || this.song.length < 2) return;
+    this.action(() => this.song.delete(i, 1));
   }
 
   // ---- device state ----
@@ -343,8 +482,8 @@ export class Project {
 
 function clampNote(n: Note): Note {
   const r3 = (x: number) => Math.round(x * 1000) / 1000;
-  const s = r3(Math.max(0, Math.min(STEPS - 1 / 64, n.s)));
-  const l = r3(Math.max(1 / 64, Math.min(STEPS - s, n.l)));
+  const s = r3(Math.max(0, Math.min(MAX_LEN - 1 / 64, n.s)));
+  const l = r3(Math.max(1 / 64, Math.min(MAX_LEN - s, n.l)));
   return { s, l, m: Math.max(0, Math.min(127, Math.round(n.m))), v: Math.max(0.05, Math.min(1, n.v)) };
 }
 

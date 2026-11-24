@@ -1,10 +1,10 @@
-import { useSyncExternalStore } from 'react';
+import { useState, useSyncExternalStore } from 'react';
 import type { Peer } from '../collab/presence';
 import { useEngine } from '../engine/EngineProvider';
-import { SCENES } from '../model/project';
+import { NOTE_NAMES, SCALES } from '../model/scales';
 import { useStudio } from './context';
 
-/** Live transport position "scene bar.beat.step", from the engine. */
+/** Live transport position "bar.beat.step", from the engine. */
 function usePosition(): string | null {
   const { engine, status } = useEngine();
   return useSyncExternalStore(
@@ -20,10 +20,12 @@ function usePosition(): string | null {
 }
 
 export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
-  const { project, ws, setWs, playing, setPlaying, rec, setRec, user } = useStudio();
+  const { project, ws, playing, setPlaying, rec, setRec, user } = useStudio();
   const { status, start, stop } = useEngine();
   const pos = usePosition();
   const trackName = (id: string | null) => (id ? project.track(id)?.name : null);
+  const rowIds = project.rows().map((r) => r.id);
+  const rowName = (id: string | null) => (id && rowIds.includes(id) ? `TRACK ${rowIds.indexOf(id) + 1}` : '');
 
   return (
     <div className="fwm-topbar">
@@ -36,21 +38,24 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
           ● Rec
         </button>
         <span className="fwm-lcdt" aria-label="Position">
-          {SCENES[ws.scene]} {pos ?? '1.1.1'}
+          {rowName(ws.row)} {pos ?? '1.1.1'}
         </span>
         <span className="fwm-bpm">
           <button type="button" className="fwm-tb fwm-tb--sm" aria-label="Slower" onClick={() => project.setBpm(project.bpm - 1)}>−</button>
-          <span className="fwm-lcdt" aria-label="Tempo">{project.bpm} BPM</span>
+          <BpmField />
           <button type="button" className="fwm-tb fwm-tb--sm" aria-label="Faster" onClick={() => project.setBpm(project.bpm + 1)}>+</button>
         </span>
-        <span className="fwm-scenes" role="group" aria-label="Scene">
-          {SCENES.map((name, i) => (
-            <button key={name} type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.scene === i}
-              aria-label={`Scene ${name}`} onClick={() => setWs({ scene: i })}>
-              {name}
-            </button>
-          ))}
-        </span>
+        <label className="fwm-songkey" title="Song key, for every instrument: the Piano roll highlights it and can fold to it">
+          Key
+          <select value={project.key.root} aria-label="Key root note" disabled={project.key.scale === 'chromatic'}
+            onChange={(e) => { project.setKey({ root: Number(e.target.value) }); e.target.blur(); }}>
+            {NOTE_NAMES.map((n, i) => <option key={n} value={i}>{n}</option>)}
+          </select>
+          <select value={project.key.scale} aria-label="Scale"
+            onChange={(e) => { project.setKey({ scale: e.target.value }); e.target.blur(); }}>
+            {Object.entries(SCALES).map(([id, s]) => <option key={id} value={id}>{s.label}</option>)}
+          </select>
+        </label>
       </div>
       <div className="fwm-grp">
         <button type="button" className="fwm-ib" aria-label="Undo (your changes)" title="Undo your own last change (Ctrl+Z)"
@@ -68,7 +73,7 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
             <span className="fwm-av" style={{ background: p.user.color }}>{p.user.name[0]}</span>
             <span>
               {p.user.name}
-              {trackName(p.track) ? ` · ${trackName(p.track)} ${SCENES[p.scene] ?? ''}` : ''}
+              {trackName(p.track) ? ` · ${trackName(p.track)} ${rowName(p.row)}` : ''}
               {p.touch && project.track(p.touch.track) && !p.touch.control.startsWith('note:') ? ` · ${p.touch.control}` : ''}
             </span>
           </span>
@@ -83,5 +88,35 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
         {status === 'on' ? 'Sound: on' : status === 'loading' ? 'Sound: loading…' : status === 'error' ? 'Sound: failed' : 'Sound: off'}
       </button>
     </div>
+  );
+}
+
+/** Tempo readout: click it and type a number (40–240), Enter to set, Escape to cancel. */
+function BpmField() {
+  const { project, toast } = useStudio();
+  const [draft, setDraft] = useState<string | null>(null);
+  if (draft == null)
+    return (
+      <button type="button" className="fwm-lcdt fwm-bpmbtn" aria-label={`Tempo ${project.bpm} BPM, click to type`} title="Click to type a tempo"
+        onClick={() => setDraft(String(project.bpm))}>
+        {project.bpm} BPM
+      </button>
+    );
+  const done = (ok: boolean) => {
+    const v = Math.round(Number(draft));
+    if (ok && Number.isFinite(v) && v >= 40 && v <= 240) project.setBpm(v);
+    else if (ok && draft.trim() && draft !== String(project.bpm)) toast('Tempo is 40 to 240 BPM');
+    setDraft(null);
+  };
+  return (
+    <input className="fwm-lcdt fwm-bpmin" aria-label="Tempo in BPM" inputMode="numeric" autoFocus value={draft}
+      onFocus={(e) => e.currentTarget.select()}
+      onChange={(e) => setDraft(e.target.value.replace(/[^0-9]/g, '').slice(0, 3))}
+      onBlur={() => done(true)}
+      onKeyDown={(e) => {
+        e.stopPropagation();
+        if (e.key === 'Enter') done(true);
+        else if (e.key === 'Escape') setDraft(null);
+      }} />
   );
 }

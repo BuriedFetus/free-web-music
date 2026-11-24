@@ -10,7 +10,7 @@ const fromB64 = (s: string) => Uint8Array.from(atob(s), (c) => c.charCodeAt(0));
 
 export function connectTabs(room: string) {
   const doc = new Y.Doc();
-  const storeKey = `fwm.harness.${room}`;
+  const storeKey = `fwm.harness.v2.${room}`; // v2: per-instrument patterns + song rows (older saves are left behind)
   try {
     const saved = localStorage.getItem(storeKey);
     if (saved) Y.applyUpdate(doc, fromB64(saved), 'storage');

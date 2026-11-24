@@ -1,128 +1,158 @@
-// Main sequencer: one row per track, all following the same clock. Length, direction and rate are
-// per track, so a 12-step ping-pong line can run against a 16-step one.
+// Main sequencer = the song arrangement. Instruments across the top, song rows (TRACK 1, TRACK 2…)
+// down the side; each cell picks the pattern that instrument plays in that row. A row lasts as long as
+// its longest pattern; shorter ones repeat inside it. Click a cell to edit its pattern in the Piano roll.
 import { useState } from 'react';
-import type { Direction } from '@fwm/engine';
 import type { Peer } from '../../collab/presence';
-import { deviceEntry } from '../../devices/registry';
-import { SCENES, STEPS, type TrackInfo } from '../../model/project';
+import { deviceEntry, LIBRARY } from '../../devices/registry';
+import { BAR, type SongRow, type TrackInfo } from '../../model/project';
 import { useStudio } from '../context';
 import { usePlayStep } from './common';
 import { TrackNameInput } from './TrackName';
 
-const DIRS: [Direction, string, string][] = [['fwd', '→', 'Forward'], ['rev', '←', 'Reverse'], ['pp', '↔', 'Ping-pong'], ['rnd', '?', 'Random']];
-const RATES: [number, string][] = [[0.5, '½×'], [1, '1×'], [2, '2×']];
+/** "2 bars", "12 steps", "1 bar 4 steps". */
+export function lenLabel(n: number): string {
+  const b = Math.floor(n / BAR);
+  const r = n % BAR;
+  return [b ? `${b} bar${b > 1 ? 's' : ''}` : '', r ? `${r} step${r > 1 ? 's' : ''}` : ''].filter(Boolean).join(' ');
+}
 
 export function SeqView({ peers }: { peers: Peer[] }) {
-  const { project, ws } = useStudio();
+  const st = useStudio();
+  const { project, ws, setWs, toast } = st;
   const tracks = project.tracks();
+  const rows = project.rows();
+  const basalt = LIBRARY.find((d) => d.id === 'basalt');
+  const addInstrument = () => {
+    if (!basalt?.manifest) return;
+    const id = project.addTrack(basalt.manifest, basalt.presets?.[0], 0, ws.row);
+    setWs({ track: id });
+    toast(`${project.track(id)?.name} added, playing P1 in this TRACK`);
+  };
+  const cols = { '--n': tracks.length } as React.CSSProperties;
+
   return (
     <div className="fwm-sq">
       <div className="fwm-sqh">
-        <span>Clock: internal</span>
-        <span className="fwm-lcdt">{project.bpm} BPM</span>
         <label>
           Swing{' '}
           <input type="range" min={0} max={60} value={Math.round(project.swing * 100)} aria-label="Swing"
             onChange={(e) => project.setSwing(Number(e.target.value) / 100)} />
         </label>
         <span>{Math.round(project.swing * 100)}%</span>
-        <span>Scene {SCENES[ws.scene]}</span>
+        <span className="fwm-sqtip">Click a cell to edit its pattern in the Piano roll. A TRACK lasts as long as its longest pattern.</span>
       </div>
-      {tracks.length === 0 && <p className="fwm-empty">No tracks yet. Open the Library and add Basalt.</p>}
-      {tracks.map((t) => (
-        <SeqRow key={t.id} track={t} peers={peers.filter((p) => p.track === t.id)} />
-      ))}
-      <p className="fwm-sqnote">
-        Every track follows this clock. Click a step to switch a note on or off (a lit step held over by a long note ends that note there); ✎ or
-        double-click a name to rename the track. Open the Piano roll for pitch, length and
-        micro-timing. "Own seq" lets a device run its built-in sequencer (Cobalt's arpeggiator, coming in Phase 5).
-      </p>
+      {tracks.length === 0 && <p className="fwm-empty">No instruments yet. Add Basalt from the Library, or with + Instrument.</p>}
+      <div className="fwm-arrw">
+        <div className="fwm-arr">
+          <div className="fwm-arow" style={cols}>
+            <span />
+            {tracks.map((t) => <InstrumentHead key={t.id} track={t} peers={peers.filter((p) => p.track === t.id)} />)}
+            <button type="button" className="fwm-addi" onClick={addInstrument} title="Add a Basalt to the song (more instruments in the Library later)">
+              + Instrument
+            </button>
+          </div>
+          {rows.map((r, i) => (
+            <Row key={r.id} row={r} index={i} tracks={tracks} peers={peers.filter((p) => p.row === r.id)} canDelete={rows.length > 1} />
+          ))}
+          <button type="button" className="fwm-tb fwm-tb--xs fwm-addt"
+            onClick={() => setWs({ row: project.addRow() })}>+ Add TRACK</button>
+        </div>
+      </div>
     </div>
   );
 }
 
-function SeqRow({ track: t, peers }: { track: TrackInfo; peers: Peer[] }) {
-  const { project, ws, setWs, slotOf, toast } = useStudio();
-  const entry = deviceEntry(t.device);
-  const notes = project.notes(t.id, ws.scene);
-  const step = usePlayStep(slotOf(t.id));
-  const q = t.seq;
-  const hasOwnSeq = false; // no device with a built-in sequencer yet
+function InstrumentHead({ track: t, peers }: { track: TrackInfo; peers: Peer[] }) {
+  const { project, ws, setWs, toast } = useStudio();
   const [renaming, setRenaming] = useState(false);
-  // A note lights the step it starts on and, dimmer, every step it is held over.
-  const startsAt = (i: number) => notes.filter(([, n]) => Math.floor(n.s) === i);
-  const holdsOver = (i: number) => notes.filter(([, n]) => Math.floor(n.s) < i && n.s + n.l > i + 1e-6);
-  const toggle = (i: number) => {
-    project.undoManager.stopCapturing();
-    const here = startsAt(i);
-    const held = holdsOver(i);
-    if (here.length) project.transact(() => here.forEach(([id]) => project.deleteNote(t.id, ws.scene, id)));
-    else if (held.length) {
-      // Clicking a held step ends the note there (the step goes dark), instead of stacking a new note on it.
-      project.transact(() => held.forEach(([id, n]) => project.updateNote(t.id, ws.scene, id, { l: i - n.s })));
-    } else {
-      const last = notes.filter(([, n]) => n.s < i).pop()?.[1] ?? notes[0]?.[1];
-      project.addNote(t.id, ws.scene, { s: i, l: 1, m: last?.m ?? entry?.rootNote ?? 48, v: 0.85 });
-    }
-  };
+  const entry = deviceEntry(t.device);
   return (
-    <div className={'fwm-sqr' + (t.id === ws.track ? ' is-sel' : '')}>
-      <span className="fwm-sqname">
-        {renaming ? (
-          <TrackNameInput track={t.id} name={t.name} autoFocus onDone={() => setRenaming(false)} className="fwm-thumb fwm-thumb--sm" />
-        ) : (
-          <button type="button" className="fwm-thumb fwm-thumb--sm" data-device={t.device} onClick={() => setWs({ track: t.id })}
-            onDoubleClick={() => setRenaming(true)} aria-label={`Select ${t.name}`} aria-pressed={t.id === ws.track}>
-            {t.name.toUpperCase()}
-            {peers.map((p) => (
-              <span key={p.clientId} className="fwm-av fwm-av--xs" style={{ background: p.user.color }} title={p.user.name}>{p.user.name[0]}</span>
-            ))}
-          </button>
-        )}
-        {!renaming && (
-          <button type="button" className="fwm-tb fwm-tb--xs fwm-rename" aria-label={`Rename ${t.name}`} title="Rename"
-            onClick={() => setRenaming(true)}>✎</button>
-        )}
-      </span>
-      <div className={'fwm-lane16' + (q.own ? ' is-own' : '')}>
-        {Array.from({ length: STEPS }, (_, i) => (
-          <button key={i} type="button" aria-label={`${t.name} step ${i + 1}`}
-            aria-pressed={startsAt(i).length > 0}
-            className={'fwm-c' + (i >= q.len ? ' is-off' : '') + (step === i ? ' is-now' : '') + (!startsAt(i).length && holdsOver(i).length ? ' is-held' : '')}
-            onClick={() => toggle(i)} />
-        ))}
-      </div>
-      <div className="fwm-sqc">
-        <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Shorter" onClick={() => project.setSeq(t.id, { len: q.len - 1 })}>−</button>
-        <span className="fwm-lcdt fwm-lcdt--sm" title="Track length in steps">{q.len}</span>
-        <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Longer" onClick={() => project.setSeq(t.id, { len: q.len + 1 })}>+</button>
-        <span className="fwm-grp">
-          {DIRS.map(([d, icon, label]) => (
-            <button key={d} type="button" className="fwm-tb fwm-tb--xs" aria-pressed={q.dir === d} aria-label={label} title={label}
-              onClick={() => project.setSeq(t.id, { dir: d })}>{icon}</button>
+    <div className="fwm-ihead">
+      {renaming ? (
+        <TrackNameInput track={t.id} name={t.name} autoFocus onDone={() => setRenaming(false)} className="fwm-thumb fwm-ithumb" />
+      ) : (
+        <button type="button" className={'fwm-thumb fwm-ithumb' + (t.id === ws.track ? ' is-on' : '')} data-device={t.device}
+          onClick={() => setWs({ track: t.id })} onDoubleClick={() => setRenaming(true)}
+          aria-label={`Select ${t.name}`} aria-pressed={t.id === ws.track}>
+          <span className="fwm-ithumb__name">{t.name}</span>
+          <small>{entry?.name}</small>
+          {peers.map((p) => (
+            <span key={p.clientId} className="fwm-av fwm-av--xs" style={{ background: p.user.color }} title={p.user.name}>{p.user.name[0]}</span>
           ))}
-        </span>
-        <span className="fwm-grp">
-          {RATES.map(([r, label]) => (
-            <button key={r} type="button" className="fwm-tb fwm-tb--xs" aria-pressed={q.rate === r} aria-label={`Rate ${label}`}
-              onClick={() => project.setSeq(t.id, { rate: r })}>{label}</button>
-          ))}
-        </span>
-        <button type="button" className="fwm-tb fwm-tb--xs" aria-pressed={q.mute} onClick={() => project.setSeq(t.id, { mute: !q.mute })}>Mute</button>
-        <button type="button" className="fwm-tb fwm-tb--xs" aria-label={`Clear ${t.name} pattern in scene ${SCENES[ws.scene]}`}
-          onClick={() => {
-            project.clearPattern(t.id, ws.scene);
-            toast(`Cleared ${t.name}, scene ${SCENES[ws.scene]}`, { label: 'Undo', run: () => project.undo() });
-          }}>Clear</button>
-        <button type="button" className="fwm-tb fwm-tb--xs" aria-pressed={q.own} disabled={!hasOwnSeq}
-          title={hasOwnSeq ? 'Let the device run its own built-in sequencer, synced to this clock' : `${entry?.name} has no built-in sequencer`}
-          onClick={() => project.setSeq(t.id, { own: !q.own })}>Own seq</button>
-        <button type="button" className="fwm-tb fwm-tb--xs" aria-label={`Remove ${t.name}`}
+        </button>
+      )}
+      <span className="fwm-ihead__btns">
+        <button type="button" className="fwm-tb fwm-tb--xs" aria-label={`Rename ${t.name}`} title="Rename" onClick={() => setRenaming(true)}>✎</button>
+        <button type="button" className="fwm-tb fwm-tb--xs" aria-pressed={t.seq.mute} aria-label={`Mute ${t.name}`}
+          onClick={() => project.setSeq(t.id, { mute: !t.seq.mute })}>Mute</button>
+        <button type="button" className="fwm-tb fwm-tb--xs" aria-label={`Remove ${t.name}`} title="Remove this instrument"
           onClick={() => {
             project.removeTrack(t.id);
             toast(`Removed ${t.name}`, { label: 'Undo', run: () => project.undo() });
           }}>×</button>
-      </div>
+      </span>
     </div>
   );
+}
+
+function Row({ row, index, tracks, peers, canDelete }: { row: SongRow; index: number; tracks: TrackInfo[]; peers: Peer[]; canDelete: boolean }) {
+  const { project, ws, setWs, playing, toast } = useStudio();
+  const len = project.rowLen(row.id);
+  const longest = tracks.find((t) => project.patternInfo(t.id, row.cells[t.id])?.len === len && row.cells[t.id]);
+  const sel = row.id === ws.row;
+  const name = `TRACK ${index + 1}`;
+  return (
+    <div className={'fwm-arow' + (sel ? ' is-sel' : '') + (sel && playing ? ' is-now' : '')} style={{ '--n': tracks.length } as React.CSSProperties}>
+      <button type="button" className="fwm-tl" aria-pressed={sel} aria-label={`${name}, ${lenLabel(len)}`}
+        title={sel ? `${name} is selected: it loops while playing` : `Select ${name}`} onClick={() => setWs({ row: row.id })}>
+        <b>{name}</b>
+        <small>{lenLabel(len)}{longest ? ` · ${longest.name}` : ''}</small>
+        {peers.map((p) => (
+          <span key={p.clientId} className="fwm-av fwm-av--xs" style={{ background: p.user.color }} title={p.user.name}>{p.user.name[0]}</span>
+        ))}
+      </button>
+      {tracks.map((t) => <Cell key={t.id} row={row.id} rowName={name} rowLen={len} track={t} />)}
+      <span className="fwm-ra">
+        <button type="button" className="fwm-tb fwm-tb--xs" aria-label={`Duplicate ${name}`} title={`Duplicate ${name}`}
+          onClick={() => setWs({ row: project.addRow(row.id, true) })}>⧉</button>
+        <button type="button" className="fwm-tb fwm-tb--xs" aria-label={`Delete ${name}`} title={`Delete ${name}`} disabled={!canDelete}
+          onClick={() => {
+            project.removeRow(row.id);
+            toast(`Deleted ${name}`, { label: 'Undo', run: () => project.undo() });
+          }}>×</button>
+      </span>
+    </div>
+  );
+}
+
+function Cell({ row, rowName, rowLen, track: t }: { row: string; rowName: string; rowLen: number; track: TrackInfo }) {
+  const { project, ws, setWs, playing, slotOf } = useStudio();
+  const info = project.patternInfo(t.id, project.cell(row, t.id));
+  const on = row === ws.row && t.id === ws.track;
+  const select = () => setWs({ row, track: t.id });
+  if (!info)
+    return (
+      <button type="button" className={'fwm-cell' + (on ? ' is-on' : '')} onClick={select} aria-label={`${rowName}, ${t.name}: silent`}>
+        <span className="fwm-cell__empty">—</span>
+      </button>
+    );
+  const reps = rowLen / info.len;
+  const idx = project.patternList(t.id).findIndex((p) => p.id === info.id);
+  return (
+    <button type="button" className={'fwm-cell has' + (on ? ' is-on' : '')} onClick={select}
+      style={{ '--k': idx % 4, '--tw': `${(info.len / rowLen) * 100}%` } as React.CSSProperties}
+      aria-label={`${rowName}, ${t.name}: ${info.name}`}>
+      <b>{info.name}</b>
+      <small>{lenLabel(info.len)}</small>
+      {reps > 1 && <span className="fwm-cell__rep">×{Number.isInteger(reps) ? reps : reps.toFixed(1)}</span>}
+      <span className="fwm-cell__ticks" />
+      {playing && row === ws.row && <CellProgress slot={slotOf(t.id)} len={info.len} />}
+    </button>
+  );
+}
+
+/** How far the pattern has played in its current repeat (only the playing cells subscribe to the clock). */
+function CellProgress({ slot, len }: { slot: number | undefined; len: number }) {
+  const step = usePlayStep(slot);
+  return <span className="fwm-cell__pr" style={{ width: step < 0 ? 0 : `${((step + 1) / len) * 100}%` }} />;
 }

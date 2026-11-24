@@ -2,7 +2,6 @@
 // (saved in their browser), so rearranging never changes anyone else's screen.
 import { useCallback, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import type { Peer } from '../collab/presence';
-import { SCENES } from '../model/project';
 import { useStudio } from './context';
 import { DeviceView } from './views/DeviceView';
 import { LibraryView } from './views/LibraryView';
@@ -104,14 +103,13 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
 }
 
 function PaneContext({ view }: { view: ViewId }) {
-  const { project, ws } = useStudio();
-  const t = ws.track ? project.track(ws.track) : null;
+  const { project } = useStudio();
+  const n = project.trackIds().length;
+  const r = project.rows().length;
   const text =
-    view === 'roll' || view === 'device'
-      ? t ? `${t.name} · scene ${SCENES[ws.scene]}` : 'No track yet'
-      : view === 'seq'
-        ? `${project.trackIds().length} tracks · scene ${SCENES[ws.scene]}`
-        : 'Bring a device in to make a track';
+    view === 'seq'
+      ? `${n} instrument${n === 1 ? '' : 's'} · ${r} TRACK${r === 1 ? '' : 's'}`
+      : 'Bring a device in to add an instrument';
   return <span className="fwm-ctx">{text}</span>;
 }
 

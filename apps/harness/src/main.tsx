@@ -41,12 +41,21 @@ function seed() {
   const p = new Project(session.doc, { seed: true });
   if (p.trackIds().length) return;
   const m = basaltManifest as DeviceManifest;
+  // A small song: TRACK 1 plays the bass line "Groove", TRACK 2 a slower 2-bar "Drift".
   const id = p.addTrack(m, BASALT_PRESETS[0], 0);
+  const groove = p.patternList(id)[0].id;
+  p.renamePattern(id, groove, 'Groove');
   const line: [number, number, number, number][] = [[0, 2, 36, 0.9], [3, 1, 36, 0.6], [6, 2, 39, 0.8], [8, 1, 36, 0.9], [10, 1, 31, 0.7], [11, 1, 34, 0.7], [12, 3, 36, 1]];
-  for (const [s, l, n, v] of line) p.addNote(id, 0, { s, l, m: n, v });
-  for (const [s, l, n, v] of [[0, 6, 36, 0.8], [8, 6, 31, 0.7]] as const) p.addNote(id, 1, { s, l, m: n, v });
+  for (const [s, l, n, v] of line) p.addNote(id, groove, { s, l, m: n, v });
+  const drift = p.addPattern(id)!;
+  p.renamePattern(id, drift, 'Drift');
+  p.setPatternLen(id, drift, 32);
+  for (const [s, l, n, v] of [[0, 6, 36, 0.8], [8, 6, 31, 0.7], [16, 6, 34, 0.8], [24, 8, 29, 0.7]] as const) p.addNote(id, drift, { s, l, m: n, v });
+  const r2 = p.addRow();
+  p.setCell(r2, id, drift);
   // ?seednow=3: extra copies, to see several tracks at once.
   for (let i = 1; i < Number(params.get('seednow') || 1); i++) p.addTrack(m, BASALT_PRESETS[i % BASALT_PRESETS.length], 0);
+  p.undoManager.clear(); // the demo is not something you can undo
   // ?key=0,minor: start with a song key set (the demo line is in C minor).
   const k = params.get('key')?.split(',');
   if (k) p.setKey({ root: Number(k[0]), scale: k[1] });

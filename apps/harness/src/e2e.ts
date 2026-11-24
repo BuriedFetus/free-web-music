@@ -31,7 +31,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
     if (role === 'a') {
       if (!p.trackIds().length) {
         const id = p.addTrack(m, undefined, 0);
-        for (const st of [0, 4, 8, 12]) p.addNote(id, 0, { s: st, l: 1, m: 36, v: 0.9 });
+        for (const st of [0, 4, 8, 12]) p.addNote(id, p.patternList(id)[0].id, { s: st, l: 1, m: 36, v: 0.9 });
       }
       const id = p.trackIds()[0];
       btn('Sound')!.click();
@@ -52,7 +52,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
       btn('■ Stop')!.click();
       // Shared edits + presence for B to observe.
       p.deviceStore(id, m)!.setParam('cut', 0.91);
-      p.addNote(id, 0, { s: 5.5, l: 0.5, m: 43, v: 0.7 });
+      p.addNote(id, p.patternList(id)[0].id, { s: 5.5, l: 0.5, m: 43, v: 0.7 });
       const knob = $('[role=slider][aria-label="Cutoff"]')!;
       knob.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientY: 100, pointerId: 1 }));
       // Live key: hold "a" (plays on B's copy of Basalt too).
@@ -67,7 +67,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
       const store = () => p.deviceStore(id, m)!;
       await until('A turned Cutoff', () => store().getState().params.cut === 0.91);
       ok(true, 'sees Cutoff turned by A (0.91)');
-      await until("A's note", () => p.notes(id, 0).some(([, n]) => n.m === 43 && n.s === 5.5));
+      await until("A's note", () => p.notes(id, p.patternList(id)[0].id).some(([, n]) => n.m === 43 && n.s === 5.5));
       ok(true, "sees A's new note with micro-timing (s = 5.5)");
       await until('peer ring on Cutoff', () => !!$('.fwm-knob.is-peer'));
       ok(!!$('.fwm-knob.is-peer .fwm-knob__tag'), `sees A's presence on the Cutoff knob ("${$('.fwm-knob__tag')?.textContent}")`);
@@ -115,7 +115,7 @@ async function runMulti(p: Project, engineRef: { current: Engine | null }, ok: (
   try {
     await sleep(300);
     const a = p.addTrack(m, undefined, 0);
-    for (const st of [0, 4, 8, 12]) p.addNote(a, 0, { s: st, l: 1, m: 36, v: 0.9 });
+    for (const st of [0, 4, 8, 12]) p.addNote(a, p.patternList(a)[0].id, { s: st, l: 1, m: 36, v: 0.9 });
     btn('Sound')!.click();
     await until('engine', () => !!engineRef.current?.last);
     btn('▶ Play')!.click();
@@ -129,7 +129,7 @@ async function runMulti(p: Project, engineRef: { current: Engine | null }, ok: (
     ok(Object.keys(w.env).length === 2, `engine has two devices (${Object.keys(w.env).join(',')})`);
     ok(vals()[0] > 0.1, `track 1 still plays after adding track 2 (${fmt(w)})`);
     const b = p.trackIds()[1];
-    for (const st of [2, 6, 10, 14]) p.addNote(b, 0, { s: st, l: 1, m: 48, v: 0.9 });
+    for (const st of [2, 6, 10, 14]) p.addNote(b, p.patternList(b)[0].id, { s: st, l: 1, m: 48, v: 0.9 });
     w = await watch(1500);
     ok(vals().length === 2 && vals().every((v) => v > 0.1), `both tracks play their patterns (${fmt(w)})`);
     btn('■ Stop')!.click();
@@ -166,7 +166,7 @@ async function runSwitch(p: Project, engineRef: { current: Engine | null }, ok: 
     await sleep(300);
     for (let i = 0; i < 3; i++) {
       const id = p.addTrack(m, undefined, 0);
-      for (const st of [0, 4, 8, 12]) p.addNote(id, 0, { s: st + i, l: 1, m: 36 + i * 7, v: 0.9 });
+      for (const st of [0, 4, 8, 12]) p.addNote(id, p.patternList(id)[0].id, { s: st + i, l: 1, m: 36 + i * 7, v: 0.9 });
     }
     await sleep(200);
     const names = p.tracks().map((t) => t.name);
@@ -197,10 +197,10 @@ async function runSwitch(p: Project, engineRef: { current: Engine | null }, ok: 
     await cycle('recording', 10, 50);
     btn('● Rec')!.click();
     ok(alive() && errs.length === 0, `switch while recording (${errs.join(' | ')})`);
-    // Switch on the piano-roll/device tabs too, and from scene B.
-    btn('B')?.click();
+    // Switch on the piano-roll/device tabs too, and on a second TRACK.
+    btn('+ Add TRACK')?.click();
     for (const t of [...document.querySelectorAll<HTMLButtonElement>('.fwm-ttab')].slice(0, 6)) { t.click(); await sleep(40); }
-    ok(alive() && errs.length === 0, `switch via tabs in scene B (${errs.join(' | ')})`);
+    ok(alive() && errs.length === 0, `switch via tabs on TRACK 2 (${errs.join(' | ')})`);
     const env: Record<string, number> = {};
     const t0 = performance.now();
     while (performance.now() - t0 < 1500) {
@@ -222,16 +222,15 @@ async function runSwitch(p: Project, engineRef: { current: Engine | null }, ok: 
     const env0 = engineRef.current!.last!.devices[0].mods[1];
     ok(env0 < 0.05, `no stuck note on the track you left (amp env ${env0.toFixed(3)})`);
     // Space with a step button focused: plays, and does not toggle the step.
-    const stepBtn = $(`[aria-label="${names[1]} step 2"]`) as HTMLButtonElement;
-    stepBtn.click();
-    const before = p.notes(p.trackIds()[1], 1).length;
+    const stepBtn = $(`[aria-label="Mute ${names[1]}"]`) as HTMLButtonElement;
+    const before = p.track(p.trackIds()[1])!.seq.mute;
     stepBtn.focus();
     stepBtn.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', bubbles: true, cancelable: true }));
     const up = new KeyboardEvent('keyup', { key: ' ', code: 'Space', bubbles: true, cancelable: true });
     stepBtn.dispatchEvent(up);
     await until('Space plays', () => !!engineRef.current?.last?.transport.playing, 2000);
     ok(true, 'Space plays while a step button has focus');
-    ok(up.defaultPrevented && p.notes(p.trackIds()[1], 1).length === before, 'Space does not press the focused button');
+    ok(up.defaultPrevented && p.track(p.trackIds()[1])!.seq.mute === before, 'Space does not press the focused button (Mute)');
     btn('■ Stop')?.click();
   } catch (e) {
     out.push(`FAIL switch: ${String(e)} | ${errs.join(' | ')}`);
@@ -270,7 +269,7 @@ async function runRoll(p: Project, engineRef: { current: Engine | null }, ok: (c
     ptr('pointermove', x, y);
     ptr('pointerup', x, y, 0);
     await sleep(100);
-    const ns = () => p.notes(id, 0).map(([, n]) => n);
+    const ns = () => p.notes(id, p.patternList(id)[0].id).map(([, n]) => n);
     ok(ns().length === 1 && ns()[0].l === 16, `draw one 16-step note (${JSON.stringify(ns())})`);
     // Press and hold in the middle of it, drag up two semitones: it moves, no new note.
     [x, y] = at(8, 36);
@@ -282,7 +281,7 @@ async function runRoll(p: Project, engineRef: { current: Engine | null }, ok: (c
     ok(ns().length === 1, `holding the note grabs it (hit ${hit.className}; notes ${JSON.stringify(ns())})`);
     ok(ns()[0]?.m === 38, `dragging moves it up (pitch ${ns()[0]?.m})`);
     // From an empty spot, draw a note across an existing one on the same pitch: no stacked notes.
-    p.addNote(id, 0, { s: 8, l: 1, m: 41, v: 0.8 });
+    p.addNote(id, p.patternList(id)[0].id, { s: 8, l: 1, m: 41, v: 0.8 });
     await sleep(100);
     [x, y] = at(2.5, 41);
     ptr('pointerdown', x, y);

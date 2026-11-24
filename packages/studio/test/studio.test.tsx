@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import * as Y from 'yjs';
 import { Project, Studio } from '../src';
 
@@ -15,15 +15,13 @@ function mount() {
 }
 
 describe('<Studio>', () => {
-  it('adds a track from the library, steps notes in the main sequencer, removes it with undo', () => {
+  it('adds an instrument from the library: it plays P1 in TRACK 1; remove it with undo', () => {
     const p = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
     expect(p.tracks().map((t) => t.name)).toEqual(['Basalt']);
     const id = p.trackIds()[0];
-    fireEvent.click(screen.getByRole('button', { name: 'Basalt step 5' }));
-    expect(p.notes(id, 0).map(([, n]) => n.s)).toEqual([4]);
-    fireEvent.click(screen.getByRole('button', { name: 'Basalt step 5' }));
-    expect(p.notes(id, 0)).toHaveLength(0);
+    expect(screen.getByRole('button', { name: 'TRACK 1, Basalt: P1' })).toBeTruthy();
+    expect(p.cell(p.rows()[0].id, id)).toBe(p.patternList(id)[0].id);
     fireEvent.click(screen.getByRole('button', { name: 'Ping-pong' }));
     expect(p.track(id)!.seq.dir).toBe('pp');
     fireEvent.click(screen.getByRole('button', { name: 'Remove Basalt' }));
@@ -32,18 +30,48 @@ describe('<Studio>', () => {
     expect(p.tracks()).toHaveLength(1);
   });
 
-  it('scenes keep separate patterns and the device shows the selected track', () => {
+  it('arrangement: add a TRACK, give an instrument a new pattern there, name and size it in the Piano roll', () => {
     const p = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
     fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
-    expect(p.tracks().map((t) => t.name)).toEqual(['Basalt', 'Basalt 2']);
-    fireEvent.click(screen.getByRole('button', { name: 'Scene B' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Basalt 2 step 1' }));
-    const id2 = p.trackIds()[1];
-    expect(p.notes(id2, 1)).toHaveLength(1);
-    expect(p.notes(id2, 0)).toHaveLength(0);
-    fireEvent.click(screen.getByRole('button', { name: 'Select Basalt 2' }));
-    expect(screen.getByText(/Mono bass synth · Basalt 2/)).toBeTruthy();
+    const [a, b] = p.trackIds();
+    fireEvent.click(screen.getByRole('button', { name: '+ Add TRACK' }));
+    const r2 = p.rows()[1].id;
+    fireEvent.click(screen.getByRole('button', { name: 'TRACK 2, Basalt: silent' }));
+    const roll = screen.getByRole('region', { name: 'Piano roll' });
+    expect(within(roll).getByText(/Basalt is silent in TRACK 2/)).toBeTruthy();
+    fireEvent.click(within(roll).getByRole('button', { name: '+ New' }));
+    expect(p.patternInfo(a, p.cell(r2, a))!.name).toBe('P2');
+    const name = within(roll).getByRole('textbox', { name: 'Rename pattern P2' });
+    fireEvent.focus(name);
+    fireEvent.change(name, { target: { value: 'Drop' } });
+    fireEvent.blur(name);
+    fireEvent.click(within(roll).getByRole('button', { name: '2 bars' }));
+    expect(p.patternInfo(a, p.cell(r2, a))).toMatchObject({ name: 'Drop', len: 32 });
+    expect(screen.getByRole('button', { name: 'TRACK 2, Basalt: Drop' })).toBeTruthy();
+    expect(screen.getByRole('button', { name: 'TRACK 2, 2 bars' })).toBeTruthy();
+    // Basalt 2 is silent in TRACK 2 until a pattern is picked for it; patterns are per instrument.
+    expect(p.cell(r2, b)).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'TRACK 2, Basalt 2: silent' }));
+    expect(within(roll).queryByRole('button', { name: 'Drop' })).toBeNull();
+    fireEvent.click(within(roll).getByRole('button', { name: 'P1' }));
+    expect(p.cell(r2, b)).toBe(p.patternList(b)[0].id);
+    // Duplicate TRACK 2 → TRACK 3 plays the same patterns.
+    fireEvent.click(screen.getByRole('button', { name: 'Duplicate TRACK 2' }));
+    expect(p.rows()[2].cells).toEqual(p.rows()[1].cells);
+  });
+
+  it('BPM: click and type', () => {
+    const p = mount();
+    fireEvent.click(screen.getByRole('button', { name: /Tempo 120 BPM/ }));
+    const input = screen.getByRole('textbox', { name: 'Tempo in BPM' });
+    fireEvent.change(input, { target: { value: '96' } });
+    fireEvent.keyDown(input, { key: 'Enter' });
+    expect(p.bpm).toBe(96);
+    fireEvent.click(screen.getByRole('button', { name: /Tempo 96 BPM/ }));
+    fireEvent.change(screen.getByRole('textbox', { name: 'Tempo in BPM' }), { target: { value: '999' } });
+    fireEvent.keyDown(screen.getByRole('textbox', { name: 'Tempo in BPM' }), { key: 'Enter' });
+    expect(p.bpm).toBe(96); // out of range: ignored
   });
 
   it('the Device panel has a tab per track to switch which one you edit', () => {
@@ -64,16 +92,6 @@ describe('<Studio>', () => {
     fireEvent.change(sel, { target: { value: 'seq' } });
     expect(JSON.parse(localStorage.getItem('fwm.layout.u1')!).views[3]).toBe('seq');
     expect(JSON.stringify(p.doc.toJSON())).not.toContain('layout');
-  });
-
-  it('a long note lights the steps it holds; clicking a held step ends it there instead of stacking a note', () => {
-    const p = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
-    const id = p.trackIds()[0];
-    act(() => { p.addNote(id, 0, { s: 0, l: 16, m: 36, v: 0.8 }); });
-    expect(screen.getByRole('button', { name: 'Basalt step 6' }).className).toContain('is-held');
-    fireEvent.click(screen.getByRole('button', { name: 'Basalt step 6' }));
-    expect(p.notes(id, 0).map(([, n]) => [n.s, n.l])).toEqual([[0, 5]]);
   });
 
   it('rename a track from the sequencer (✎) or the Device panel', () => {
@@ -102,8 +120,8 @@ describe('<Studio>', () => {
     const rows = () => roll.querySelectorAll('.fwm-gr').length;
     const all = rows();
     expect((within(roll).getByRole('button', { name: 'Fold to key' }) as HTMLButtonElement).disabled).toBe(true);
-    fireEvent.change(within(roll).getByRole('combobox', { name: 'Scale' }), { target: { value: 'minor' } });
-    fireEvent.change(within(roll).getByRole('combobox', { name: 'Key root note' }), { target: { value: '2' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Scale' }), { target: { value: 'minor' } });
+    fireEvent.change(screen.getByRole('combobox', { name: 'Key root note' }), { target: { value: '2' } });
     expect(p.key).toEqual({ root: 2, scale: 'minor' });
     expect(roll.querySelectorAll('.fwm-gr.is-out').length).toBeGreaterThan(0);
     fireEvent.click(within(roll).getByRole('button', { name: 'Fold to key' }));

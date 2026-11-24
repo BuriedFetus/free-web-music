@@ -31,17 +31,18 @@ describe('Project (shared)', () => {
     const b = new Y.Doc();
     const you = new Project(a, {});
     const id = you.addTrack(m);
+    const P = you.patternList(id)[0].id;
     Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
     const mira = new Project(b, {});
     // offline at the same time
-    you.addNote(id, 0, { s: 0, l: 1, m: 36, v: 1 });
-    mira.addNote(id, 0, { s: 4, l: 1, m: 38, v: 1 });
+    you.addNote(id, P, { s: 0, l: 1, m: 36, v: 1 });
+    mira.addNote(id, P, { s: 4, l: 1, m: 38, v: 1 });
     you.deviceStore(id, m)!.setParam('res', 0.1);
     mira.deviceStore(id, m)!.setParam('cut', 0.2);
     Y.applyUpdate(b, Y.encodeStateAsUpdate(a));
     Y.applyUpdate(a, Y.encodeStateAsUpdate(b));
     for (const p of [you, mira]) {
-      expect(p.notes(id, 0).map(([, n]) => n.m)).toEqual([36, 38]);
+      expect(p.notes(id, P).map(([, n]) => n.m)).toEqual([36, 38]);
       expect(p.deviceStore(id, m)!.getState().params).toMatchObject({ res: 0.1, cut: 0.2 });
     }
   });
@@ -49,16 +50,17 @@ describe('Project (shared)', () => {
   it('undo only undoes your own changes', () => {
     const [you, mira] = pair();
     const id = you.addTrack(m);
+    const P = you.patternList(id)[0].id;
     you.undoManager.clear();
     you.deviceStore(id, m)!.setParam('cut', 0.8);
     you.undoManager.stopCapturing();
     mira.deviceStore(id, m)!.setParam('res', 0.2);
-    mira.addNote(id, 0, { s: 0, l: 1, m: 40, v: 1 });
+    mira.addNote(id, P, { s: 0, l: 1, m: 40, v: 1 });
     you.undo();
     const st = you.deviceStore(id, m)!.getState().params;
     expect(st.cut).toBe(m.params.find((p) => p.id === 'cut')!.default); // yours: undone
     expect(st.res).toBe(0.2); // Mira's: kept
-    expect(mira.notes(id, 0)).toHaveLength(1);
+    expect(mira.notes(id, P)).toHaveLength(1);
     you.redo();
     expect(mira.deviceStore(id, m)!.getState().params.cut).toBe(0.8);
   });
@@ -66,41 +68,47 @@ describe('Project (shared)', () => {
   it('clear pattern is undoable', () => {
     const [you] = pair();
     const id = you.addTrack(m);
-    you.addNote(id, 1, { s: 0, l: 1, m: 36, v: 1 });
-    you.setAutomation(id, 1, 'cut', 3, 0.7);
+    const P = you.patternList(id)[0].id;
+    you.addNote(id, P, { s: 0, l: 1, m: 36, v: 1 });
+    you.setAutomation(id, P, 'cut', 3, 0.7);
     you.undoManager.stopCapturing();
-    you.clearPattern(id, 1);
-    expect(you.notes(id, 1)).toHaveLength(0);
+    you.clearPattern(id, P);
+    expect(you.notes(id, P)).toHaveLength(0);
     you.undo();
-    expect(you.notes(id, 1)).toHaveLength(1);
-    expect(you.automation(id, 1, 'cut')[3]).toBe(0.7);
+    expect(you.notes(id, P)).toHaveLength(1);
+    expect(you.automation(id, P, 'cut')[3]).toBe(0.7);
   });
 
   it('notes keep micro-timing and are clamped to the pattern', () => {
     const [you] = pair();
     const id = you.addTrack(m);
-    const n = you.addNote(id, 0, { s: 3.37, l: 40, m: 200, v: 2 })!;
-    expect(you.notes(id, 0)[0][1]).toEqual({ s: 3.37, l: 12.63, m: 127, v: 1 });
-    you.quantize(id, 0, 0.25);
-    expect(you.notes(id, 0)[0][1].s).toBe(3.25);
-    you.deleteNote(id, 0, n);
-    expect(you.notes(id, 0)).toHaveLength(0);
+    const P = you.patternList(id)[0].id;
+    const n = you.addNote(id, P, { s: 3.37, l: 400, m: 200, v: 2 })!;
+    expect(you.notes(id, P)[0][1]).toEqual({ s: 3.37, l: 124.63, m: 127, v: 1 }); // 8 bars max
+    you.quantize(id, P, 0.25);
+    expect(you.notes(id, P)[0][1].s).toBe(3.25);
+    you.deleteNote(id, P, n);
+    expect(you.notes(id, P)).toHaveLength(0);
   });
 
   it('removing a track removes its patterns everywhere', () => {
     const [you, mira] = pair();
     const id = you.addTrack(m);
-    mira.addNote(id, 2, { s: 0, l: 1, m: 36, v: 1 });
+    const P = you.patternList(id)[0].id;
+    mira.addNote(id, P, { s: 0, l: 1, m: 36, v: 1 });
     mira.removeTrack(id);
     expect(you.tracks()).toEqual([]);
-    expect(you.notes(id, 2)).toEqual([]);
+    expect(you.notes(id, P)).toEqual([]);
   });
 
   it('per-track sequencer settings and transport are shared', () => {
     const [you, mira] = pair();
     const id = you.addTrack(m);
-    mira.setSeq(id, { len: 99, dir: 'pp', rate: 2 });
-    expect(you.track(id)!.seq).toMatchObject({ len: 16, dir: 'pp', rate: 2 });
+    const P = you.patternList(id)[0].id;
+    mira.setSeq(id, { dir: 'pp', rate: 2 });
+    expect(you.track(id)!.seq).toMatchObject({ dir: 'pp', rate: 2 });
+    mira.setPatternLen(id, P, 300);
+    expect(you.patternInfo(id, P)!.len).toBe(128);
     you.setBpm(132);
     mira.setSwing(0.9);
     expect([mira.bpm, you.swing]).toEqual([132, 0.6]);
@@ -111,15 +119,16 @@ describe('Project (undo of structure)', () => {
   it('undoing a track removal brings back a working track and device store', () => {
     const [you, mira] = pair();
     const id = you.addTrack(m);
+    const P = you.patternList(id)[0].id;
     you.deviceStore(id, m)!.setParam('cut', 0.77);
-    you.addNote(id, 0, { s: 2, l: 1, m: 40, v: 1 });
+    you.addNote(id, P, { s: 2, l: 1, m: 40, v: 1 });
     you.undoManager.stopCapturing();
     mira.deviceStore(id, m); // Mira has it cached
     you.removeTrack(id);
     you.undo();
     expect(mira.tracks().map((t) => t.id)).toEqual([id]);
     expect(mira.deviceStore(id, m)!.getState().params.cut).toBe(0.77);
-    expect(mira.notes(id, 0)).toHaveLength(1);
+    expect(mira.notes(id, P)).toHaveLength(1);
     mira.deviceStore(id, m)!.setParam('res', 0.3);
     expect(you.deviceStore(id, m)!.getState().params.res).toBe(0.3);
   });
@@ -127,27 +136,29 @@ describe('Project (undo of structure)', () => {
   it('notes on the same pitch never overlap: the note you edit wins', () => {
     const [you] = pair();
     const id = you.addTrack(m);
-    const long = you.addNote(id, 0, { s: 0, l: 16, m: 36, v: 0.8 })!;
-    const mid = you.addNote(id, 0, { s: 8, l: 2, m: 36, v: 0.8 })!;
-    you.addNote(id, 0, { s: 9, l: 1, m: 40, v: 0.8 }); // other pitch: untouched
-    you.resolveOverlaps(id, 0, mid);
-    const get = (k: string) => you.notes(id, 0).find(([n]) => n === k)?.[1];
+    const P = you.patternList(id)[0].id;
+    const long = you.addNote(id, P, { s: 0, l: 16, m: 36, v: 0.8 })!;
+    const mid = you.addNote(id, P, { s: 8, l: 2, m: 36, v: 0.8 })!;
+    you.addNote(id, P, { s: 9, l: 1, m: 40, v: 0.8 }); // other pitch: untouched
+    you.resolveOverlaps(id, P, mid);
+    const get = (k: string) => you.notes(id, P).find(([n]) => n === k)?.[1];
     expect(get(long)?.l).toBe(8); // cut short where the new note starts
-    expect(you.notes(id, 0)).toHaveLength(3);
+    expect(you.notes(id, P)).toHaveLength(3);
     // Drag the long one over the middle one: the middle one goes.
-    you.updateNote(id, 0, long, { l: 16 });
-    you.resolveOverlaps(id, 0, long);
+    you.updateNote(id, P, long, { l: 16 });
+    you.resolveOverlaps(id, P, long);
     expect(get(mid)).toBeUndefined();
-    expect(you.notes(id, 0).map(([, n]) => n.m)).toEqual([36, 40]);
+    expect(you.notes(id, P).map(([, n]) => n.m)).toEqual([36, 40]);
   });
 
   it('quantize never leaves stacked notes', () => {
     const [you] = pair();
     const id = you.addTrack(m);
-    you.addNote(id, 0, { s: 3.8, l: 1, m: 36, v: 0.8 });
-    you.addNote(id, 0, { s: 4.1, l: 1, m: 36, v: 0.8 });
-    you.quantize(id, 0, 1);
-    expect(you.notes(id, 0)).toHaveLength(1);
+    const P = you.patternList(id)[0].id;
+    you.addNote(id, P, { s: 3.8, l: 1, m: 36, v: 0.8 });
+    you.addNote(id, P, { s: 4.1, l: 1, m: 36, v: 0.8 });
+    you.quantize(id, P, 1);
+    expect(you.notes(id, P)).toHaveLength(1);
   });
 
   it('the song key and track names are shared; blank names are ignored', () => {
@@ -161,4 +172,59 @@ describe('Project (undo of structure)', () => {
     you.renameTrack(id, '   ');
     expect(mira.track(id)!.name).toBe('Bassline');
   });
+
+  it('patterns belong to an instrument: new, copy, rename, length', () => {
+    const [you, mira] = pair();
+    const a = you.addTrack(m);
+    const b = you.addTrack(m);
+    expect(you.patternList(a).map((p) => p.name)).toEqual(['P1']);
+    const a1 = you.patternList(a)[0].id;
+    you.addNote(a, a1, { s: 0, l: 2, m: 36, v: 1 });
+    you.renamePattern(a, a1, '  Verse ');
+    const copy = mira.addPattern(a, a1)!;
+    const p2 = mira.addPattern(a)!;
+    expect(you.patternList(a).map((p) => p.name)).toEqual(['Verse', 'Verse 2', 'P3']);
+    expect(you.notes(a, copy)).toHaveLength(1); // a copy has the notes…
+    you.addNote(a, copy, { s: 4, l: 1, m: 38, v: 1 });
+    expect(you.notes(a, a1)).toHaveLength(1); // …but is its own pattern
+    expect(you.notes(a, p2)).toHaveLength(0);
+    expect(you.patternList(b).map((p) => p.name)).toEqual(['P1']); // b has its own P1
+    you.renamePattern(a, a1, '   ');
+    expect(mira.patternInfo(a, a1)!.name).toBe('Verse');
+  });
+
+  it('song rows: each cell picks a pattern; a row lasts as long as its longest pattern', () => {
+    const [you, mira] = pair();
+    const bass = you.addTrack(m);
+    const lead = you.addTrack(m);
+    const [r1] = you.rows().map((r) => r.id);
+    expect(you.rows()).toHaveLength(1); // the first instrument made TRACK 1
+    expect(you.cell(r1, bass)).toBe(you.patternList(bass)[0].id);
+    expect(you.cell(r1, lead)).toBe(you.patternList(lead)[0].id);
+    expect(you.rowLen(r1)).toBe(16);
+    you.setPatternLen(lead, you.cell(r1, lead)!, 12);
+    expect(you.rowLen(r1)).toBe(16);
+    you.setPatternLen(bass, you.cell(r1, bass)!, 32);
+    expect(mira.rowLen(r1)).toBe(32);
+    const r2 = mira.addRow(r1, true); // duplicate
+    expect(you.rows().map((r) => r.id)).toEqual([r1, r2]);
+    expect(you.cell(r2, bass)).toBe(you.cell(r1, bass));
+    you.setCell(r2, bass, null);
+    expect(you.cell(r2, bass)).toBeNull();
+    expect(you.rowLen(r2)).toBe(12); // only the 12-step lead left
+    const r3 = you.addRow();
+    expect(you.rowLen(r3)).toBe(16); // empty row: one bar
+    // A new instrument goes into the row you are on.
+    const third = you.addTrack(m, undefined, 0, r3);
+    expect(you.cell(r3, third)).not.toBeNull();
+    expect(you.cell(r1, third)).toBeNull();
+    // Removing an instrument clears its cells; the last row can't be deleted.
+    you.removeTrack(bass);
+    expect(Object.keys(you.rows()[0].cells)).toEqual([lead]);
+    you.removeRow(r2);
+    you.removeRow(r3);
+    you.removeRow(r1);
+    expect(you.rows().map((r) => r.id)).toEqual([r1]);
+  });
 });
+

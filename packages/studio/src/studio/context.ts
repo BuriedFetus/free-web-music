@@ -7,8 +7,10 @@ export const QUANT: Record<string, number> = { '1/4': 4, '1/8': 2, '1/16': 1, '1
 
 /** Private to this user (never shared): what they selected and how they edit. */
 export interface Workspace {
+  /** Selected instrument. */
   track: string | null;
-  scene: number;
+  /** Selected song row (TRACK n in the UI). The Piano roll edits the pattern in cell (row, track). */
+  row: string | null;
   snap: string;
   recQuant: string;
   /** Piano roll shows only the rows in the song key. */

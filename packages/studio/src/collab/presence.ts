@@ -13,8 +13,8 @@ export interface PresenceState {
   user: StudioUser;
   /** Track this person is focused on. */
   track: string | null;
-  /** Scene they are editing. */
-  scene: number;
+  /** Song row (TRACK n) they are looking at. */
+  row: string | null;
   touch: Touch | null;
 }
 
@@ -30,7 +30,7 @@ export class PresenceModel {
     private awareness: Awareness | null,
     user: StudioUser,
   ) {
-    this.local = { user, track: null, scene: 0, touch: null };
+    this.local = { user, track: null, row: null, touch: null };
     this.publish();
     awareness?.on('change', this.refresh);
     this.refresh();

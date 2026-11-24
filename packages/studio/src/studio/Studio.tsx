@@ -11,7 +11,7 @@ import { deviceEntry } from '../devices/registry';
 import { EngineProvider, useEngine } from '../engine/EngineProvider';
 import { useDeviceSync } from '../engine/useDeviceSync';
 import { useComputerKeys } from '../hooks/useComputerKeys';
-import { Project, STEPS, type TrackInfo } from '../model/project';
+import { MAX_LEN, Project, type TrackInfo } from '../model/project';
 import { ThemeRoot, type StudioTheme } from '../theme/Theme';
 import { QUANT, StudioContext, type StudioCtx, type Workspace } from './context';
 import { TopBar } from './TopBar';
@@ -38,7 +38,7 @@ export function Studio(props: StudioProps) {
   );
 }
 
-const WS_DEFAULT: Workspace = { track: null, scene: 0, snap: '1/16', recQuant: '1/16', fold: false };
+const WS_DEFAULT: Workspace = { track: null, row: null, snap: '1/16', recQuant: '1/16', fold: false };
 function loadWs(key: string): Workspace {
   try {
     return { ...WS_DEFAULT, ...JSON.parse(localStorage.getItem(key) || '{}') };
@@ -77,7 +77,12 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
   useEffect(() => {
     if ((selTrack?.id ?? null) !== ws.track) setWs({ track: selTrack?.id ?? null });
   }, [selTrack?.id, ws.track, setWs]);
-  useEffect(() => presence.set({ track: selTrack?.id ?? null, scene: ws.scene }), [presence, selTrack?.id, ws.scene]);
+  const rows = project.rows();
+  const selRow = rows.find((r) => r.id === ws.row) ?? rows[0] ?? null;
+  useEffect(() => {
+    if ((selRow?.id ?? null) !== ws.row) setWs({ row: selRow?.id ?? null });
+  }, [selRow?.id, ws.row, setWs]);
+  useEffect(() => presence.set({ track: selTrack?.id ?? null, row: selRow?.id ?? null }), [presence, selTrack?.id, selRow?.id]);
 
   // ---- engine slots: one per track, local to this client ----
   const slots = useRef(new Map<string, number>());
@@ -117,7 +122,7 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
   }, [toastState]);
 
   // ---- live recording ----
-  const recHeld = useRef(new Map<string, { id: string; track: string; scene: number; s: number; startPos: number }>());
+  const recHeld = useRef(new Map<string, { id: string; track: string; pat: string; s: number; startPos: number }>());
   const recPos = useCallback(() => {
     const p = live?.position();
     if (p == null || !live) return null;
@@ -129,18 +134,26 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
   const recordOn = useCallback(
     (track: TrackInfo, note: number, vel: number) => {
       const pos = recPos();
-      if (pos == null) return;
+      if (pos == null || !ws.row) return;
+      // Record into the pattern this instrument plays in the selected TRACK; an empty cell gets a new pattern.
+      let pat = project.cell(ws.row, track.id);
+      if (!pat) {
+        pat = project.addPattern(track.id);
+        if (!pat) return;
+        project.setCell(ws.row, track.id, pat);
+      }
+      const len = project.patternInfo(track.id, pat)?.len ?? 16;
       const raw = Math.max(0, pos) * track.seq.rate;
       const n = Math.floor(raw);
-      const idx = stepOf(n, track.seq.len, track.seq.dir, (slots.current.get(track.id) ?? 0) + 1);
+      const idx = stepOf(n, len, track.seq.dir, (slots.current.get(track.id) ?? 0) + 1);
       const q = QUANT[ws.recQuant] ?? 0;
       let s = idx + (raw - n);
       if (q) s = Math.round(s / q) * q;
-      if (s >= track.seq.len) s = 0;
-      const id = project.addNote(track.id, ws.scene, { s, l: q || 0.25, m: note, v: vel });
-      if (id) recHeld.current.set(`${track.id}:${note}`, { id, track: track.id, scene: ws.scene, s, startPos: pos });
+      if (s >= len) s = 0;
+      const id = project.addNote(track.id, pat, { s, l: q || 0.25, m: note, v: vel });
+      if (id) recHeld.current.set(`${track.id}:${note}`, { id, track: track.id, pat, s, startPos: pos });
     },
-    [recPos, ws.recQuant, ws.scene, project],
+    [recPos, ws.recQuant, ws.row, project],
   );
   const recordOff = useCallback(
     (trackId: string, note: number) => {
@@ -153,7 +166,8 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
       const q = QUANT[ws.recQuant] ?? 0;
       const el = (pos - h.startPos) * t.seq.rate;
       const l = q ? Math.max(q, Math.round(el / q) * q) : Math.max(1 / 16, el);
-      project.updateNote(h.track, h.scene, h.id, { l: Math.min(STEPS - h.s, l) });
+      const len = project.patternInfo(h.track, h.pat)?.len ?? MAX_LEN;
+      project.updateNote(h.track, h.pat, h.id, { l: Math.min(len - h.s, l) });
     },
     [recPos, ws.recQuant, project],
   );
@@ -291,7 +305,7 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
     <StudioContext.Provider value={ctx}>
       {live && tracks.map((t) => {
         const slot = slots.current.get(t.id);
-        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} scene={ws.scene} />;
+        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} pat={project.cell(selRow?.id, t.id)} />;
       })}
       <div className="fwm-app">
         <TopBar peers={peers} octave={octave} />
@@ -311,8 +325,11 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
   );
 }
 
-/** Keeps one track's device, sequencer settings and current pattern mirrored in the engine. */
-function TrackEngine({ project, track, slot, scene }: { project: Project; track: TrackInfo; slot: number; scene: number }) {
+/**
+ * Keeps one instrument's device, sequencer settings and playing pattern mirrored in the engine.
+ * For now the selected TRACK (song row) loops; playing through the song comes next.
+ */
+function TrackEngine({ project, track, slot, pat }: { project: Project; track: TrackInfo; slot: number; pat: string | null }) {
   const { engine } = useEngine();
   const sent = useRef('');
   const seqKey = useRef('');
@@ -327,13 +344,15 @@ function TrackEngine({ project, track, slot, scene }: { project: Project; track:
   }, [engine, store]);
   useEffect(() => {
     if (!engine) return;
-    const k = JSON.stringify(track.seq);
+    const info = project.patternInfo(track.id, pat);
+    const settings = { ...track.seq, len: info?.len ?? 16, mute: track.seq.mute || !info };
+    const k = JSON.stringify(settings);
     if (k !== seqKey.current) {
       seqKey.current = k;
-      engine.setTrack(slot, track.seq);
+      engine.setTrack(slot, settings);
     }
-    const notes = project.notes(track.id, scene).map(([, n]) => n);
-    const auto = project.automationAll(track.id, scene);
+    const notes = pat ? project.notes(track.id, pat).map(([, n]) => n) : [];
+    const auto = pat ? project.automationAll(track.id, pat) : {};
     const pk = JSON.stringify([notes, auto]);
     if (pk !== sent.current) {
       sent.current = pk;

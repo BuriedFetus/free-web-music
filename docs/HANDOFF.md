@@ -1,6 +1,19 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-22): user testing feedback, in progress
+## START HERE (2026-11-23): sequencer redesign, slice 1 of 3 done
+The user approved the Song Arrangement mock-up (`design/kit/arrange.html`, published privately). Build plan:
+1. **Done:** scenes A–D are gone. Patterns belong to each instrument (`fwm.tracks[id].pats`, each pattern has a
+   name and a length of 1–128 steps). The song is `fwm.song`: rows the UI calls TRACK 1, 2… In code a "track" is
+   still an instrument lane, and song rows are "rows". The main sequencer is the arrangement grid (`SeqView`). The
+   Piano roll edits the pattern in cell (ws.row, ws.track) and has the pattern picker, Name, Length, direction and
+   rate. The song key and a typed BPM are in the top bar. For now the **selected TRACK loops** (TrackEngine sends
+   that row's pattern per instrument). Schema 2; the harness saves under a new key (old saves are not migrated).
+2. **Next:** play through the song in the worklet (a row lasts as long as its longest pattern, then the next row),
+   Loop TRACK / Loop SONG, a playhead and progress on the arrangement, click a TRACK to play from it.
+3. Then: songs (Save, song list, New from INIT) through a host-provided storage API (the core does no storage).
+Also planned: Flint (drums) reuses the old step grid with a length per row.
+
+## Earlier (2026-11-22): user testing feedback
 The user played with Phases 2–3 and said: "quite buggy", "Not satisfied with the sequencer".
 Fixed and pushed this session (each has a browser test):
 - `82adcec` Adding a 2nd device silenced the 1st: the Basalt panel also called `useDeviceSync`, so switching the

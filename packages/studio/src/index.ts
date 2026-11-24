@@ -12,7 +12,7 @@ export { formatParam, toPhysical } from './model/params';
 export * from './primitives';
 export { ThemeRoot, useDeviceTokens, usePrimitives, type StudioTheme } from './theme/Theme';
 export { Studio, type StudioProps } from './studio/Studio';
-export { Project, SCENES, STEPS, patternKey, type Note, type SeqSettings, type TrackInfo } from './model/project';
+export { Project, BAR, MAX_LEN, SCHEMA, patternKey, type Note, type PatternInfo, type SeqSettings, type SongRow, type TrackInfo } from './model/project';
 export { DEFAULT_KEY, NOTE_NAMES, SCALES, inKey, isRoot, keyLabel, type SongKey } from './model/scales';
 export { PresenceModel, type Peer, type PresenceState, type Touch } from './collab/presence';
 export type { LiveChannel, LiveMessage, StudioUser } from './collab/types';

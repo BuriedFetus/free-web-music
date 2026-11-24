@@ -29,7 +29,8 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
         // Rec + Play: knob moves are written as automation on the step that is playing.
         if (!st.rec || !st.playing || slot == null) return;
         const step = engine?.last?.devices[slot]?.step ?? -1;
-        if (step >= 0) st.project.setAutomation(t.id, st.ws.scene, id, step, v);
+        const pat = st.project.cell(st.ws.row, t.id);
+        if (step >= 0 && pat) st.project.setAutomation(t.id, pat, id, step, v);
       },
       subtitle: t.name,
     };
@@ -46,7 +47,7 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
       </label>
       <C key={t.id} store={store} host={host} slot={slot ?? 0} computerKeys={false} />
       <p className="fwm-devnote">
-        Notes come from the main sequencer (scene {'ABCD'[st.ws.scene]}), edited in the Piano roll. Keys you play are heard by
+        Notes come from the pattern {t.name} plays in the selected TRACK, edited in the Piano roll. Keys you play are heard by
         everyone in the session.
       </p>
     </div>
