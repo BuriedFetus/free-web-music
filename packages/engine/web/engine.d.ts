@@ -40,7 +40,7 @@ export interface EngineTick {
   /** Per slot: modulated param values (manifest order) and mod source values [lfo, amp, filt]. */
   devices: Record<number, { eff: Float32Array; mods: [number, number, number]; step: number }>;
   /** row: id of the song row playing (song mode), rowPos: steps since that row started. */
-  transport: { playing: boolean; pos: number; bpm: number; time: number; row: string | null; rowPos: number };
+  transport: { playing: boolean; pos: number; bpm: number; time: number; row: string | null; rowPos: number; next?: string | null };
 }
 
 export type Direction = 'fwd' | 'rev' | 'pp' | 'rnd';
@@ -92,7 +92,7 @@ export interface Engine {
   setPat(slot: number, id: string, pattern: { len: number; notes: SeqNote[]; auto?: Record<string, (number | null)[]>; lens?: number[] }): void;
   deletePat(slot: number, id: string): void;
   setSong(song: SongPlan | null): void;
-  cue(row: number): void;
+  cue(row: number, wait?: boolean): void;
   rowPosition(): { row: string; pos: number } | null;
   setTrack(slot: number, settings: Partial<TrackSettings>): void;
   setPattern(slot: number, notes: SeqNote[], auto?: Record<string, (number | null)[]>): void;

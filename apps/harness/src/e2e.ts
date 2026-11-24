@@ -363,8 +363,23 @@ async function runSong(p: Project, engineRef: { current: Engine | null }, ok: (c
     const names = seen.map((r) => (r === r1 ? 'T1' : r === r2 ? 'T2' : '?')).join(' → ');
     ok(names === 'T1 → T2 → T1', `Loop SONG plays TRACK 1, then TRACK 2 (2 bars), then back to 1 (${names})`);
     ok(nowShown, 'the arrangement highlights the TRACK that is playing');
-    // Loop TRACK: click TRACK 2 while playing → it plays at once and keeps repeating.
+    // Loop TRACK + Wait (default): clicking TRACK 2 queues it; it starts when TRACK 1 ends (1 bar = 1 s).
     btn('⟲ Loop TRACK')!.click();
+    await until('back on TRACK 1', () => engineRef.current!.last!.transport.row === r1, 4000);
+    await until('early in TRACK 1', () => engineRef.current!.last!.transport.rowPos < 4, 2000);
+    ($('[aria-label^="TRACK 2,"]') as HTMLButtonElement).click();
+    await sleep(150);
+    const tr = engineRef.current!.last!.transport;
+    ok(tr.row === r1 && tr.next === r2 && !!$('.fwm-arow.is-next .fwm-tl__next'), 'with Wait on, TRACK 2 is queued ("next") while TRACK 1 finishes');
+    const w0 = performance.now();
+    await until('switch at the end', () => engineRef.current!.last!.transport.row === r2, 2000);
+    const waited = performance.now() - w0;
+    ok(waited > 400, `…and starts when TRACK 1 ends (${Math.round(waited)} ms later)`);
+    // Wait off: switch at once.
+    btn('⏳ Wait')!.click();
+    ($('[aria-label^="TRACK 1,"]') as HTMLButtonElement).click();
+    await sleep(150);
+    ok(engineRef.current!.last!.transport.row === r1, 'with Wait off, clicking a TRACK switches at once');
     ($('[aria-label^="TRACK 2,"]') as HTMLButtonElement).click();
     await sleep(150);
     ok(engineRef.current!.last!.transport.row === r2, 'clicking TRACK 2 while playing jumps there');

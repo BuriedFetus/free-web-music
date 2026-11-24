@@ -19,6 +19,19 @@ export function usePlayStep(slot: number | undefined): number {
   );
 }
 
+/** Id of the song row (TRACK) queued to play when the playing one ends, or null. */
+export function usePlayNext(): string | null {
+  const { engine, status } = useEngine();
+  return useSyncExternalStore(
+    (fn) => (engine && status === 'on' ? engine.subscribe(fn) : () => {}),
+    () => {
+      const t = engine?.last?.transport;
+      return status === 'on' && t?.playing ? t.next ?? null : null;
+    },
+    () => null,
+  );
+}
+
 /** Id of the song row (TRACK) playing right now, or null when stopped. */
 export function usePlayRow(): string | null {
   const { engine, status } = useEngine();

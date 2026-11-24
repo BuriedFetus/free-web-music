@@ -40,7 +40,7 @@ export function Studio(props: StudioProps) {
   );
 }
 
-const WS_DEFAULT: Workspace = { track: null, row: null, snap: '1/16', recQuant: '1/16', fold: false, loop: 'song' };
+const WS_DEFAULT: Workspace = { track: null, row: null, snap: '1/16', recQuant: '1/16', fold: false, loop: 'song', cueWait: true };
 function loadWs(key: string): Workspace {
   try {
     return { ...WS_DEFAULT, ...JSON.parse(localStorage.getItem(key) || '{}') };
@@ -61,10 +61,13 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   // ---- private workspace (per user, saved in this browser) ----
   const wsKey = `fwm.ws.${user.id}`;
   const [ws, setWsState] = useState<Workspace>(() => loadWs(wsKey));
+  const wsRef = useRef(ws); // the latest settings, also between a change and the next render
+  wsRef.current = ws;
   const setWs = useCallback(
     (patch: Partial<Workspace>) =>
       setWsState((w) => {
         const next = { ...w, ...patch };
+        wsRef.current = next;
         try {
           localStorage.setItem(wsKey, JSON.stringify(next));
         } catch {
@@ -123,7 +126,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   const cueRow = useCallback(
     (row: string) => {
       const i = rowsRef.current.findIndex((r) => r.id === row);
-      if (live && playing && i >= 0) live.cue(i);
+      if (live && playing && i >= 0) live.cue(i, wsRef.current.cueWait);
     },
     [live, playing],
   );

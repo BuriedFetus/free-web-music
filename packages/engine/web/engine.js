@@ -124,9 +124,9 @@ export async function createEngine({ base, context, manifests } = {}) {
     setSong(song) {
       send({ t: 'song', song });
     },
-    /** Jump to song row `row` now (keeps the place in the bar while playing). */
-    cue(row) {
-      send({ t: 'cue', row });
+    /** Jump to song row `row` now (keeps the place in the bar while playing), or with `wait` when the playing row ends. */
+    cue(row, wait = false) {
+      send({ t: 'cue', row, wait });
     },
     /** Per-track sequencer settings: len 1..16, dir fwd|rev|pp|rnd, rate 0.5|1|2, own, mute. */
     setTrack(slot, settings) {

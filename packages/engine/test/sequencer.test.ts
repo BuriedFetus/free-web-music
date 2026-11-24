@@ -191,3 +191,25 @@ describe('Sequencer: drum patterns (rows with their own length, accent, rolls, p
     expect(at(e, 49)).toEqual([]);
   });
 });
+
+describe('Sequencer: cue with wait', () => {
+  it('switches when the playing row ends, not before; cueing the playing row again cancels', () => {
+    const seq = new Sequencer(SR);
+    seq.setTrack(0, {});
+    seq.setPat(0, 'a', { len: 16, notes: [{ s: 0, l: 1, m: 36, v: 1 }] });
+    seq.setPat(0, 'b', { len: 16, notes: [{ s: 0, l: 1, m: 48, v: 1 }] });
+    seq.setSong({ loop: 'track', rows: [{ id: 'r1', len: 16, cells: { 0: 'a' } }, { id: 'r2', len: 16, cells: { 0: 'b' } }] });
+    play(seq);
+    run(seq, 6 * STEP);
+    seq.cue(1, true);
+    expect(seq.pending).toBe('r2');
+    const e = run(seq, 26 * STEP); // to step 32
+    const firstB = ons(e).find((x) => x.a === 48)!;
+    expect(Math.round((firstB.frame / STEP + 6) * 100) / 100).toBeCloseTo(16, 1); // row 2 starts at step 16, on the beat
+    expect(ons(e).filter((x) => x.a === 36 && x.frame < 9 * STEP)).toHaveLength(0); // row 1 finished first (no early cut)
+    expect(seq.pending).toBeNull();
+    seq.cue(0, true);
+    seq.cue(1, true); // the playing row again: cancel
+    expect(seq.pending).toBeNull();
+  });
+});

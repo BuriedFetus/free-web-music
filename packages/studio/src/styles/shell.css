@@ -232,3 +232,8 @@
 .fwm-dg__vb { position: relative; border-radius: 3px; background: color-mix(in srgb, var(--fwm-roll-ink) 6%, transparent); }
 .fwm-dg__vb i { position: absolute; left: 0; right: 0; bottom: 0; border-radius: 3px; background: var(--fwm-note); }
 .fwm-dg__vb.is-acc i { box-shadow: inset 0 3px 0 var(--fwm-roll-ink); }
+/* the TRACK queued to play when the playing one ends */
+.fwm-arow.is-next .fwm-tl { box-shadow: inset 0 0 0 2px var(--fwm-note); }
+.fwm-tl__next { position: absolute; right: 6px; bottom: 5px; font: 700 11px var(--fwm-font-ui); color: var(--fwm-note); text-transform: uppercase; letter-spacing: .06em; }
+@media (prefers-reduced-motion: no-preference) { .fwm-arow.is-next .fwm-tl__next { animation: fwm-blink 1s steps(2) infinite; } }
+@keyframes fwm-blink { 50% { opacity: .3; } }

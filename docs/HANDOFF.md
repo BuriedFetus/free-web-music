@@ -15,6 +15,8 @@ they test and review next. Built:
    The worklet loops each pad row on its own length, sends accents as note + 12 and splits rolls.
 Demo song (`?seednow`) now has Drums ("Beat" with a 12-step rim row, "Fill" with snare rolls). Browser tests
 `?e2e=flint`, `?e2e=drums`. Screenshot with Drums selected: `?seednow&drumsfirst`.
+Also (user request): **Wait** toggle in the top bar (`ws.cueWait`, on by default). Clicking a TRACK while playing
+queues it (`cue(row, wait)`, shown as "next") and it starts when the playing TRACK ends; with Wait off it switches at once.
 Open: the user's review of how the 32 sounds feel (they were tuned by tests and measurements, not by ear).
 
 ## Earlier (2026-11-24): sequencer redesign done (3 slices)

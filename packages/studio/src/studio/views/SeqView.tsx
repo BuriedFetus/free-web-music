@@ -6,7 +6,7 @@ import type { Peer } from '../../collab/presence';
 import { deviceEntry, LIBRARY } from '../../devices/registry';
 import { BAR, type SongRow, type TrackInfo } from '../../model/project';
 import { useStudio } from '../context';
-import { usePlayRow, usePlayStep } from './common';
+import { usePlayNext, usePlayRow, usePlayStep } from './common';
 import { TrackNameInput } from './TrackName';
 
 /** "2 bars", "12 steps", "1 bar 4 steps". */
@@ -101,19 +101,21 @@ function InstrumentHead({ track: t, peers }: { track: TrackInfo; peers: Peer[] }
 function Row({ row, index, tracks, peers, canDelete }: { row: SongRow; index: number; tracks: TrackInfo[]; peers: Peer[]; canDelete: boolean }) {
   const { project, ws, setWs, toast, cueRow } = useStudio();
   const now = usePlayRow() === row.id;
+  const next = usePlayNext() === row.id;
   const len = project.rowLen(row.id);
   const longest = tracks.find((t) => project.patternInfo(t.id, row.cells[t.id])?.len === len && row.cells[t.id]);
   const sel = row.id === ws.row;
   const name = `TRACK ${index + 1}`;
   return (
-    <div className={'fwm-arow' + (sel ? ' is-sel' : '') + (now ? ' is-now' : '')} style={{ '--n': tracks.length } as React.CSSProperties}>
+    <div className={'fwm-arow' + (sel ? ' is-sel' : '') + (now ? ' is-now' : '') + (next ? ' is-next' : '')} style={{ '--n': tracks.length } as React.CSSProperties}>
       <button type="button" className="fwm-tl" aria-pressed={sel} aria-label={`${name}, ${lenLabel(len)}`}
-        title={`Play from ${name} (while playing: jump here, on the beat)`}
+        title={`Play from ${name} (while playing: switch here when the playing TRACK ends, or at once with Wait off)`}
         onClick={() => {
           setWs({ row: row.id });
           cueRow(row.id);
         }}>
         <b>{name}</b>
+        {next && <span className="fwm-tl__next">next</span>}
         <small>{lenLabel(len)}{longest ? ` · ${longest.name}` : ''}</small>
         {peers.map((p) => (
           <span key={p.clientId} className="fwm-av fwm-av--xs" style={{ background: p.user.color }} title={p.user.name}>{p.user.name[0]}</span>

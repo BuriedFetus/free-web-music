@@ -50,6 +50,11 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
           <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.loop === 'song'} title="Play the TRACKs in order, then start again"
             onClick={() => setWs({ loop: 'song' })}>⟲ Loop SONG</button>
         </span>
+        <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.cueWait}
+          title={ws.cueWait ? 'Clicking a TRACK while playing switches when the playing TRACK ends' : 'Clicking a TRACK while playing switches at once'}
+          onClick={() => setWs({ cueWait: !ws.cueWait })}>
+          ⏳ Wait
+        </button>
         <span className="fwm-bpm">
           <button type="button" className="fwm-tb fwm-tb--sm" aria-label="Slower" onClick={() => project.setBpm(project.bpm - 1)}>−</button>
           <BpmField />

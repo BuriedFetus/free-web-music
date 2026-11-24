@@ -13,7 +13,8 @@ export class Sequencer {
   setPat(slot: number, id: string, p: { len: number; notes?: { s: number; l: number; m: number; v: number; a?: number; r?: number }[]; auto?: Record<number, (number | null)[]>; lens?: number[] }): void;
   delPat(slot: number, id: string): void;
   setSong(song: { rows: { id: string; len: number; cells: Record<number, string> }[]; loop: 'track' | 'song' } | null): void;
-  cue(row: number): void;
+  cue(row: number, wait?: boolean): void;
+  pending: string | null;
   song: { rows: { id: string; len: number; cells: Record<number, string> }[]; loop: 'track' | 'song' } | null;
   row: number;
   rowStart: number;

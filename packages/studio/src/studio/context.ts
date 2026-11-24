@@ -17,6 +17,8 @@ export interface Workspace {
   fold: boolean;
   /** At the end of a TRACK: play it again ('track') or go to the next one ('song'). */
   loop: 'track' | 'song';
+  /** Clicking a TRACK while playing: switch when the playing TRACK ends (true) or at once. */
+  cueWait: boolean;
 }
 
 export interface StudioCtx {

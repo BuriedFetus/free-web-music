@@ -10,7 +10,8 @@
 // Song mode (when a song is set):
 //   {t:'pat', slot, id, len, notes, auto}  {t:'patdel', slot, id}     an instrument's patterns
 //   {t:'song', rows:[{id, len, cells:{[slot]: patternId}}], loop:'track'|'song'}
-//   {t:'cue', row}                         jump to a row now, keeping the place in the bar
+//   {t:'cue', row, wait}                   jump to a row now, keeping the place in the bar; with `wait`, switch
+//                                          when the playing row ends (it shows as `next` in the tick)
 //   transport may carry `row`: the row to start from when play starts
 // Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport}.
 // MessagePort is used everywhere for now; a SharedArrayBuffer ring comes later behind the same API.
@@ -63,6 +64,7 @@ export class Sequencer {
     this.song = null; // {rows:[{id,len,cells}], loop}
     this.row = 0; // index of the playing row
     this.rowStart = 0; // global position (steps) where it started
+    this.pending = null; // id of the row to switch to when the playing one ends (cue with wait)
   }
   setPat(slot, id, p) {
     if (!this.pats.has(slot)) this.pats.set(slot, new Map());
@@ -79,9 +81,15 @@ export class Sequencer {
     this.row = i >= 0 ? i : Math.min(this.row, this.song.rows.length - 1);
   }
   /** Jump to a row now. While playing, the new row picks up at the same place in the bar, so the beat goes on. */
-  cue(row) {
+  cue(row, wait = false) {
     if (!this.song) return;
-    this.row = Math.max(0, Math.min(this.song.rows.length - 1, row | 0));
+    const i = Math.max(0, Math.min(this.song.rows.length - 1, row | 0));
+    if (wait && this.playing) {
+      this.pending = i === this.row ? null : this.song.rows[i].id; // the playing row again = cancel
+      return;
+    }
+    this.pending = null;
+    this.row = i;
     if (!this.playing) return;
     const p = this.pos;
     let into = (p - this.rowStart) % 16;
@@ -140,6 +148,7 @@ export class Sequencer {
       this.anchorFrame = 0;
       this.anchorPos = 0;
       this.rowStart = 0;
+      this.pending = null;
       if (playing && row != null && this.song) this.row = Math.max(0, Math.min(this.song.rows.length - 1, row | 0));
       for (const t of this.tracks.values()) t.step = -1;
       return true; // caller flushes note-offs
@@ -171,8 +180,11 @@ export class Sequencer {
       const b = Math.min(p1, end);
       if (b > a) this.collect(a, b, events);
       if (end > p1) break;
-      // The row is over: next row (loop song) or the same one again (loop track).
-      if (this.song && this.song.loop === 'song') this.row = (this.row + 1) % this.song.rows.length;
+      // The row is over: a queued row, else the next one (loop song) or the same one again (loop track).
+      const queued = this.pending != null && this.song ? this.song.rows.findIndex((r) => r.id === this.pending) : -1;
+      this.pending = null;
+      if (queued >= 0) this.row = queued;
+      else if (this.song && this.song.loop === 'song') this.row = (this.row + 1) % this.song.rows.length;
       this.rowStart = end;
       a = end;
     }
@@ -322,7 +334,7 @@ class FwmEngine extends Processor {
       case 'pat': this.seq.setPat(m.slot, m.id, m); break;
       case 'patdel': this.seq.delPat(m.slot, m.id); break;
       case 'song': this.seq.setSong(m.song); break;
-      case 'cue': this.seq.cue(m.row); break;
+      case 'cue': this.seq.cue(m.row, m.wait); break;
     }
   }
   /** After playback, knobs go back to where the users left them (automation only applies while playing). */
@@ -369,6 +381,7 @@ class FwmEngine extends Processor {
     const transport = {
       playing: sq.playing, pos: sq.pos, bpm: sq.bpm, time: currentTime,
       row: sq.song ? sq.song.rows[sq.row]?.id ?? null : null, rowPos: sq.playing && sq.song ? sq.pos - sq.rowStart : 0,
+      next: sq.pending,
     };
     this.port.postMessage({ t: 'tick', scope, devices, transport }, [scope.buffer]);
   }
