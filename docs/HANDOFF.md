@@ -1,13 +1,16 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-24, later): Phase 4 (shared transport) mock-up, waiting for the user's feedback
-The user reviewed Flint and Wait: "The drums and tracks are good. Start phase 4". Mock-up: `design/kit/together.html`
-(two screens, You and Mira, with a pretend network: delay + wobble sliders, timing strip, rough sounds). It proposes:
-one Play/Stop for everyone, starting together after a short lead (> p95 network delay); TRACK clicks cue for everyone
-with the exact switch time; automatic clock sync (NTP-style pings, see `spikes/RESULTS.md`); late joiners ask for the
-transport and drop in on the right beat; live keys **Even** (adaptive buffer ~p95) or **Tight** (on arrival), per
-person; recording always at the player's own exact time; a new **Play alone** toggle (local transport, edits still
-shared); people chips show ms and in time / far. Build only after the user signs off.
+## START HERE (2026-11-24, later): Phase 4 slice 1 (shared transport) built; slices 2–3 next
+The user approved the Playing Together mock-up (`design/kit/together.html`): "its all good" (after asking whether
+latency only affects live playing: yes; the song itself, your own keys and recordings have no network delay).
+Slice 1 built (see PLAN.md "Phase 4 progress"): `collab/transport.ts` (TransportSync) owns Play / Stop / TRACK clicks /
+loop for the group; Studio passes it the engine as a `TransportTarget` (row ids ↔ indices). Toasts say who pressed
+Play / Stop. **Play alone** button in the top bar (shown when someone else is here). Message types: `TransportMessage`.
+Browser test: `?e2e=ta&room=R` + `?e2e=tb&room=R` in one Firefox (15 checks).
+Next: slice 2 (live keys + knob turns stamped with the sender's time, played at sent + buffer: Even = adaptive
+~p95 of measured delay, Tight = on arrival; per person, in the workspace), then slice 3 (people chips with ms).
+Known limits: a long note that started before someone joins mid-row is not played for them (they hear from the next
+note on); opening a song while others play is only coordinated through the doc sync.
 
 ## Earlier (2026-11-24): Flint (drum machine) built in 3 slices, waiting for the user's review
 The user approved the Flint mock-up (`design/kit/flint.html`) and asked to build all three slices and commit;

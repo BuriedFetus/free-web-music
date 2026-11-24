@@ -50,11 +50,30 @@ export async function createEngine({ base, context, manifests } = {}) {
 
   const slots = new Map(); // slot → device id
   const listeners = new Set();
+  // Page time (performance.now(), ms) ↔ audio time (context seconds), for the moment a sample is
+  // HEARD: getOutputTimestamp includes the output latency, so two computers that start "at the same
+  // page time" sound together. Median of recent readings, so one odd reading can't move it.
+  const ks = [];
+  let k = null;
+  const sampleClock = () => {
+    const ts = ctx.getOutputTimestamp?.();
+    const v = ts && ts.performanceTime > 0 && ts.contextTime > 0
+      ? ts.contextTime - ts.performanceTime / 1000
+      : ctx.currentTime - performance.now() / 1000 - (ctx.baseLatency || 0) - (ctx.outputLatency || 0);
+    ks.push(v);
+    if (ks.length > 31) ks.shift();
+    k = [...ks].sort((a, b) => a - b)[ks.length >> 1];
+  };
+  const ctxAt = (ms) => {
+    if (k == null) sampleClock();
+    return k + ms / 1000;
+  };
   const ready = new Promise((res) => {
     node.port.onmessage = (e) => {
       const m = e.data;
       if (m.t === 'ready') res();
       else if (m.t === 'tick') {
+        sampleClock();
         engine.last = m;
         engine.onTick?.(m);
         for (const fn of listeners) fn(m);
@@ -110,6 +129,26 @@ export async function createEngine({ base, context, manifests } = {}) {
     /** Main sequencer: play/stop (restarts from bar 1, from song row `row`), tempo, swing (0..0.6). */
     setTransport({ playing, bpm, swing, row }) {
       send({ t: 'transport', playing, bpm, swing, row });
+    },
+    /**
+     * Shared transport: start so that song row `row` is `pos` steps in at page time `at`
+     * (performance.now() ms; in the future = start exactly then, in the past = join mid-row).
+     */
+    playAt(row, pos, at) {
+      send({ t: 'transport', playing: true, row, pos, at: ctxAt(at) });
+    },
+    /** While playing: move so that row `row` is `pos` steps in at page time `at` (drift correction). */
+    seek(row, pos, at) {
+      send({ t: 'seek', row, pos, at: ctxAt(at) });
+    },
+    /** Audio time (context seconds) heard at page time `ms`. */
+    contextTime: ctxAt,
+    /** Song row (id), position in it (steps) and the queued row, heard at page time `at`; null when stopped. */
+    where(at) {
+      const tr = engine.last?.transport;
+      if (!tr || !tr.playing || tr.row == null) return null;
+      const spm = (tr.bpm / 60) * 4 / 1000;
+      return { row: tr.row, pos: tr.rowPos + (ctxAt(at) - tr.time) * 1000 * spm, next: tr.next ?? null, stepsPerMs: spm };
     },
     /** Song mode: one of a slot's patterns, {len, notes, auto: {paramId: (value|null)[]}}. */
     setPat(slot, id, { len, notes, auto = {}, lens }) {

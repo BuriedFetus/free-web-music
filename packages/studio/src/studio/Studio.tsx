@@ -6,6 +6,7 @@ import type { Awareness } from 'y-protocols/awareness';
 import type { Engine } from '@fwm/engine';
 import { stepOf } from '@fwm/engine/worklet';
 import { PresenceModel } from '../collab/presence';
+import { TransportSync, type Loop, type TransportTarget } from '../collab/transport';
 import type { LiveChannel, LiveMessage, SongLibrary, StudioUser } from '../collab/types';
 import { deviceEntry } from '../devices/registry';
 import { EngineProvider, useEngine } from '../engine/EngineProvider';
@@ -101,36 +102,6 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   }
   const slotOf = useCallback((track: string) => slots.current.get(track), []);
 
-  // ---- transport (local play/stop for now; shared tempo and swing) ----
-  const [playing, setPlayingState] = useState(false);
-  const [rec, setRec] = useState(false);
-  const setPlaying = useCallback(
-    (p: boolean) => {
-      if (p && status !== 'on') void start();
-      setPlayingState(p);
-    },
-    [status, start],
-  );
-  // Play starts from the selected TRACK; tempo and swing apply at once.
-  const rowsRef = useRef(rows);
-  rowsRef.current = rows;
-  const selRowRef = useRef(selRow?.id ?? null);
-  selRowRef.current = selRow?.id ?? null;
-  useEffect(() => {
-    const row = Math.max(0, rowsRef.current.findIndex((r) => r.id === selRowRef.current));
-    live?.setTransport({ playing, row });
-  }, [live, playing]);
-  useEffect(() => {
-    live?.setTransport({ bpm: project.bpm, swing: project.swing });
-  }, [live, project.bpm, project.swing]);
-  const cueRow = useCallback(
-    (row: string) => {
-      const i = rowsRef.current.findIndex((r) => r.id === row);
-      if (live && playing && i >= 0) live.cue(i, wsRef.current.cueWait);
-    },
-    [live, playing],
-  );
-
   // ---- toasts ----
   const [toastState, setToast] = useState<{ msg: string; action?: { label: string; run(): void }; id: number } | null>(null);
   const toast = useCallback((msg: string, action?: { label: string; run(): void }) => {
@@ -141,6 +112,74 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     const t = setTimeout(() => setToast(null), 5000);
     return () => clearTimeout(t);
   }, [toastState]);
+
+  // ---- transport: one Play for everyone in the session (see collab/transport.ts); tempo and swing are in the song ----
+  const peersRef = useRef(peers);
+  peersRef.current = peers;
+  const nameOf = (id: string) => peersRef.current.find((p) => p.user.id === id)?.user.name ?? 'Someone';
+  const sync = useMemo(
+    () =>
+      new TransportSync(channel, user.id, {
+        loop: wsRef.current.loop,
+        onRemote: (kind, who, s) => {
+          if (kind === 'loop') setWs({ loop: s.loop });
+          else if (kind === 'play') toast(`${nameOf(who)} pressed Play`);
+          else if (kind === 'stop') toast(`${nameOf(who)} stopped`);
+          else if (kind === 'state') toast(`Joined ${nameOf(who)}'s song where it is`);
+        },
+      }),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [channel, user.id],
+  );
+  useEffect(() => () => sync.destroy(), [sync]);
+  const tp = useSyncExternalStore(sync.subscribe, sync.getSnapshot);
+  const playing = tp.playing;
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const selRowRef = useRef(selRow?.id ?? null);
+  selRowRef.current = selRow?.id ?? null;
+  useEffect(() => {
+    if (!live) return sync.setTarget(null);
+    const idx = (row: string) => Math.max(0, rowsRef.current.findIndex((r) => r.id === row));
+    const target: TransportTarget = {
+      play: (row, pos, at) => live.playAt(idx(row), pos, at),
+      seek: (row, pos, at) => live.seek(idx(row), pos, at),
+      stop: () => live.setTransport({ playing: false }),
+      cue: (row, wait) => live.cue(idx(row), wait),
+      where: (at) => live.where(at),
+    };
+    sync.setTarget(target);
+    return () => sync.setTarget(null);
+  }, [live, sync]);
+  const [rec, setRec] = useState(false);
+  // Play starts from the selected TRACK.
+  const setPlaying = useCallback(
+    (p: boolean) => {
+      if (p && status !== 'on') void start();
+      if (p) {
+        const row = selRowRef.current ?? rowsRef.current[0]?.id;
+        if (row) sync.play(row);
+      } else sync.stop();
+    },
+    [status, start, sync],
+  );
+  useEffect(() => {
+    live?.setTransport({ bpm: project.bpm, swing: project.swing });
+  }, [live, project.bpm, project.swing]);
+  const cueRow = useCallback(
+    (row: string) => {
+      if (playing && rowsRef.current.some((r) => r.id === row)) sync.cue(row, wsRef.current.cueWait);
+    },
+    [playing, sync],
+  );
+  const setLoop = useCallback(
+    (loop: Loop) => {
+      setWs({ loop });
+      sync.setLoop(loop);
+    },
+    [setWs, sync],
+  );
+  const setAlone = useCallback((a: boolean) => sync.setAlone(a), [sync]);
 
   // ---- live recording ----
   const recHeld = useRef(new Map<string, { id: string; track: string; pat: string; s: number; startPos: number }>());
@@ -229,14 +268,12 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
 
   // ---- notes from other people: play on our own copy of their instrument ----
   const [peerHeld, setPeerHeld] = useState<Record<string, { note: number; color: string; user: string }[]>>({});
-  const peersRef = useRef(peers);
-  peersRef.current = peers;
   const liveRef = useRef(live);
   liveRef.current = live;
   useEffect(() => {
     if (!channel) return;
     return channel.subscribe((m: LiveMessage) => {
-      if (m.user === user.id) return;
+      if ((m.t !== 'on' && m.t !== 'off') || m.user === user.id) return;
       const slot = slots.current.get(m.track);
       const e = liveRef.current;
       if (e && slot != null) {
@@ -323,7 +360,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   }, [project, playing, setPlaying]);
 
   const ctx: StudioCtx = {
-    project, presence, user, channel, songs, ws, setWs, playing, setPlaying, rec, setRec, slotOf, cueRow,
+    project, presence, user, channel, songs, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop, rec, setRec, slotOf, cueRow,
     playNote, releaseNote, audition, peerHeld, toast,
   };
 

@@ -14,7 +14,7 @@ function usePosition(): string | null {
     () => {
       const p = status === 'on' ? engine?.last?.transport : null;
       if (!p?.playing) return null;
-      const s = Math.floor(p.row != null ? p.rowPos : p.pos);
+      const s = Math.max(0, Math.floor(p.row != null ? p.rowPos : p.pos)); // below 0 = about to start
       return `${p.row ?? ''}|${Math.floor(s / 16) + 1}.${Math.floor((s % 16) / 4) + 1}.${(s % 4) + 1}`;
     },
     () => null,
@@ -22,7 +22,7 @@ function usePosition(): string | null {
 }
 
 export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
-  const { project, ws, setWs, playing, setPlaying, rec, setRec, user } = useStudio();
+  const { project, ws, setWs, playing, setPlaying, alone, setAlone, setLoop, rec, setRec, user } = useStudio();
   const { status, start, stop } = useEngine();
   const live = usePosition();
   const [playRow, pos] = live ? live.split('|') : [null, null];
@@ -46,15 +46,22 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
         </span>
         <span className="fwm-grp" role="group" aria-label="Loop">
           <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.loop === 'track'} title="Repeat the TRACK that is playing"
-            onClick={() => setWs({ loop: 'track' })}>⟲ Loop TRACK</button>
+            onClick={() => setLoop('track')}>⟲ Loop TRACK</button>
           <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.loop === 'song'} title="Play the TRACKs in order, then start again"
-            onClick={() => setWs({ loop: 'song' })}>⟲ Loop SONG</button>
+            onClick={() => setLoop('song')}>⟲ Loop SONG</button>
         </span>
         <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.cueWait}
           title={ws.cueWait ? 'Clicking a TRACK while playing switches when the playing TRACK ends' : 'Clicking a TRACK while playing switches at once'}
           onClick={() => setWs({ cueWait: !ws.cueWait })}>
           ⏳ Wait
         </button>
+        {(peers.length > 0 || alone) && (
+          <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={alone}
+            title={alone ? 'Playing alone: your Play, Stop and TRACK clicks only affect you. Click to rejoin the group' : 'Play alone: your Play, Stop and TRACK clicks only affect you (edits still reach everyone)'}
+            onClick={() => setAlone(!alone)}>
+            🎧 Play alone
+          </button>
+        )}
         <span className="fwm-bpm">
           <button type="button" className="fwm-tb fwm-tb--sm" aria-label="Slower" onClick={() => project.setBpm(project.bpm - 1)}>−</button>
           <BpmField />

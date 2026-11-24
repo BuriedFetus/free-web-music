@@ -30,6 +30,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'songs') return runSongs(p, engineRef, ok, out);
   if (role === 'flint') return runFlint(p, engineRef, ok, out);
   if (role === 'drums') return runDrums(p, engineRef, ok, out);
+  if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
     if (role === 'a') {
@@ -558,6 +559,137 @@ async function runDrums(p: Project, engineRef: { current: Engine | null }, ok: (
     btn('■ Stop')!.click();
   } catch (e) {
     out.push(`FAIL drums: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/**
+ * Two tabs, one song (shared transport). Tab A: ?e2e=ta&room=R, tab B: ?e2e=tb&room=R, in one Firefox.
+ * Each tab asks its own engine where the song is at the same wall-clock moment and they compare.
+ */
+async function runTogether(
+  role: string, p: Project, awareness: Awareness, engineRef: { current: Engine | null },
+  ok: (c: boolean, l: string) => void, out: string[],
+) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  const bc = new BroadcastChannel('fwm-e2e-together' + (new URLSearchParams(location.search).get('room') ?? ''));
+  const got = new Map<string, unknown>();
+  const wall = () => performance.timeOrigin + performance.now();
+  const where = (W: number) => engineRef.current?.where(W - performance.timeOrigin) ?? null;
+  bc.onmessage = async (e) => {
+    const m = e.data;
+    if (m.t === 'probe') {
+      while (wall() < m.W + 40) await sleep(10);
+      bc.postMessage({ t: 'at', id: m.id, w: where(m.W) });
+    } else got.set(m.t === 'at' ? 'at' + m.id : m.t, m);
+  };
+  const post = (t: string) => bc.postMessage({ t });
+  const wait = (t: string, ms = 20000) => until('the other tab: ' + t, () => got.has(t), ms);
+  let probes = 0;
+  /** ms between the two tabs' song positions at the same moment, or null if either is stopped / on another TRACK. */
+  const apart = async () => {
+    const id = ++probes;
+    const W = wall() + 150;
+    bc.postMessage({ t: 'probe', id, W });
+    while (wall() < W + 40) await sleep(10);
+    const mine = where(W);
+    await until('probe reply', () => got.has('at' + id), 2000);
+    const theirs = (got.get('at' + id) as { w: ReturnType<typeof where> }).w;
+    if (!mine || !theirs || mine.row !== theirs.row) return { ms: null, mine, theirs };
+    return { ms: Math.abs(mine.pos - theirs.pos) / mine.stepsPerMs, mine, theirs };
+  };
+  const playingUi = () => !!btn('■ Stop');
+  const isPlaying = () => !!engineRef.current?.last?.transport.playing;
+  const fmt = (x: { ms: number | null }) => (x.ms == null ? 'not comparable' : `${x.ms.toFixed(1)} ms apart`);
+  try {
+    await until('a peer', () => awareness.getStates().size >= 2, 10000);
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    if (role === 'ta') {
+      p.setBpm(120);
+      const id = p.addTrack(m, undefined, 0);
+      for (const st of [0, 4, 8, 12]) p.addNote(id, p.patternList(id)[0].id, { s: st, l: 1, m: 36, v: 0.9 });
+      const r2 = p.addRow();
+      p.setCell(r2, id, p.patternList(id)[0].id);
+      await sleep(1500); // clocks
+      post('ready');
+      await wait('ready');
+      ($('[aria-label^="TRACK 1,"]') as HTMLButtonElement).click();
+      btn('▶ Play')!.click();
+      await wait('b-playing', 3000);
+      ok(true, 'B started when A pressed Play');
+      btn('⟲ Loop TRACK')!.click(); // stays on TRACK 1 (shared: B's loop changes too)
+      await sleep(1200);
+      let d = await apart();
+      ok(d.ms != null && d.ms < 5, `both tabs play the same place at the same moment (${fmt(d)})`);
+      await sleep(6000);
+      d = await apart();
+      ok(d.ms != null && d.ms < 5, `still together 6 s later (${fmt(d)})`);
+      post('b-cue');
+      await wait('b-cued');
+      ok((got.get('b-cued') as { loop: boolean }).loop, "A's Loop TRACK reached B");
+      await until('TRACK 2 queued or playing here', () => {
+        const tr = engineRef.current!.last!.transport;
+        return tr.next === r2 || tr.row === r2;
+      }, 3000);
+      ok(true, "B's click on TRACK 2 (Wait on) queued it on A too");
+      await until('TRACK 2 playing', () => engineRef.current!.last!.transport.row === r2, 4000);
+      await sleep(300);
+      d = await apart();
+      ok(d.ms != null && d.ms < 5 && d.mine!.row === r2, `both switched to TRACK 2 on the same beat (${fmt(d)})`);
+      post('b-stop');
+      await until('stopped by B', () => !isPlaying() && !playingUi(), 3000);
+      ok(true, 'B pressed Stop: A stopped');
+      // Play alone.
+      btn('🎧 Play alone')!.click();
+      btn('▶ Play')!.click();
+      await sleep(1500);
+      post('check-b-stopped');
+      await wait('b-was-stopped');
+      ok((got.get('b-was-stopped') as { v: boolean }).v, 'A playing alone did not start B');
+      btn('■ Stop')!.click();
+      post('b-play');
+      await wait('b-playing2');
+      await sleep(800);
+      ok(!isPlaying(), 'A (alone) ignored B pressing Play');
+      btn('🎧 Play alone')!.click(); // back to the group: drops in where B's song is
+      await until('joined the group', () => isPlaying(), 3000);
+      ok(true, 'turning Play alone off joined the song B is playing');
+      await sleep(1200);
+      d = await apart();
+      ok(d.ms != null && d.ms < 5, `…in step with B (${fmt(d)})`);
+      post('b-stop');
+      await until('stopped', () => !isPlaying(), 3000);
+      post('done');
+    } else {
+      await until('track from A', () => p.trackIds().length > 0 && p.rows().length >= 2);
+      post('ready');
+      await wait('ready');
+      const t0 = performance.now();
+      await until('A pressed Play', () => playingUi() && isPlaying(), 5000);
+      ok(performance.now() - t0 < 5000, 'started when A pressed Play');
+      post('b-playing');
+      await wait('b-cue');
+      ($('[aria-label^="TRACK 2,"]') as HTMLButtonElement).click();
+      bc.postMessage({ t: 'b-cued', loop: btn('⟲ Loop TRACK')?.getAttribute('aria-pressed') === 'true' });
+      await wait('b-stop');
+      btn('■ Stop')!.click();
+      await wait('check-b-stopped');
+      ok(!isPlaying(), 'stayed stopped while A played alone');
+      bc.postMessage({ t: 'b-was-stopped', v: !isPlaying() });
+      await wait('b-play');
+      ($('[aria-label^="TRACK 1,"]') as HTMLButtonElement).click();
+      btn('▶ Play')!.click();
+      post('b-playing2');
+      got.delete('b-stop');
+      await wait('b-stop');
+      btn('■ Stop')!.click();
+      await wait('done');
+    }
+  } catch (e) {
+    out.push(`FAIL ${role}: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

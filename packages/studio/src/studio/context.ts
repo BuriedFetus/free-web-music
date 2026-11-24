@@ -30,8 +30,14 @@ export interface StudioCtx {
   songs: SongLibrary | null;
   ws: Workspace;
   setWs(patch: Partial<Workspace>): void;
+  /** Playing, for everyone in the session (or only me when alone). */
   playing: boolean;
   setPlaying(p: boolean): void;
+  /** Play alone: my Play / Stop / TRACK clicks only affect me. */
+  alone: boolean;
+  setAlone(a: boolean): void;
+  /** Loop TRACK / Loop SONG, shared with the group. */
+  setLoop(loop: 'track' | 'song'): void;
   rec: boolean;
   setRec(r: boolean): void;
   slotOf(track: string): number | undefined;

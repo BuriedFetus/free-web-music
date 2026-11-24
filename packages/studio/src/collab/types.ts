@@ -9,9 +9,40 @@ export interface StudioUser {
 }
 
 /** Live performance events (keyboard jamming). Small, frequent, never stored. */
-export type LiveMessage =
+export type NoteMessage =
   | { t: 'on'; track: string; note: number; vel: number; user: string }
   | { t: 'off'; track: string; note: number; user: string };
+
+/**
+ * Shared transport (one Play for everyone). `from` is one open studio (a tab), so the same person
+ * in two tabs is two sessions. Times are the sender's performance.now() (ms); the receiver converts
+ * them with the clock difference it measured (ping / pong).
+ */
+export type TransportMessage =
+  | { t: 'ping'; from: string; user: string; a: number; alone: boolean }
+  | { t: 'pong'; from: string; to: string; a: number; b: number }
+  | { t: 'hello'; from: string }
+  | {
+      t: 'tp';
+      from: string;
+      user: string;
+      kind: 'play' | 'stop' | 'cue' | 'loop' | 'beat' | 'state';
+      /** Version of the shared transport: each Play / Stop / TRACK click / loop change adds 1. */
+      n: number;
+      playing: boolean;
+      /** Song row (TRACK) id, and how many steps into it the song is at `time`. */
+      row: string | null;
+      pos: number;
+      time: number;
+      /** Sender's clock when sent (lets a receiver that has no clock difference yet guess). */
+      sent: number;
+      loop: 'track' | 'song';
+      next?: string | null;
+      wait?: boolean;
+    };
+
+/** Everything on the live channel. The host relays these as they are, to everyone in the session. */
+export type LiveMessage = NoteMessage | TransportMessage;
 
 /** A low-latency ephemeral message channel to everyone in the session (e.g. a WebRTC data channel). */
 export interface LiveChannel {

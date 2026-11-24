@@ -213,3 +213,41 @@ describe('Sequencer: cue with wait', () => {
     expect(seq.pending).toBeNull();
   });
 });
+
+describe('Sequencer: shared transport (start at a time, seek)', () => {
+  const song = () => {
+    const seq = new Sequencer(SR);
+    seq.setTrack(0, {});
+    seq.setPat(0, 'a', { len: 16, notes: [0, 4, 8, 12].map((s) => ({ s, l: 1, m: 36, v: 1 })) });
+    seq.setPat(0, 'b', { len: 16, notes: [{ s: 0, l: 1, m: 48, v: 1 }] });
+    seq.setSong({ loop: 'song', rows: [{ id: 'r1', len: 16, cells: { 0: 'a' } }, { id: 'r2', len: 16, cells: { 0: 'b' } }] });
+    seq.setTransport({ bpm: 120 });
+    return seq;
+  };
+
+  it('a start in the future waits, to the sample', () => {
+    const seq = song();
+    seq.start(0, -1000 / STEP); // 1000 frames from now
+    const e = ons(run(seq, 5 * STEP));
+    expect(e.map((x) => x.frame)).toEqual([1000, 1000 + 4 * STEP]);
+  });
+
+  it('a start in the past joins mid-row on the beat, then the song goes on', () => {
+    const seq = song();
+    seq.start(0, 6); // 6 steps in: the next hit is step 8, two steps from now
+    const e = ons(run(seq, 12 * STEP));
+    expect(e.map((x) => [x.frame, x.a])).toEqual([[2 * STEP, 36], [6 * STEP, 36], [10 * STEP, 48]]);
+  });
+
+  it('seek moves the row without restarting the clock or cutting notes', () => {
+    const seq = song();
+    seq.start(0, 0);
+    run(seq, 2 * STEP);
+    seq.seek(0, 3.5); // half a step ahead of where it was (2)
+    const e = ons(run(seq, 2 * STEP));
+    expect(e.map((x) => x.frame)).toEqual([0.5 * STEP]); // step 4 is now half a step away
+    seq.seek(1, 15); // jump to the end of row 2: loop song goes back to row 1
+    const f = ons(run(seq, 2 * STEP));
+    expect(f.map((x) => [x.frame, x.a])).toEqual([[STEP, 36]]);
+  });
+});

@@ -94,6 +94,14 @@ export interface Engine {
   setSong(song: SongPlan | null): void;
   cue(row: number, wait?: boolean): void;
   rowPosition(): { row: string; pos: number } | null;
+  /** Shared transport: start so that song row `row` (index) is `pos` steps in at page time `at` (performance.now() ms). */
+  playAt(row: number, pos: number, at: number): void;
+  /** While playing: move so that row `row` (index) is `pos` steps in at page time `at`. */
+  seek(row: number, pos: number, at: number): void;
+  /** Audio time (context seconds) heard at page time `ms`. */
+  contextTime(ms: number): number;
+  /** Row (id), position in it (steps) and queued row, heard at page time `at`; null when stopped. */
+  where(at: number): { row: string; pos: number; next: string | null; stepsPerMs: number } | null;
   setTrack(slot: number, settings: Partial<TrackSettings>): void;
   setPattern(slot: number, notes: SeqNote[], auto?: Record<string, (number | null)[]>): void;
   position(): number | null;

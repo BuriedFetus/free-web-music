@@ -33,6 +33,7 @@ What the user wants:
 - Live notes are sent as tiny timestamped events; every client plays them on **its own copy** of that instrument (no audio streamed).
 - Shared transport: clock-offset estimation between peers, so play/stop and position agree; remote live notes go through a small **jitter buffer** for even timing. Network delay is unavoidable for live notes; recorded notes are exact.
 - **Contract needed from friend's collab**: Yjs doc + awareness + a low-latency **ephemeral message channel** (Yjs awareness alone is too coarse for note streams). Asset/file storage is needed later for tape audio.
+- The channel carries small JSON messages (`LiveMessage` in `packages/studio/src/collab/types.ts`) to everyone else in the session: live notes, plus the shared transport's `ping` / `pong` (about one per second per person), `hello` and `tp`. The host relays them as they are. In-order delivery is best but not required.
 
 ## Windows
 - v1: floating windows inside one browser tab (desktop-style).
@@ -142,7 +143,12 @@ The core does no networking. The host owns providers, persistence and storage.
 - [x] Flint (drum machine), pulled forward from Phase 5 at the user's request: synthesized 8-pad kits (8 drum types × 4 characters), kit presets, drum grid in the Piano roll panel with a length per pad row, accent, rolls, velocity, pad mute / solo
 - [ ] Flint: sample pads (later; goal: no download from a server for everyone)
 - [ ] "Own seq": plumbing done (flag reaches the engine), waits for a device with a built-in sequencer (Cobalt, Phase 5)
-- [ ] Play/stop is local per person for now; a shared transport is Phase 4
+- [x] ~~Play/stop is local per person~~ shared since Phase 4
+
+### Phase 4 progress (mock-up `design/kit/together.html`, approved 2026-11-24)
+- [x] Slice 1, shared transport (`packages/studio/src/collab/transport.ts`): clock difference per peer from ping / pong (lowest-delay quarter, median); Play starts everyone on the same sample after a short lead (worst recent delay + 30 ms, 60–400 ms, 0 when alone); TRACK clicks and Loop TRACK / SONG reach everyone; the driver (last to press Play / click a TRACK) says where the song is once a second and anyone > 4 ms off seeks (drift, tempo changes, song edits); newcomers ask ("hello") and drop in; **Play alone**. Engine: `playAt / seek / where`, page time ↔ audio time via `getOutputTimestamp`. Tests: `packages/studio/test/transport.test.ts` (simulated network), sequencer start / seek to the sample, browser `?e2e=ta` + `?e2e=tb` (two tabs measured 0.2–2.7 ms apart)
+- [ ] Slice 2, live keys and knob turns in time: timestamps, Even (adaptive buffer) / Tight per person
+- [ ] Slice 3, people chips: delay in ms, in time / far, playing alone / joining
 
 **Phase 0 complete.** Handoff notes for Phase 1: `docs/HANDOFF.md`.
 

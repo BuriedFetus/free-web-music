@@ -13,6 +13,11 @@
 //   {t:'cue', row, wait}                   jump to a row now, keeping the place in the bar; with `wait`, switch
 //                                          when the playing row ends (it shows as `next` in the tick)
 //   transport may carry `row`: the row to start from when play starts
+// Shared transport (several people, one song): times are AudioContext seconds.
+//   {t:'transport', playing:true, row, pos, at}   start so that row `row` is `pos` steps in at time `at`
+//                                                  (`at` in the future: waits, to the sample; in the past: joins mid-row)
+//   {t:'seek', row, pos, at}                       while playing: move so that row `row` is `pos` steps in at `at`
+//                                                  (corrects drift between people; the global clock keeps running)
 // Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport}.
 // MessagePort is used everywhere for now; a SharedArrayBuffer ring comes later behind the same API.
 const UI_EVERY = 6; // blocks between UI snapshots (~16 ms at 48 kHz)
@@ -96,6 +101,18 @@ export class Sequencer {
     const len = this.song.rows[this.row].len;
     if (into >= len) into %= len;
     this.rowStart = p - into;
+  }
+  /** Play from `target` steps into row `row` (negative = start that many steps from now). */
+  start(row, target) {
+    this.setTransport({ playing: false });
+    this.setTransport({ playing: true, row });
+    this.rowStart = -target;
+  }
+  /** Move so that row `row` is `target` steps in right now, without touching the global position. */
+  seek(row, target) {
+    if (!this.song) return;
+    this.row = Math.max(0, Math.min(this.song.rows.length - 1, row | 0));
+    this.rowStart = this.pos - target;
   }
   /** What a slot plays right now: {len, notes, auto} or null (silent). */
   active(slot, t) {
@@ -289,6 +306,7 @@ class FwmEngine extends Processor {
     this.base = new Map(); // slot → Map(paramIndex → value) last set by the UI (restored on stop)
     for (const s of slots) this.add(s.slot, s.kind);
     this.n = 0;
+    this.next = typeof currentFrame === 'number' ? currentFrame : 0; // frame where the next block starts
     this.port.onmessage = (e) => this.msg(e.data);
     this.port.postMessage({ t: 'ready', sampleRate });
   }
@@ -323,7 +341,12 @@ class FwmEngine extends Processor {
       case 'unroute': x.fwm_clear_route(m.slot, m.r); break;
       case 'transport': {
         const wasPlaying = this.seq.playing;
-        if (this.seq.setTransport(m)) {
+        if (m.playing && m.at != null) {
+          if (m.bpm) this.seq.setTransport({ bpm: m.bpm });
+          this.seq.flush(this.emit);
+          if (wasPlaying) this.restoreAutomated();
+          this.seq.start(m.row ?? 0, this.target(m));
+        } else if (this.seq.setTransport(m)) {
           this.seq.flush(this.emit);
           if (wasPlaying) this.restoreAutomated();
         }
@@ -335,7 +358,15 @@ class FwmEngine extends Processor {
       case 'patdel': this.seq.delPat(m.slot, m.id); break;
       case 'song': this.seq.setSong(m.song); break;
       case 'cue': this.seq.cue(m.row, m.wait); break;
+      case 'seek':
+        if (this.seq.playing) this.seq.seek(m.row, this.target(m));
+        else this.seq.start(m.row, this.target(m));
+        break;
     }
+  }
+  /** Steps into the row at the start of the next block, for "row is `pos` steps in at time `at`". */
+  target(m) {
+    return (m.pos ?? 0) + (this.next - m.at * sampleRate) * this.seq.stepsPerFrame();
   }
   /** After playback, knobs go back to where the users left them (automation only applies while playing). */
   restoreAutomated() {
@@ -357,10 +388,11 @@ class FwmEngine extends Processor {
     x.fwm_render(frames);
     out[0].set(this.view(x.fwm_out_l(), frames));
     if (out[1]) out[1].set(this.view(x.fwm_out_r(), frames));
-    if (++this.n % UI_EVERY === 0) this.snapshot();
+    this.next = currentFrame + frames;
+    if (++this.n % UI_EVERY === 0) this.snapshot(frames);
     return true;
   }
-  snapshot() {
+  snapshot(frames) {
     const x = this.x;
     const len = x.fwm_scope_len();
     const ring = this.view(x.fwm_scope(), len);
@@ -379,7 +411,7 @@ class FwmEngine extends Processor {
     }
     const sq = this.seq;
     const transport = {
-      playing: sq.playing, pos: sq.pos, bpm: sq.bpm, time: currentTime,
+      playing: sq.playing, pos: sq.pos, bpm: sq.bpm, time: currentTime + frames / sampleRate, // `time` is when `pos` is
       row: sq.song ? sq.song.rows[sq.row]?.id ?? null : null, rowPos: sq.playing && sq.song ? sq.pos - sq.rowStart : 0,
       next: sq.pending,
     };
