@@ -10,34 +10,36 @@
 // The worklet and WASM files are found next to this module (`new URL(..., import.meta.url)`,
 // which Vite, webpack 5 and Rollup all understand), or under `base` if given.
 
-export const KINDS = { basalt: 1 };
+export const KINDS = { basalt: 1, flint: 2 };
 export const MOD_SOURCES = { lfo: 0, amp: 1, filt: 2 };
 
 const DEFAULT_URLS = () => ({
   wasm: new URL('./fwm_engine.wasm', import.meta.url).href,
   worklet: new URL('./worklet.js', import.meta.url).href,
   basalt: new URL('./basalt.json', import.meta.url).href,
+  flint: new URL('./flint.json', import.meta.url).href,
 });
 
 export async function createEngine({ base, context, manifests } = {}) {
   const ctx = context || new AudioContext({ latencyHint: 'interactive' });
   const urls = base
     ? Object.fromEntries(
-        Object.entries({ wasm: 'fwm_engine.wasm', worklet: 'worklet.js', basalt: 'basalt.json' }).map(([k, f]) => [
+        Object.entries({ wasm: 'fwm_engine.wasm', worklet: 'worklet.js', basalt: 'basalt.json', flint: 'flint.json' }).map(([k, f]) => [
           k,
           new URL(f, new URL(base, location.href)).href,
         ]),
       )
     : DEFAULT_URLS();
   const loadManifest = async (m) => (typeof m === 'object' ? m : (await fetch(m)).json());
-  const [wasm, basalt] = await Promise.all([
+  const [wasm, basalt, flint] = await Promise.all([
     fetch(urls.wasm).then((r) => {
       if (!r.ok) throw new Error('engine wasm: HTTP ' + r.status);
       return r.arrayBuffer();
     }),
     loadManifest(manifests?.basalt ?? urls.basalt),
+    loadManifest(manifests?.flint ?? urls.flint),
   ]);
-  const manifest = { basalt };
+  const manifest = { basalt, flint };
   await ctx.audioWorklet.addModule(urls.worklet);
   const node = new AudioWorkletNode(ctx, 'fwm-engine', {
     numberOfInputs: 0,

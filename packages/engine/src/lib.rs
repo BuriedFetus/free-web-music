@@ -16,6 +16,7 @@ pub mod events;
 
 use device::{Device, ModSource, RouteError};
 use devices::basalt::Basalt;
+use devices::flint::Flint;
 use events::{Event, Kind, Queue};
 
 #[cfg(all(target_arch = "wasm32", not(test)))]
@@ -32,12 +33,14 @@ pub const SCOPE_LEN: usize = 2048;
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
 pub enum DeviceKind {
     Basalt = 1,
+    Flint = 2,
 }
 
 impl DeviceKind {
     pub fn from_index(i: u32) -> Option<DeviceKind> {
         match i {
             1 => Some(DeviceKind::Basalt),
+            2 => Some(DeviceKind::Flint),
             _ => None,
         }
     }
@@ -46,6 +49,7 @@ impl DeviceKind {
 pub enum Slot {
     Empty,
     Basalt(Basalt),
+    Flint(Flint),
 }
 
 impl Slot {
@@ -53,6 +57,7 @@ impl Slot {
         match self {
             Slot::Empty => None,
             Slot::Basalt(d) => Some(d),
+            Slot::Flint(d) => Some(d),
         }
     }
 
@@ -60,6 +65,7 @@ impl Slot {
         match self {
             Slot::Empty => None,
             Slot::Basalt(d) => Some(d),
+            Slot::Flint(d) => Some(d),
         }
     }
 }
@@ -99,6 +105,7 @@ impl Rack {
         }
         let mut s = match kind {
             DeviceKind::Basalt => Slot::Basalt(Basalt::new()),
+            DeviceKind::Flint => Slot::Flint(Flint::new()),
         };
         if let Some(d) = s.device() {
             d.prepare(self.sample_rate);

@@ -1,0 +1,629 @@
+{
+ "id": "flint",
+ "name": "Flint",
+ "kind": "instrument",
+ "version": 1,
+ "voices": "8 pads, one voice each",
+ "description": "Drum machine: 8 pads, each any of 8 drum types in one of 4 characters (Analog, Digital, Noise, Vintage), with Tune, Decay, Tone and Level. A Closed hat chokes ringing Open hats.",
+ "params": [
+  {
+   "id": "p1.type",
+   "label": "Drum",
+   "section": "pad1",
+   "type": "enum",
+   "options": [
+    "Kick",
+    "Snare",
+    "Clap",
+    "Closed hat",
+    "Open hat",
+    "Tom",
+    "Rim",
+    "Perc"
+   ],
+   "default": 0
+  },
+  {
+   "id": "p1.model",
+   "label": "Character",
+   "section": "pad1",
+   "type": "enum",
+   "options": [
+    "Analog",
+    "Digital",
+    "Noise",
+    "Vintage"
+   ],
+   "default": 0
+  },
+  {
+   "id": "p1.tune",
+   "label": "Tune",
+   "section": "pad1",
+   "type": "float",
+   "default": 0.5,
+   "unit": "st",
+   "map": "lin",
+   "min": -12,
+   "max": 12
+  },
+  {
+   "id": "p1.decay",
+   "label": "Decay",
+   "section": "pad1",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p1.tone",
+   "label": "Tone",
+   "section": "pad1",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p1.level",
+   "label": "Level",
+   "section": "pad1",
+   "type": "float",
+   "default": 0.8,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p2.type",
+   "label": "Drum",
+   "section": "pad2",
+   "type": "enum",
+   "options": [
+    "Kick",
+    "Snare",
+    "Clap",
+    "Closed hat",
+    "Open hat",
+    "Tom",
+    "Rim",
+    "Perc"
+   ],
+   "default": 1
+  },
+  {
+   "id": "p2.model",
+   "label": "Character",
+   "section": "pad2",
+   "type": "enum",
+   "options": [
+    "Analog",
+    "Digital",
+    "Noise",
+    "Vintage"
+   ],
+   "default": 0
+  },
+  {
+   "id": "p2.tune",
+   "label": "Tune",
+   "section": "pad2",
+   "type": "float",
+   "default": 0.5,
+   "unit": "st",
+   "map": "lin",
+   "min": -12,
+   "max": 12
+  },
+  {
+   "id": "p2.decay",
+   "label": "Decay",
+   "section": "pad2",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p2.tone",
+   "label": "Tone",
+   "section": "pad2",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p2.level",
+   "label": "Level",
+   "section": "pad2",
+   "type": "float",
+   "default": 0.8,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p3.type",
+   "label": "Drum",
+   "section": "pad3",
+   "type": "enum",
+   "options": [
+    "Kick",
+    "Snare",
+    "Clap",
+    "Closed hat",
+    "Open hat",
+    "Tom",
+    "Rim",
+    "Perc"
+   ],
+   "default": 2
+  },
+  {
+   "id": "p3.model",
+   "label": "Character",
+   "section": "pad3",
+   "type": "enum",
+   "options": [
+    "Analog",
+    "Digital",
+    "Noise",
+    "Vintage"
+   ],
+   "default": 0
+  },
+  {
+   "id": "p3.tune",
+   "label": "Tune",
+   "section": "pad3",
+   "type": "float",
+   "default": 0.5,
+   "unit": "st",
+   "map": "lin",
+   "min": -12,
+   "max": 12
+  },
+  {
+   "id": "p3.decay",
+   "label": "Decay",
+   "section": "pad3",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p3.tone",
+   "label": "Tone",
+   "section": "pad3",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p3.level",
+   "label": "Level",
+   "section": "pad3",
+   "type": "float",
+   "default": 0.8,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p4.type",
+   "label": "Drum",
+   "section": "pad4",
+   "type": "enum",
+   "options": [
+    "Kick",
+    "Snare",
+    "Clap",
+    "Closed hat",
+    "Open hat",
+    "Tom",
+    "Rim",
+    "Perc"
+   ],
+   "default": 3
+  },
+  {
+   "id": "p4.model",
+   "label": "Character",
+   "section": "pad4",
+   "type": "enum",
+   "options": [
+    "Analog",
+    "Digital",
+    "Noise",
+    "Vintage"
+   ],
+   "default": 0
+  },
+  {
+   "id": "p4.tune",
+   "label": "Tune",
+   "section": "pad4",
+   "type": "float",
+   "default": 0.5,
+   "unit": "st",
+   "map": "lin",
+   "min": -12,
+   "max": 12
+  },
+  {
+   "id": "p4.decay",
+   "label": "Decay",
+   "section": "pad4",
+   "type": "float",
+   "default": 0.3,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p4.tone",
+   "label": "Tone",
+   "section": "pad4",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p4.level",
+   "label": "Level",
+   "section": "pad4",
+   "type": "float",
+   "default": 0.8,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p5.type",
+   "label": "Drum",
+   "section": "pad5",
+   "type": "enum",
+   "options": [
+    "Kick",
+    "Snare",
+    "Clap",
+    "Closed hat",
+    "Open hat",
+    "Tom",
+    "Rim",
+    "Perc"
+   ],
+   "default": 4
+  },
+  {
+   "id": "p5.model",
+   "label": "Character",
+   "section": "pad5",
+   "type": "enum",
+   "options": [
+    "Analog",
+    "Digital",
+    "Noise",
+    "Vintage"
+   ],
+   "default": 0
+  },
+  {
+   "id": "p5.tune",
+   "label": "Tune",
+   "section": "pad5",
+   "type": "float",
+   "default": 0.5,
+   "unit": "st",
+   "map": "lin",
+   "min": -12,
+   "max": 12
+  },
+  {
+   "id": "p5.decay",
+   "label": "Decay",
+   "section": "pad5",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p5.tone",
+   "label": "Tone",
+   "section": "pad5",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p5.level",
+   "label": "Level",
+   "section": "pad5",
+   "type": "float",
+   "default": 0.8,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p6.type",
+   "label": "Drum",
+   "section": "pad6",
+   "type": "enum",
+   "options": [
+    "Kick",
+    "Snare",
+    "Clap",
+    "Closed hat",
+    "Open hat",
+    "Tom",
+    "Rim",
+    "Perc"
+   ],
+   "default": 5
+  },
+  {
+   "id": "p6.model",
+   "label": "Character",
+   "section": "pad6",
+   "type": "enum",
+   "options": [
+    "Analog",
+    "Digital",
+    "Noise",
+    "Vintage"
+   ],
+   "default": 0
+  },
+  {
+   "id": "p6.tune",
+   "label": "Tune",
+   "section": "pad6",
+   "type": "float",
+   "default": 0.45,
+   "unit": "st",
+   "map": "lin",
+   "min": -12,
+   "max": 12
+  },
+  {
+   "id": "p6.decay",
+   "label": "Decay",
+   "section": "pad6",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p6.tone",
+   "label": "Tone",
+   "section": "pad6",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p6.level",
+   "label": "Level",
+   "section": "pad6",
+   "type": "float",
+   "default": 0.8,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p7.type",
+   "label": "Drum",
+   "section": "pad7",
+   "type": "enum",
+   "options": [
+    "Kick",
+    "Snare",
+    "Clap",
+    "Closed hat",
+    "Open hat",
+    "Tom",
+    "Rim",
+    "Perc"
+   ],
+   "default": 6
+  },
+  {
+   "id": "p7.model",
+   "label": "Character",
+   "section": "pad7",
+   "type": "enum",
+   "options": [
+    "Analog",
+    "Digital",
+    "Noise",
+    "Vintage"
+   ],
+   "default": 0
+  },
+  {
+   "id": "p7.tune",
+   "label": "Tune",
+   "section": "pad7",
+   "type": "float",
+   "default": 0.5,
+   "unit": "st",
+   "map": "lin",
+   "min": -12,
+   "max": 12
+  },
+  {
+   "id": "p7.decay",
+   "label": "Decay",
+   "section": "pad7",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p7.tone",
+   "label": "Tone",
+   "section": "pad7",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p7.level",
+   "label": "Level",
+   "section": "pad7",
+   "type": "float",
+   "default": 0.8,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p8.type",
+   "label": "Drum",
+   "section": "pad8",
+   "type": "enum",
+   "options": [
+    "Kick",
+    "Snare",
+    "Clap",
+    "Closed hat",
+    "Open hat",
+    "Tom",
+    "Rim",
+    "Perc"
+   ],
+   "default": 7
+  },
+  {
+   "id": "p8.model",
+   "label": "Character",
+   "section": "pad8",
+   "type": "enum",
+   "options": [
+    "Analog",
+    "Digital",
+    "Noise",
+    "Vintage"
+   ],
+   "default": 0
+  },
+  {
+   "id": "p8.tune",
+   "label": "Tune",
+   "section": "pad8",
+   "type": "float",
+   "default": 0.5,
+   "unit": "st",
+   "map": "lin",
+   "min": -12,
+   "max": 12
+  },
+  {
+   "id": "p8.decay",
+   "label": "Decay",
+   "section": "pad8",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p8.tone",
+   "label": "Tone",
+   "section": "pad8",
+   "type": "float",
+   "default": 0.5,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "p8.level",
+   "label": "Level",
+   "section": "pad8",
+   "type": "float",
+   "default": 0.8,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "accent",
+   "label": "Accent",
+   "section": "out",
+   "type": "float",
+   "default": 0.6,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  },
+  {
+   "id": "lvl",
+   "label": "Level",
+   "section": "out",
+   "type": "float",
+   "default": 0.8,
+   "unit": "%",
+   "map": "lin",
+   "min": 0,
+   "max": 100
+  }
+ ],
+ "modSources": [],
+ "notes": {
+  "pads": "Pad i (0-7) is note 36+i. Accented hits are note 48+i (louder and brighter by Accent). Note-off is ignored (one-shots).",
+  "values": "Every param is stored normalised 0..1 (enums as their index), like Basalt."
+ }
+}

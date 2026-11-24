@@ -1,4 +1,4 @@
-export type DeviceId = 'basalt';
+export type DeviceId = 'basalt' | 'flint';
 export type ModSourceId = 'lfo' | 'amp' | 'filt';
 
 export interface ParamSpec {
@@ -98,7 +98,7 @@ export const KINDS: Record<DeviceId, number>;
 export const MOD_SOURCES: Record<ModSourceId, number>;
 
 export function createEngine(options?: {
-  /** Folder holding fwm_engine.wasm, worklet.js, basalt.json. Default: next to this module. */
+  /** Folder holding fwm_engine.wasm, worklet.js, basalt.json, flint.json. Default: next to this module. */
   base?: string;
   context?: BaseAudioContext;
   /** Manifests as objects or URLs. */
