@@ -15,6 +15,8 @@ export interface Workspace {
   recQuant: string;
   /** Piano roll shows only the rows in the song key. */
   fold: boolean;
+  /** At the end of a TRACK: play it again ('track') or go to the next one ('song'). */
+  loop: 'track' | 'song';
 }
 
 export interface StudioCtx {
@@ -29,6 +31,8 @@ export interface StudioCtx {
   rec: boolean;
   setRec(r: boolean): void;
   slotOf(track: string): number | undefined;
+  /** Jump playback to a song row now (when playing), keeping the beat. */
+  cueRow(row: string): void;
   /** Notes played by this user: sound, sent to everyone, recorded when Rec is on. */
   playNote(track: string, note: number, vel: number): void;
   releaseNote(track: string, note: number): void;

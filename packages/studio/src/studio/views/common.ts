@@ -18,3 +18,16 @@ export function usePlayStep(slot: number | undefined): number {
     () => -1,
   );
 }
+
+/** Id of the song row (TRACK) playing right now, or null when stopped. */
+export function usePlayRow(): string | null {
+  const { engine, status } = useEngine();
+  return useSyncExternalStore(
+    (fn) => (engine && status === 'on' ? engine.subscribe(fn) : () => {}),
+    () => {
+      const t = engine?.last?.transport;
+      return status === 'on' && t?.playing ? t.row ?? null : null;
+    },
+    () => null,
+  );
+}

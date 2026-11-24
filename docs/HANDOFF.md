@@ -1,6 +1,6 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-23): sequencer redesign, slice 1 of 3 done
+## START HERE (2026-11-23): sequencer redesign, slices 1–2 of 3 done
 The user approved the Song Arrangement mock-up (`design/kit/arrange.html`, published privately). Build plan:
 1. **Done:** scenes A–D are gone. Patterns belong to each instrument (`fwm.tracks[id].pats`, each pattern has a
    name and a length of 1–128 steps). The song is `fwm.song`: rows the UI calls TRACK 1, 2… In code a "track" is
@@ -8,9 +8,13 @@ The user approved the Song Arrangement mock-up (`design/kit/arrange.html`, publi
    Piano roll edits the pattern in cell (ws.row, ws.track) and has the pattern picker, Name, Length, direction and
    rate. The song key and a typed BPM are in the top bar. For now the **selected TRACK loops** (TrackEngine sends
    that row's pattern per instrument). Schema 2; the harness saves under a new key (old saves are not migrated).
-2. **Next:** play through the song in the worklet (a row lasts as long as its longest pattern, then the next row),
-   Loop TRACK / Loop SONG, a playhead and progress on the arrangement, click a TRACK to play from it.
-3. Then: songs (Save, song list, New from INIT) through a host-provided storage API (the core does no storage).
+2. **Done:** the worklet plays the song (`Sequencer.setSong/setPat/cue`, see the message list at the top of
+   `worklet.js`). A row lasts as long as its longest pattern (length ÷ rate), shorter ones restart with each row.
+   Loop TRACK repeats the playing row, Loop SONG goes on to the next (per user, `ws.loop`). Play starts from the
+   selected TRACK; clicking a TRACK name while playing jumps there at once, at the same place in the bar.
+   Clicking a cell only selects it for editing. Recording and knob automation go into the playing row's pattern.
+   Tests: `packages/engine/test/sequencer.test.ts` (song timing to the sample), browser `?e2e=song`.
+3. **Next:** songs (Save, song list, New from INIT) through a host-provided storage API (the core does no storage).
 Also planned: Flint (drums) reuses the old step grid with a length per row.
 
 ## Earlier (2026-11-22): user testing feedback
@@ -46,7 +50,7 @@ Fixed and pushed this session (each has a browser test):
    publish as artifact) before building it.
 Then Phase 4 (shared transport). The Studio artifact (HEVoA3TExTjSF2bRmVUUei) has NOT been republished with these fixes.
 
-Single-tab e2e runs: `dist/index.html?e2e=multi`, `?e2e=switch` and `?e2e=roll` (one firefox tab, POST to ./log).
+Single-tab e2e runs: `dist/index.html?e2e=multi`, `?e2e=switch`, `?e2e=roll` and `?e2e=song` (one firefox tab, POST to ./log).
 `?seednow=3` seeds three Basalts for screenshots.
 
 ---

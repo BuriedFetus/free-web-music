@@ -6,7 +6,7 @@ import type { Peer } from '../../collab/presence';
 import { deviceEntry, LIBRARY } from '../../devices/registry';
 import { BAR, type SongRow, type TrackInfo } from '../../model/project';
 import { useStudio } from '../context';
-import { usePlayStep } from './common';
+import { usePlayRow, usePlayStep } from './common';
 import { TrackNameInput } from './TrackName';
 
 /** "2 bars", "12 steps", "1 bar 4 steps". */
@@ -96,22 +96,27 @@ function InstrumentHead({ track: t, peers }: { track: TrackInfo; peers: Peer[] }
 }
 
 function Row({ row, index, tracks, peers, canDelete }: { row: SongRow; index: number; tracks: TrackInfo[]; peers: Peer[]; canDelete: boolean }) {
-  const { project, ws, setWs, playing, toast } = useStudio();
+  const { project, ws, setWs, toast, cueRow } = useStudio();
+  const now = usePlayRow() === row.id;
   const len = project.rowLen(row.id);
   const longest = tracks.find((t) => project.patternInfo(t.id, row.cells[t.id])?.len === len && row.cells[t.id]);
   const sel = row.id === ws.row;
   const name = `TRACK ${index + 1}`;
   return (
-    <div className={'fwm-arow' + (sel ? ' is-sel' : '') + (sel && playing ? ' is-now' : '')} style={{ '--n': tracks.length } as React.CSSProperties}>
+    <div className={'fwm-arow' + (sel ? ' is-sel' : '') + (now ? ' is-now' : '')} style={{ '--n': tracks.length } as React.CSSProperties}>
       <button type="button" className="fwm-tl" aria-pressed={sel} aria-label={`${name}, ${lenLabel(len)}`}
-        title={sel ? `${name} is selected: it loops while playing` : `Select ${name}`} onClick={() => setWs({ row: row.id })}>
+        title={`Play from ${name} (while playing: jump here, on the beat)`}
+        onClick={() => {
+          setWs({ row: row.id });
+          cueRow(row.id);
+        }}>
         <b>{name}</b>
         <small>{lenLabel(len)}{longest ? ` · ${longest.name}` : ''}</small>
         {peers.map((p) => (
           <span key={p.clientId} className="fwm-av fwm-av--xs" style={{ background: p.user.color }} title={p.user.name}>{p.user.name[0]}</span>
         ))}
       </button>
-      {tracks.map((t) => <Cell key={t.id} row={row.id} rowName={name} rowLen={len} track={t} />)}
+      {tracks.map((t) => <Cell key={t.id} row={row.id} rowName={name} rowLen={len} track={t} now={now} />)}
       <span className="fwm-ra">
         <button type="button" className="fwm-tb fwm-tb--xs" aria-label={`Duplicate ${name}`} title={`Duplicate ${name}`}
           onClick={() => setWs({ row: project.addRow(row.id, true) })}>⧉</button>
@@ -125,8 +130,8 @@ function Row({ row, index, tracks, peers, canDelete }: { row: SongRow; index: nu
   );
 }
 
-function Cell({ row, rowName, rowLen, track: t }: { row: string; rowName: string; rowLen: number; track: TrackInfo }) {
-  const { project, ws, setWs, playing, slotOf } = useStudio();
+function Cell({ row, rowName, rowLen, track: t, now }: { row: string; rowName: string; rowLen: number; track: TrackInfo; now: boolean }) {
+  const { project, ws, setWs, slotOf } = useStudio();
   const info = project.patternInfo(t.id, project.cell(row, t.id));
   const on = row === ws.row && t.id === ws.track;
   const select = () => setWs({ row, track: t.id });
@@ -136,17 +141,17 @@ function Cell({ row, rowName, rowLen, track: t }: { row: string; rowName: string
         <span className="fwm-cell__empty">—</span>
       </button>
     );
-  const reps = rowLen / info.len;
+  const reps = rowLen / project.playLen(t.id, info.id);
   const idx = project.patternList(t.id).findIndex((p) => p.id === info.id);
   return (
     <button type="button" className={'fwm-cell has' + (on ? ' is-on' : '')} onClick={select}
-      style={{ '--k': idx % 4, '--tw': `${(info.len / rowLen) * 100}%` } as React.CSSProperties}
+      style={{ '--k': idx % 4, '--tw': `${(project.playLen(t.id, info.id) / rowLen) * 100}%` } as React.CSSProperties}
       aria-label={`${rowName}, ${t.name}: ${info.name}`}>
       <b>{info.name}</b>
       <small>{lenLabel(info.len)}</small>
       {reps > 1 && <span className="fwm-cell__rep">×{Number.isInteger(reps) ? reps : reps.toFixed(1)}</span>}
       <span className="fwm-cell__ticks" />
-      {playing && row === ws.row && <CellProgress slot={slotOf(t.id)} len={info.len} />}
+      {now && <CellProgress slot={slotOf(t.id)} len={info.len} />}
     </button>
   );
 }
@@ -156,3 +161,4 @@ function CellProgress({ slot, len }: { slot: number | undefined; len: number }) 
   const step = usePlayStep(slot);
   return <span className="fwm-cell__pr" style={{ width: step < 0 ? 0 : `${((step + 1) / len) * 100}%` }} />;
 }
+

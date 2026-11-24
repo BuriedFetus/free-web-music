@@ -29,7 +29,7 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
         // Rec + Play: knob moves are written as automation on the step that is playing.
         if (!st.rec || !st.playing || slot == null) return;
         const step = engine?.last?.devices[slot]?.step ?? -1;
-        const pat = st.project.cell(st.ws.row, t.id);
+        const pat = st.project.cell(engine?.last?.transport.row, t.id); // the TRACK that is playing
         if (step >= 0 && pat) st.project.setAutomation(t.id, pat, id, step, v);
       },
       subtitle: t.name,

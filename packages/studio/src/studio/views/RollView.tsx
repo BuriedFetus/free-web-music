@@ -10,7 +10,7 @@ import { inKey, isRoot, keyLabel } from '../../model/scales';
 import { BAR, MAX_LEN, type Note } from '../../model/project';
 import { noteName } from '../../primitives/Keys';
 import { QUANT, useStudio } from '../context';
-import { usePlayStep } from './common';
+import { usePlayRow, usePlayStep } from './common';
 import { lenLabel } from './SeqView';
 import { NameInput } from './TrackName';
 
@@ -36,7 +36,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const { project, ws, setWs } = st;
   const t = ws.track ? project.track(ws.track) : null;
   const entry = t ? deviceEntry(t.device) : null;
-  const step = usePlayStep(t ? st.slotOf(t.id) : undefined);
+  const slotStep = usePlayStep(t ? st.slotOf(t.id) : undefined);
+  const playRow = usePlayRow();
   const grid = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const [sel, setSel] = useState<string | null>(null);
@@ -86,6 +87,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
       </div>
     );
   const L = info.len;
+  // The playhead shows only when this pattern is the one playing now.
+  const step = playRow && project.cell(playRow, t.id) === pat ? slotStep : -1;
   const { low, high } = entry.roll;
   const key = project.key;
   const keyed = key.scale !== 'chromatic';

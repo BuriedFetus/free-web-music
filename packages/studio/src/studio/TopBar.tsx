@@ -4,7 +4,7 @@ import { useEngine } from '../engine/EngineProvider';
 import { NOTE_NAMES, SCALES } from '../model/scales';
 import { useStudio } from './context';
 
-/** Live transport position "bar.beat.step", from the engine. */
+/** Live position inside the playing TRACK: "row|bar.beat.step", from the engine. */
 function usePosition(): string | null {
   const { engine, status } = useEngine();
   return useSyncExternalStore(
@@ -12,17 +12,18 @@ function usePosition(): string | null {
     () => {
       const p = status === 'on' ? engine?.last?.transport : null;
       if (!p?.playing) return null;
-      const s = Math.floor(p.pos);
-      return `${Math.floor(s / 16) + 1}.${Math.floor((s % 16) / 4) + 1}.${(s % 4) + 1}`;
+      const s = Math.floor(p.row != null ? p.rowPos : p.pos);
+      return `${p.row ?? ''}|${Math.floor(s / 16) + 1}.${Math.floor((s % 16) / 4) + 1}.${(s % 4) + 1}`;
     },
     () => null,
   );
 }
 
 export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
-  const { project, ws, playing, setPlaying, rec, setRec, user } = useStudio();
+  const { project, ws, setWs, playing, setPlaying, rec, setRec, user } = useStudio();
   const { status, start, stop } = useEngine();
-  const pos = usePosition();
+  const live = usePosition();
+  const [playRow, pos] = live ? live.split('|') : [null, null];
   const trackName = (id: string | null) => (id ? project.track(id)?.name : null);
   const rowIds = project.rows().map((r) => r.id);
   const rowName = (id: string | null) => (id && rowIds.includes(id) ? `TRACK ${rowIds.indexOf(id) + 1}` : '');
@@ -38,7 +39,13 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
           ● Rec
         </button>
         <span className="fwm-lcdt" aria-label="Position">
-          {rowName(ws.row)} {pos ?? '1.1.1'}
+          {rowName(playRow || ws.row)} {pos ?? '1.1.1'}
+        </span>
+        <span className="fwm-grp" role="group" aria-label="Loop">
+          <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.loop === 'track'} title="Repeat the TRACK that is playing"
+            onClick={() => setWs({ loop: 'track' })}>⟲ Loop TRACK</button>
+          <button type="button" className="fwm-tb fwm-tb--sm" aria-pressed={ws.loop === 'song'} title="Play the TRACKs in order, then start again"
+            onClick={() => setWs({ loop: 'song' })}>⟲ Loop SONG</button>
         </span>
         <span className="fwm-bpm">
           <button type="button" className="fwm-tb fwm-tb--sm" aria-label="Slower" onClick={() => project.setBpm(project.bpm - 1)}>−</button>

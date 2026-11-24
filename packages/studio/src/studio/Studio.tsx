@@ -38,7 +38,7 @@ export function Studio(props: StudioProps) {
   );
 }
 
-const WS_DEFAULT: Workspace = { track: null, row: null, snap: '1/16', recQuant: '1/16', fold: false };
+const WS_DEFAULT: Workspace = { track: null, row: null, snap: '1/16', recQuant: '1/16', fold: false, loop: 'song' };
 function loadWs(key: string): Workspace {
   try {
     return { ...WS_DEFAULT, ...JSON.parse(localStorage.getItem(key) || '{}') };
@@ -106,9 +106,25 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
     },
     [status, start],
   );
+  // Play starts from the selected TRACK; tempo and swing apply at once.
+  const rowsRef = useRef(rows);
+  rowsRef.current = rows;
+  const selRowRef = useRef(selRow?.id ?? null);
+  selRowRef.current = selRow?.id ?? null;
   useEffect(() => {
-    live?.setTransport({ playing, bpm: project.bpm, swing: project.swing });
-  }, [live, playing, project.bpm, project.swing]);
+    const row = Math.max(0, rowsRef.current.findIndex((r) => r.id === selRowRef.current));
+    live?.setTransport({ playing, row });
+  }, [live, playing]);
+  useEffect(() => {
+    live?.setTransport({ bpm: project.bpm, swing: project.swing });
+  }, [live, project.bpm, project.swing]);
+  const cueRow = useCallback(
+    (row: string) => {
+      const i = rowsRef.current.findIndex((r) => r.id === row);
+      if (live && playing && i >= 0) live.cue(i);
+    },
+    [live, playing],
+  );
 
   // ---- toasts ----
   const [toastState, setToast] = useState<{ msg: string; action?: { label: string; run(): void }; id: number } | null>(null);
@@ -123,27 +139,30 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
 
   // ---- live recording ----
   const recHeld = useRef(new Map<string, { id: string; track: string; pat: string; s: number; startPos: number }>());
+  // What the player heard is late by the output latency: record where they heard it.
+  const latSteps = useCallback(() => {
+    const lat = live?.latency();
+    return lat ? (lat.base + lat.output) * (project.bpm / 60) * 4 : 0;
+  }, [live, project]);
   const recPos = useCallback(() => {
     const p = live?.position();
-    if (p == null || !live) return null;
-    const lat = live.latency();
-    // What the player heard is late by the output latency: record where they heard it.
-    return p - (lat.base + lat.output) * (project.bpm / 60) * 4;
-  }, [live, project]);
+    return p == null ? null : p - latSteps();
+  }, [live, latSteps]);
 
   const recordOn = useCallback(
     (track: TrackInfo, note: number, vel: number) => {
       const pos = recPos();
-      if (pos == null || !ws.row) return;
-      // Record into the pattern this instrument plays in the selected TRACK; an empty cell gets a new pattern.
-      let pat = project.cell(ws.row, track.id);
+      const rp = live?.rowPosition();
+      if (pos == null || !rp) return;
+      // Record into the pattern this instrument plays in the TRACK that is playing; an empty cell gets a new pattern.
+      let pat = project.cell(rp.row, track.id);
       if (!pat) {
         pat = project.addPattern(track.id);
         if (!pat) return;
-        project.setCell(ws.row, track.id, pat);
+        project.setCell(rp.row, track.id, pat);
       }
       const len = project.patternInfo(track.id, pat)?.len ?? 16;
-      const raw = Math.max(0, pos) * track.seq.rate;
+      const raw = Math.max(0, rp.pos - latSteps()) * track.seq.rate;
       const n = Math.floor(raw);
       const idx = stepOf(n, len, track.seq.dir, (slots.current.get(track.id) ?? 0) + 1);
       const q = QUANT[ws.recQuant] ?? 0;
@@ -153,7 +172,7 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
       const id = project.addNote(track.id, pat, { s, l: q || 0.25, m: note, v: vel });
       if (id) recHeld.current.set(`${track.id}:${note}`, { id, track: track.id, pat, s, startPos: pos });
     },
-    [recPos, ws.recQuant, ws.row, project],
+    [recPos, latSteps, live, ws.recQuant, project],
   );
   const recordOff = useCallback(
     (trackId: string, note: number) => {
@@ -297,7 +316,7 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
   }, [project, playing, setPlaying]);
 
   const ctx: StudioCtx = {
-    project, presence, user, channel, ws, setWs, playing, setPlaying, rec, setRec, slotOf,
+    project, presence, user, channel, ws, setWs, playing, setPlaying, rec, setRec, slotOf, cueRow,
     playNote, releaseNote, audition, peerHeld, toast,
   };
 
@@ -305,8 +324,9 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
     <StudioContext.Provider value={ctx}>
       {live && tracks.map((t) => {
         const slot = slots.current.get(t.id);
-        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} pat={project.cell(selRow?.id, t.id)} />;
+        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} />;
       })}
+      {live && <SongEngine project={project} slotOf={slotOf} loop={ws.loop} />}
       <div className="fwm-app">
         <TopBar peers={peers} octave={octave} />
         <WorkspaceGrid userId={user.id} peers={peers} />
@@ -325,39 +345,67 @@ function StudioInner({ doc, awareness = null, channel = null, user }: StudioProp
   );
 }
 
-/**
- * Keeps one instrument's device, sequencer settings and playing pattern mirrored in the engine.
- * For now the selected TRACK (song row) loops; playing through the song comes next.
- */
-function TrackEngine({ project, track, slot, pat }: { project: Project; track: TrackInfo; slot: number; pat: string | null }) {
+/** Keeps one instrument's device, sequencer settings and all its patterns mirrored in the engine. */
+function TrackEngine({ project, track, slot }: { project: Project; track: TrackInfo; slot: number }) {
   const { engine } = useEngine();
-  const sent = useRef('');
+  const sent = useRef(new Map<string, string>()); // patternId → what the engine has
   const seqKey = useRef('');
   const manifest = deviceEntry(track.device)!.manifest!;
   const store = project.deviceStore(track.id, manifest)!;
   useDeviceSync(engine, store, slot, track.device);
   // Re-send everything when the engine (re)starts or the device is re-created (removing a device
-  // in the worklet also forgets its pattern).
+  // in the worklet also forgets its patterns).
   useEffect(() => {
-    sent.current = '';
+    sent.current = new Map();
     seqKey.current = '';
   }, [engine, store]);
   useEffect(() => {
     if (!engine) return;
-    const info = project.patternInfo(track.id, pat);
-    const settings = { ...track.seq, len: info?.len ?? 16, mute: track.seq.mute || !info };
-    const k = JSON.stringify(settings);
+    const k = JSON.stringify(track.seq);
     if (k !== seqKey.current) {
       seqKey.current = k;
-      engine.setTrack(slot, settings);
+      engine.setTrack(slot, track.seq);
     }
-    const notes = pat ? project.notes(track.id, pat).map(([, n]) => n) : [];
-    const auto = pat ? project.automationAll(track.id, pat) : {};
-    const pk = JSON.stringify([notes, auto]);
-    if (pk !== sent.current) {
-      sent.current = pk;
-      engine.setPattern(slot, notes, auto);
+    const seen = new Set<string>();
+    for (const p of project.patternList(track.id)) {
+      seen.add(p.id);
+      const data = { len: p.len, notes: project.notes(track.id, p.id).map(([, n]) => n), auto: project.automationAll(track.id, p.id) };
+      const pk = JSON.stringify(data);
+      if (sent.current.get(p.id) === pk) continue;
+      sent.current.set(p.id, pk);
+      engine.setPat(slot, p.id, data);
     }
+    for (const id of [...sent.current.keys()]) {
+      if (seen.has(id)) continue;
+      sent.current.delete(id);
+      engine.deletePat(slot, id);
+    }
+  });
+  return null;
+}
+
+/** Sends the song (which pattern each instrument plays in each TRACK, and how long each TRACK is). */
+function SongEngine({ project, slotOf, loop }: { project: Project; slotOf(track: string): number | undefined; loop: 'track' | 'song' }) {
+  const { engine } = useEngine();
+  const sent = useRef('');
+  useEffect(() => {
+    sent.current = '';
+  }, [engine]);
+  useEffect(() => {
+    if (!engine) return;
+    const rows = project.rows().map((r) => {
+      const cells: Record<number, string> = {};
+      for (const [t, p] of Object.entries(r.cells)) {
+        const slot = slotOf(t);
+        if (slot != null && project.patternInfo(t, p)) cells[slot] = p;
+      }
+      return { id: r.id, len: project.rowLen(r.id), cells };
+    });
+    const plan = { rows, loop };
+    const k = JSON.stringify(plan);
+    if (k === sent.current) return;
+    sent.current = k;
+    engine.setSong(rows.length ? plan : null);
   });
   return null;
 }

@@ -102,3 +102,60 @@ describe('Sequencer', () => {
     expect(ons(run(seq, 128))[0].frame).toBe(0);
   });
 });
+
+describe('Sequencer: song (rows of patterns)', () => {
+  // Slot 0 has a 16-step pattern "a" (note 36 on every beat) and a 32-step "b" (note 48 at 0 and 16);
+  // slot 1 has a 12-step pattern "c" (note 60 at step 0).
+  function songSeq(loop: 'track' | 'song') {
+    const seq = new Sequencer(SR);
+    seq.setTrack(0, {});
+    seq.setTrack(1, {});
+    seq.setPat(0, 'a', { len: 16, notes: [0, 4, 8, 12].map((s) => ({ s, l: 1, m: 36, v: 1 })) });
+    seq.setPat(0, 'b', { len: 32, notes: [0, 16].map((s) => ({ s, l: 1, m: 48, v: 1 })) });
+    seq.setPat(1, 'c', { len: 12, notes: [{ s: 0, l: 1, m: 60, v: 1 }] });
+    seq.setSong({ loop, rows: [{ id: 'r1', len: 16, cells: { 0: 'a', 1: 'c' } }, { id: 'r2', len: 32, cells: { 0: 'b' } }] });
+    return seq;
+  }
+  const at = (e: Ev[], note: number) => ons(e).filter((x) => x.a === note).map((x) => x.frame / STEP);
+
+  it('loop song: a row lasts as long as its longest pattern, shorter ones restart with each row', () => {
+    const seq = songSeq('song');
+    play(seq);
+    const e = run(seq, 64 * STEP);
+    expect(at(e, 36)).toEqual([0, 4, 8, 12, 48, 52, 56, 60]); // row 1 at 0, row 2 (32 steps) 16–48, row 1 again at 48
+    expect(at(e, 48)).toEqual([16, 32]);
+    expect(at(e, 60)).toEqual([0, 12, 48, 60]); // the 12-step pattern repeats inside row 1 and restarts with it
+  });
+
+  it('loop track: the playing row repeats; play can start from any row', () => {
+    const seq = songSeq('track');
+    seq.setTransport({ playing: true, bpm: 120, swing: 0, row: 1 });
+    const e = run(seq, 64 * STEP);
+    expect(at(e, 48)).toEqual([0, 16, 32, 48]);
+    expect(at(e, 36)).toEqual([]);
+  });
+
+  it('cue jumps to another row at once, keeping the place in the bar', () => {
+    const seq = songSeq('track');
+    play(seq);
+    run(seq, 6 * STEP); // about 6 steps into row 1 (blocks are 128 frames, so 6.016)
+    const into = seq.pos - seq.rowStart;
+    seq.cue(1);
+    expect(seq.pos - seq.rowStart).toBeCloseTo(into, 6); // same place in the bar, now in row 2
+    const e = run(seq, 20 * STEP);
+    // Row 2's next note (its step 16) comes when row 2 reaches 16, about 10 steps later.
+    expect(at(e, 48).map((f) => Math.round((f + into) * 1000) / 1000)).toEqual([16]);
+    expect(at(e, 36)).toEqual([]);
+  });
+
+  it('a slot with no pattern in the row is silent; editing the song keeps the playing row', () => {
+    const seq = songSeq('song');
+    play(seq);
+    run(seq, 20 * STEP); // in row 2
+    seq.setSong({ loop: 'song', rows: [{ id: 'r0', len: 16, cells: {} }, { id: 'r1', len: 16, cells: { 0: 'a', 1: 'c' } }, { id: 'r2', len: 32, cells: { 0: 'b' } }] });
+    expect(seq.song!.rows[seq.row].id).toBe('r2');
+    const e = run(seq, 12 * STEP);
+    expect(at(e, 60)).toEqual([]); // slot 1 has nothing in row 2
+    expect(at(e, 36)).toEqual([]); // row r0 (empty) comes next, at 32
+  });
+});

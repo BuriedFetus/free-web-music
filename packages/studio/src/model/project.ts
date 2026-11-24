@@ -447,9 +447,14 @@ export class Project {
     if (!c) return;
     this.action(() => (pat ? c.set(track, pat) : c.delete(track)));
   }
+  /** How long a pattern takes to play once in a track, in steps of the song clock (rate ½× = twice as long). */
+  playLen(track: string, pat: string | null | undefined): number {
+    const info = this.patternInfo(track, pat);
+    return info ? info.len / (this.track(track)?.seq.rate || 1) : 0;
+  }
   /** How long a row plays, in steps: its longest pattern (one bar when it is empty). */
   rowLen(row: string): number {
-    const lens = this.trackIds().map((t) => this.patternInfo(t, this.cell(row, t))?.len ?? 0);
+    const lens = this.trackIds().map((t) => this.playLen(t, this.cell(row, t)));
     return Math.max(0, ...lens) || BAR;
   }
   /** Add an empty row after `after` (default: at the end), or a copy of it with `copy`. Returns its id. */

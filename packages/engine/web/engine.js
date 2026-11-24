@@ -105,9 +105,26 @@ export async function createEngine({ base, context, manifests } = {}) {
     clearRoute(slot, r) {
       send({ t: 'unroute', slot, r });
     },
-    /** Main sequencer: play/stop (restarts from bar 1), tempo, swing (0..0.6). */
-    setTransport({ playing, bpm, swing }) {
-      send({ t: 'transport', playing, bpm, swing });
+    /** Main sequencer: play/stop (restarts from bar 1, from song row `row`), tempo, swing (0..0.6). */
+    setTransport({ playing, bpm, swing, row }) {
+      send({ t: 'transport', playing, bpm, swing, row });
+    },
+    /** Song mode: one of a slot's patterns, {len, notes, auto: {paramId: (value|null)[]}}. */
+    setPat(slot, id, { len, notes, auto = {} }) {
+      const byIndex = {};
+      for (const k in auto) byIndex[index(slot, k)] = auto[k];
+      send({ t: 'pat', slot, id, len, notes, auto: byIndex });
+    },
+    deletePat(slot, id) {
+      send({ t: 'patdel', slot, id });
+    },
+    /** Song mode: rows [{id, len, cells: {slot: patternId}}] and loop 'track' | 'song' (null = no song). */
+    setSong(song) {
+      send({ t: 'song', song });
+    },
+    /** Jump to song row `row` now (keeps the place in the bar while playing). */
+    cue(row) {
+      send({ t: 'cue', row });
     },
     /** Per-track sequencer settings: len 1..16, dir fwd|rev|pp|rnd, rate 0.5|1|2, own, mute. */
     setTrack(slot, settings) {
@@ -124,6 +141,12 @@ export async function createEngine({ base, context, manifests } = {}) {
       const tr = engine.last?.transport;
       if (!tr || !tr.playing) return null;
       return tr.pos + (ctx.currentTime - tr.time) * (tr.bpm / 60) * 4;
+    },
+    /** Song row playing now and the estimated position inside it (steps), or null when stopped. */
+    rowPosition() {
+      const tr = engine.last?.transport;
+      if (!tr || !tr.playing || tr.row == null) return null;
+      return { row: tr.row, pos: tr.rowPos + (ctx.currentTime - tr.time) * (tr.bpm / 60) * 4 };
     },
     resume() {
       return ctx.resume();

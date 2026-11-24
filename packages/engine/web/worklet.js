@@ -6,7 +6,12 @@
 //   {t:'param',slot,i,v} {t:'route',slot,r,src,target,depth} {t:'unroute',slot,r}
 //   {t:'transport', playing, bpm, swing}            play/stop restarts from bar 1
 //   {t:'track', slot, len, dir, rate, own, mute}     per-track sequencer settings
-//   {t:'pattern', slot, notes:[{s,l,m,v}], auto:{[paramIndex]:(number|null)[16]}}
+//   {t:'pattern', slot, notes:[{s,l,m,v}], auto:{[paramIndex]:(number|null)[]}}   one pattern (no song)
+// Song mode (when a song is set):
+//   {t:'pat', slot, id, len, notes, auto}  {t:'patdel', slot, id}     an instrument's patterns
+//   {t:'song', rows:[{id, len, cells:{[slot]: patternId}}], loop:'track'|'song'}
+//   {t:'cue', row}                         jump to a row now, keeping the place in the bar
+//   transport may carry `row`: the row to start from when play starts
 // Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport}.
 // MessagePort is used everywhere for now; a SharedArrayBuffer ring comes later behind the same API.
 const UI_EVERY = 6; // blocks between UI snapshots (~16 ms at 48 kHz)
@@ -50,6 +55,46 @@ export class Sequencer {
     this.anchorPos = 0;
     this.tracks = new Map(); // slot → {len,dir,rate,own,mute,notes,auto,step}
     this.offs = []; // pending note-offs: {at (steps, global), slot, note}
+    // Song: each row plays, per slot, one of that slot's patterns; a row lasts `len` steps (its longest
+    // pattern), then the next row starts (loop 'song') or the same row again (loop 'track').
+    this.pats = new Map(); // slot → Map(patternId → {len, notes, auto})
+    this.song = null; // {rows:[{id,len,cells}], loop}
+    this.row = 0; // index of the playing row
+    this.rowStart = 0; // global position (steps) where it started
+  }
+  setPat(slot, id, p) {
+    if (!this.pats.has(slot)) this.pats.set(slot, new Map());
+    this.pats.get(slot).set(id, { len: Math.max(1, p.len | 0), notes: p.notes || [], auto: p.auto || {} });
+  }
+  delPat(slot, id) {
+    this.pats.get(slot)?.delete(id);
+  }
+  setSong(song) {
+    const cur = this.song?.rows[this.row]?.id;
+    this.song = song && song.rows.length ? song : null;
+    if (!this.song) return;
+    const i = this.song.rows.findIndex((r) => r.id === cur);
+    this.row = i >= 0 ? i : Math.min(this.row, this.song.rows.length - 1);
+  }
+  /** Jump to a row now. While playing, the new row picks up at the same place in the bar, so the beat goes on. */
+  cue(row) {
+    if (!this.song) return;
+    this.row = Math.max(0, Math.min(this.song.rows.length - 1, row | 0));
+    if (!this.playing) return;
+    const p = this.pos;
+    let into = (p - this.rowStart) % 16;
+    const len = this.song.rows[this.row].len;
+    if (into >= len) into %= len;
+    this.rowStart = p - into;
+  }
+  /** What a slot plays right now: {len, notes, auto} or null (silent). */
+  active(slot, t) {
+    if (!this.song) return t;
+    const id = this.song.rows[this.row]?.cells[slot];
+    return (id != null && this.pats.get(slot)?.get(id)) || null;
+  }
+  get rowLen() {
+    return this.song ? Math.max(1, this.song.rows[this.row]?.len || 16) : Infinity;
   }
   track(slot) {
     let t = this.tracks.get(slot);
@@ -69,6 +114,7 @@ export class Sequencer {
   }
   removeTrack(slot) {
     this.tracks.delete(slot);
+    this.pats.delete(slot);
     this.offs = this.offs.filter((o) => o.slot !== slot);
   }
   /** Global position in steps at the start of the next block. */
@@ -78,7 +124,7 @@ export class Sequencer {
   posAt(frame) {
     return this.anchorPos + (frame - this.anchorFrame) * this.stepsPerFrame();
   }
-  setTransport({ playing, bpm, swing }) {
+  setTransport({ playing, bpm, swing, row }) {
     if (bpm && bpm !== this.bpm) {
       // Tempo change keeps the current position.
       this.anchorPos = this.pos;
@@ -91,6 +137,8 @@ export class Sequencer {
       this.frame = 0;
       this.anchorFrame = 0;
       this.anchorPos = 0;
+      this.rowStart = 0;
+      if (playing && row != null && this.song) this.row = Math.max(0, Math.min(this.song.rows.length - 1, row | 0));
       for (const t of this.tracks.values()) t.step = -1;
       return true; // caller flushes note-offs
     }
@@ -114,32 +162,57 @@ export class Sequencer {
     const p1 = this.posAt(this.frame + frames);
     const events = [];
     const at = (pos) => Math.min(frames - 1, Math.max(0, Math.floor((pos - p0) / spf + 1e-6)));
+    // A block can cross the end of a row: play each part with the row it belongs to.
+    let a = p0;
+    for (let guard = 0; guard < 64 && a < p1; guard++) {
+      const end = this.rowStart + this.rowLen;
+      const b = Math.min(p1, end);
+      if (b > a) this.collect(a, b, events);
+      if (end > p1) break;
+      // The row is over: next row (loop song) or the same one again (loop track).
+      if (this.song && this.song.loop === 'song') this.row = (this.row + 1) % this.song.rows.length;
+      this.rowStart = end;
+      a = end;
+    }
+    this.schedule(events, p0, p1, emit, at);
+    this.frame += frames;
+  }
+  /** Events of the playing row between global positions a and b. Ticks count from the row's start. */
+  collect(p0, p1, events) {
+    const base = this.rowStart;
     for (const [slot, t] of this.tracks) {
+      const pat = this.active(slot, t);
+      if (!pat) {
+        t.step = -1;
+        continue;
+      }
       const r = t.rate || 1;
-      const t0 = p0 * r;
-      const t1 = p1 * r;
+      const t0 = (p0 - base) * r;
+      const t1 = (p1 - base) * r;
       // Ticks whose (shifted, offset) events could fall in [t0, t1): notes sit up to 1 tick after
       // their tick start, swing adds up to half a tick.
       for (let n = Math.max(0, Math.floor(t0) - 2); n <= Math.floor(t1); n++) {
         const tickStart = n + this.swingShift(n);
-        const idx = stepOf(n, t.len, t.dir, slot + 1);
+        const idx = stepOf(n, pat.len, t.dir, slot + 1);
         if (tickStart >= t0 - 1e-9 && tickStart < t1 - 1e-9) {
           t.step = idx;
-          for (const k in t.auto) {
-            const v = t.auto[k]?.[idx];
-            if (v != null) events.push({ pos: tickStart / r, kind: 'param', slot, a: Number(k), b: v });
+          for (const k in pat.auto) {
+            const v = pat.auto[k]?.[idx];
+            if (v != null) events.push({ pos: base + tickStart / r, kind: 'param', slot, a: Number(k), b: v });
           }
         }
         if (t.own || t.mute) continue;
-        for (const note of t.notes) {
+        for (const note of pat.notes) {
           if (Math.floor(note.s) !== idx) continue;
           const on = tickStart + (note.s - idx);
           if (on < t0 - 1e-9 || on >= t1 - 1e-9) continue;
-          const gOn = on / r;
+          const gOn = base + on / r;
           events.push({ pos: gOn, kind: 'on', slot, a: note.m, b: note.v, off: gOn + Math.max(0.05, note.l * 0.98) / r });
         }
       }
     }
+  }
+  schedule(events, p0, p1, emit, at) {
     events.sort((x, y) => x.pos - y.pos);
     const out = [];
     for (const e of events) {
@@ -165,7 +238,6 @@ export class Sequencer {
     // Stable order: by time, and at equal times offs before ons (so retriggers work).
     out.sort((x, y) => x.pos - y.pos || (x.kind === 'off' ? 0 : 1) - (y.kind === 'off' ? 0 : 1));
     for (const e of out) emit(at(e.pos), e.kind, e.slot, e.a, e.b);
-    this.frame += frames;
   }
   /** All pending note-offs now (used on stop). */
   flush(emit) {
@@ -229,6 +301,10 @@ class FwmEngine extends Processor {
       }
       case 'track': this.seq.setTrack(m.slot, m); break;
       case 'pattern': this.seq.setPattern(m.slot, m.notes, m.auto); break;
+      case 'pat': this.seq.setPat(m.slot, m.id, m); break;
+      case 'patdel': this.seq.delPat(m.slot, m.id); break;
+      case 'song': this.seq.setSong(m.song); break;
+      case 'cue': this.seq.cue(m.row); break;
     }
   }
   /** After playback, knobs go back to where the users left them (automation only applies while playing). */
@@ -236,7 +312,8 @@ class FwmEngine extends Processor {
     for (const [slot, t] of this.seq.tracks) {
       const base = this.base.get(slot);
       if (!base) continue;
-      for (const k in t.auto) if (base.has(Number(k))) this.x.fwm_param(slot, 0, Number(k), base.get(Number(k)));
+      const autos = [t.auto, ...[...(this.seq.pats.get(slot)?.values() ?? [])].map((p) => p.auto)];
+      for (const auto of autos) for (const k in auto) if (base.has(Number(k))) this.x.fwm_param(slot, 0, Number(k), base.get(Number(k)));
     }
   }
   view(ptr, len) {
@@ -270,7 +347,11 @@ class FwmEngine extends Processor {
         step: this.seq.tracks.get(s)?.step ?? -1,
       };
     }
-    const transport = { playing: this.seq.playing, pos: this.seq.pos, bpm: this.seq.bpm, time: currentTime };
+    const sq = this.seq;
+    const transport = {
+      playing: sq.playing, pos: sq.pos, bpm: sq.bpm, time: currentTime,
+      row: sq.song ? sq.song.rows[sq.row]?.id ?? null : null, rowPos: sq.playing && sq.song ? sq.pos - sq.rowStart : 0,
+    };
     this.port.postMessage({ t: 'tick', scope, devices, transport }, [scope.buffer]);
   }
 }

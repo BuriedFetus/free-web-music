@@ -39,7 +39,8 @@ export interface EngineTick {
   scope: Float32Array;
   /** Per slot: modulated param values (manifest order) and mod source values [lfo, amp, filt]. */
   devices: Record<number, { eff: Float32Array; mods: [number, number, number]; step: number }>;
-  transport: { playing: boolean; pos: number; bpm: number; time: number };
+  /** row: id of the song row playing (song mode), rowPos: steps since that row started. */
+  transport: { playing: boolean; pos: number; bpm: number; time: number; row: string | null; rowPos: number };
 }
 
 export type Direction = 'fwd' | 'rev' | 'pp' | 'rnd';
@@ -55,6 +56,12 @@ export interface SeqNote {
   l: number;
   m: number;
   v: number;
+}
+
+/** The song as the engine plays it: rows of {slot: patternId}; a row lasts `len` steps. */
+export interface SongPlan {
+  rows: { id: string; len: number; cells: Record<number, string> }[];
+  loop: 'track' | 'song';
 }
 
 export interface Engine {
@@ -73,7 +80,12 @@ export interface Engine {
   paramIndex(slot: number, id: string): number;
   setRoute(slot: number, route: number, src: ModSourceId, target: string, depth: number): void;
   clearRoute(slot: number, route: number): void;
-  setTransport(t: { playing?: boolean; bpm?: number; swing?: number }): void;
+  setTransport(t: { playing?: boolean; bpm?: number; swing?: number; row?: number }): void;
+  setPat(slot: number, id: string, pattern: { len: number; notes: SeqNote[]; auto?: Record<string, (number | null)[]> }): void;
+  deletePat(slot: number, id: string): void;
+  setSong(song: SongPlan | null): void;
+  cue(row: number): void;
+  rowPosition(): { row: string; pos: number } | null;
   setTrack(slot: number, settings: Partial<TrackSettings>): void;
   setPattern(slot: number, notes: SeqNote[], auto?: Record<string, (number | null)[]>): void;
   position(): number | null;

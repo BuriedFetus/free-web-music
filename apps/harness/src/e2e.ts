@@ -26,6 +26,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'multi') return runMulti(p, engineRef, ok, out);
   if (role === 'switch') return runSwitch(p, engineRef, ok, out);
   if (role === 'roll') return runRoll(p, engineRef, ok, out);
+  if (role === 'song') return runSong(p, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
     if (role === 'a') {
@@ -319,6 +320,77 @@ async function runRoll(p: Project, engineRef: { current: Engine | null }, ok: (c
     ok(env > 0.1 && after < 0.05, `pressing a piano key plays it, releasing stops it (env ${env.toFixed(2)} → ${after.toFixed(3)})`);
   } catch (e) {
     out.push(`FAIL roll: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: the song plays TRACK after TRACK (Loop SONG), repeats one (Loop TRACK), jumps on click, stays editable. */
+async function runSong(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  try {
+    await sleep(300);
+    const id = p.addTrack(m, undefined, 0);
+    const p1 = p.patternList(id)[0].id;
+    for (const st of [0, 4, 8, 12]) p.addNote(id, p1, { s: st, l: 1, m: 36, v: 0.9 });
+    const p2 = p.addPattern(id)!;
+    p.setPatternLen(id, p2, 32);
+    for (const st of [0, 8, 16, 24]) p.addNote(id, p2, { s: st, l: 2, m: 43, v: 0.9 });
+    const [r1] = p.rows().map((r) => r.id);
+    const r2 = p.addRow();
+    p.setCell(r2, id, p2);
+    p.setBpm(240); // 1 bar = 1 s
+    await sleep(200);
+    ($('[aria-label^="TRACK 1,"]') as HTMLButtonElement).click(); // start from TRACK 1
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    btn('⟲ Loop SONG')!.click();
+    btn('▶ Play')!.click();
+    // Watch which row plays, every 50 ms for 3.6 s: TRACK 1 (1 s) → TRACK 2 (2 s) → TRACK 1.
+    const seen: string[] = [];
+    const t0 = performance.now();
+    let nowShown = false;
+    while (performance.now() - t0 < 3600) {
+      const row = engineRef.current!.last!.transport.row;
+      if (row && seen[seen.length - 1] !== row) seen.push(row);
+      if (row === r2 && $('.fwm-arow.is-now [aria-label^="TRACK 2"]')) nowShown = true;
+      await sleep(50);
+    }
+    const names = seen.map((r) => (r === r1 ? 'T1' : r === r2 ? 'T2' : '?')).join(' → ');
+    ok(names === 'T1 → T2 → T1', `Loop SONG plays TRACK 1, then TRACK 2 (2 bars), then back to 1 (${names})`);
+    ok(nowShown, 'the arrangement highlights the TRACK that is playing');
+    // Loop TRACK: click TRACK 2 while playing → it plays at once and keeps repeating.
+    btn('⟲ Loop TRACK')!.click();
+    ($('[aria-label^="TRACK 2,"]') as HTMLButtonElement).click();
+    await sleep(150);
+    ok(engineRef.current!.last!.transport.row === r2, 'clicking TRACK 2 while playing jumps there');
+    const rows = new Set<string>();
+    const t1 = performance.now();
+    while (performance.now() - t1 < 2600) {
+      rows.add(engineRef.current!.last!.transport.row ?? '');
+      await sleep(50);
+    }
+    ok(rows.size === 1 && rows.has(r2), `Loop TRACK keeps repeating TRACK 2 (${[...rows].length} row(s) seen)`);
+    // Editing while playing: rename the pattern; the field keeps focus and text through playback.
+    ($('[aria-label="TRACK 2, Basalt: P2"]') as HTMLButtonElement).click();
+    await sleep(100);
+    const name = $<HTMLInputElement>('[aria-label="Rename pattern P2"]')!;
+    name.focus();
+    const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;
+    set.call(name, 'Chorus');
+    name.dispatchEvent(new Event('input', { bubbles: true }));
+    await sleep(800);
+    const still = $<HTMLInputElement>('.fwm-pname');
+    ok(still === name && name.value === 'Chorus', 'typing a pattern name is not disturbed by playback');
+    name.dispatchEvent(new KeyboardEvent('keydown', { key: 'Enter', bubbles: true }));
+    name.blur();
+    name.dispatchEvent(new FocusEvent('focusout', { bubbles: true }));
+    await sleep(100);
+    ok(p.patternInfo(id, p2)?.name === 'Chorus', `pattern renamed while playing (${p.patternInfo(id, p2)?.name})`);
+    btn('■ Stop')!.click();
+  } catch (e) {
+    out.push(`FAIL song: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
