@@ -1,0 +1,468 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Flint Drum Machine</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Figtree:wght@400;600;800&family=VT323&family=Big+Shoulders+Display:wght@800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="skins/app.css">
+<link rel="stylesheet" href="skins/device-base.css">
+<link rel="stylesheet" href="skins/flint.css">
+<style>
+/* VOICE studio tool: hardware you want to hit; calm chrome around a sandstone instrument
+   IDEA a desktop drum machine: 8 rubber pads, a kit screen, a sound editor, and the step grid below it
+   PICTURE Flint itself: pads lighting as the pattern plays, each grid row running at its own length
+   COLOUR theme tokens only: Flint's casing tokens (--dev-*), the sequencer world in --fwm-roll blue
+   TYPE tokens: display for the nameplate, screen for readouts, label for silkscreen, ui for chrome
+   LAYOUT top bar, device (pads left, sound editor right), step grid; phone: everything stacks */
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--fwm-bg);color:var(--fwm-ink);font:15px/1.45 var(--fwm-font-ui);overflow-x:clip}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fwm-me);outline-offset:2px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px max(2vw,12px);background:var(--fwm-panel);border-bottom:1px solid var(--fwm-line)}
+.grow{flex:1}
+.btn{min-height:40px;padding:0 14px;border-radius:calc(9px*var(--fwm-round));border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;font-weight:600;white-space:nowrap}
+.btn[aria-pressed=true]{background:var(--fwm-me);color:var(--fwm-on-me);border-color:var(--fwm-me)}
+.lcd{font:24px/1 var(--fwm-font-screen);background:var(--fwm-roll-deep);color:var(--fwm-note);padding:6px 10px;border-radius:7px;white-space:nowrap;border:1px solid transparent}
+.bpm{cursor:text}.bpm:hover{border-color:var(--fwm-note)}
+.bpmin{width:7ch;font:24px/1 var(--fwm-font-screen);background:var(--fwm-roll-deep);color:var(--fwm-note);border:2px solid var(--fwm-note);border-radius:7px;padding:5px 9px}
+.muted{color:var(--fwm-mute);font-size:14px}
+main{padding:14px max(2vw,12px) 28px;display:grid;gap:14px;max-width:1240px;margin:0 auto}
+
+/* the device */
+.dev{border-radius:calc(16px*var(--fwm-round));padding:16px;background:var(--dev-texture),linear-gradient(160deg,var(--dev-case),var(--dev-case2));box-shadow:inset 0 1px 0 color-mix(in srgb,var(--dev-cap) 0%,var(--dev-btn)),inset 0 -3px 0 var(--dev-edge),0 calc(10px*var(--fwm-depth,1)) calc(24px*var(--fwm-depth,1)) color-mix(in srgb,var(--fwm-bg) 60%,transparent);color:var(--dev-silk);display:grid;gap:14px}
+.dhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.plate b{display:block;font:900 44px/.9 var(--fwm-font-display);letter-spacing:.04em}
+.plate b i{font-style:normal;color:var(--dev-acc)}
+.plate span{font:600 12px var(--fwm-font-label,var(--fwm-font-ui));letter-spacing:.08em;text-transform:uppercase}
+.kit{display:flex;align-items:center;gap:6px;margin-left:auto}
+.screen{font:26px/1 var(--fwm-font-screen);background:var(--dev-lcd);color:var(--dev-lcdink);padding:8px 12px;border-radius:8px;min-width:250px;white-space:nowrap;box-shadow:inset 0 2px 6px color-mix(in srgb,var(--dev-lcd) 50%,black)}
+.screen small{font-size:18px;opacity:.75}
+.hw{min-height:40px;min-width:40px;padding:0 10px;border:0;border-radius:8px;cursor:pointer;background:linear-gradient(var(--dev-btn),var(--dev-btn2));color:var(--dev-btnink);box-shadow:inset 0 -3px 0 var(--dev-btnedge);font-weight:700}
+.hw[aria-pressed=true]{background:var(--dev-acc);color:var(--dev-btn);box-shadow:inset 0 -3px 0 color-mix(in srgb,var(--dev-acc) 60%,black)}
+.hw:disabled{opacity:.45;cursor:default}
+.body{display:grid;grid-template-columns:minmax(0,1fr) minmax(0,1.25fr);gap:14px}
+.sec{background:var(--dev-sec);border-radius:12px;padding:12px}
+.sec h3{margin:0 0 10px;font:700 12px var(--fwm-font-ui);letter-spacing:.1em;text-transform:uppercase;color:var(--dev-acc)}
+.pads{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:10px}
+.pad{position:relative;aspect-ratio:1;border:0;border-radius:12px;cursor:pointer;background:linear-gradient(160deg,var(--dev-btn),var(--dev-btn2));color:var(--dev-btnink);box-shadow:inset 0 -5px 0 var(--dev-btnedge);display:flex;flex-direction:column;justify-content:flex-end;align-items:flex-start;padding:8px;text-align:left;transition:transform .05s}
+.pad:active{transform:translateY(2px)}
+.pad b{font:800 14px/1.1 var(--fwm-font-ui);text-transform:uppercase}
+.pad small{font-size:12px;opacity:.8}
+.pad .n{position:absolute;top:6px;left:8px;font:700 12px var(--fwm-font-ui);opacity:.6}
+.pad.sel{outline:3px solid var(--dev-acc);outline-offset:2px}
+.pad .led{position:absolute;top:8px;right:8px;width:10px;height:10px;border-radius:50%;background:color-mix(in srgb,var(--dev-acc) 25%,var(--dev-btn2))}
+.pad.hit .led{background:var(--dev-acc);box-shadow:0 0 calc(10px*var(--fwm-glow)) var(--dev-acc)}
+.pad.hit{background:linear-gradient(160deg,color-mix(in srgb,var(--dev-acc) 35%,var(--dev-btn)),var(--dev-btn2))}
+.row{display:flex;flex-wrap:wrap;gap:6px;align-items:center;margin-bottom:10px}
+.lab{font:700 12px var(--fwm-font-ui);letter-spacing:.06em;text-transform:uppercase;min-width:84px}
+.desc{font-size:13px;margin:-4px 0 12px}
+.knobs{display:grid;grid-template-columns:repeat(4,minmax(0,1fr));gap:8px;text-align:center}
+.knob{width:64px;height:64px;margin:0 auto;border-radius:50%;cursor:ns-resize;touch-action:none;position:relative;background:conic-gradient(from 225deg,var(--dev-acc) calc(var(--v)*270deg),color-mix(in srgb,var(--dev-silk) 18%,transparent) 0 270deg,transparent 0)}
+.knob::before{content:"";position:absolute;inset:7px;border-radius:50%;background:radial-gradient(circle at 35% 30%,var(--dev-cap),var(--dev-capd));box-shadow:0 3px 6px color-mix(in srgb,var(--dev-capd) 60%,transparent)}
+.knob::after{content:"";position:absolute;left:50%;top:10px;width:3px;height:16px;margin-left:-1.5px;border-radius:2px;background:var(--dev-btn);transform-origin:50% 22px;transform:rotate(calc(-135deg + var(--v)*270deg))}
+.kv{font:18px/1 var(--fwm-font-screen);margin-top:4px}
+.kl{font:700 11px var(--fwm-font-ui);letter-spacing:.08em;text-transform:uppercase}
+.later{margin-top:12px;padding:8px 10px;border:2px dashed color-mix(in srgb,var(--dev-silk) 35%,transparent);border-radius:10px;font-size:13px}
+
+/* the step grid (in the studio it replaces the Piano roll for Flint) */
+.grid{background:var(--fwm-roll);color:var(--fwm-roll-ink);border-radius:calc(12px*var(--fwm-round));padding:12px;display:grid;gap:6px}
+.ghead{display:flex;flex-wrap:wrap;gap:8px 12px;align-items:center;margin-bottom:4px}
+.ghead h2{margin:0;font-size:16px}
+.pk{min-width:44px;min-height:34px;padding:0 10px;border-radius:8px;border:0;background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);font-weight:700;cursor:pointer}
+.pk[aria-pressed=true]{background:var(--fwm-note);color:var(--fwm-on-note)}
+.scroll{overflow-x:auto;scrollbar-width:thin}
+.lane{display:grid;grid-template-columns:118px minmax(var(--w),1fr) 128px;gap:8px;align-items:center;min-width:max-content}
+.lname{min-height:34px;border:0;border-radius:8px;background:var(--fwm-roll2);color:var(--fwm-roll-ink);text-align:left;padding:0 10px;cursor:pointer;font-weight:700;font-size:13px;white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.lname.sel{box-shadow:inset 0 0 0 2px var(--fwm-note)}
+.cells{display:grid;grid-template-columns:repeat(var(--cols),minmax(18px,1fr));gap:3px}
+.c{height:34px;border:0;border-radius:5px;cursor:pointer;background:var(--fwm-roll2);padding:0}
+.c.bt{box-shadow:inset 2px 0 0 color-mix(in srgb,var(--fwm-roll-ink) 35%,transparent)}
+.c.on{background:color-mix(in srgb,var(--fwm-note) 70%,var(--fwm-roll2))}
+.c.acc{background:var(--fwm-note);box-shadow:0 0 calc(8px*var(--fwm-glow)) var(--fwm-note)}
+.c.out{visibility:hidden}
+.c.now{outline:2px solid var(--fwm-roll-ink);outline-offset:1px}
+.len{display:flex;align-items:center;gap:4px}
+.len button{width:34px;height:34px;border:0;border-radius:8px;background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);cursor:pointer;font-weight:700}
+.len span{font:18px/1 var(--fwm-font-screen);background:var(--fwm-roll-deep);color:var(--fwm-note);padding:6px 6px;border-radius:6px;min-width:3.4ch;text-align:center}
+.notes{font-size:14px;color:var(--fwm-mute);max-width:85ch;margin:0;padding-left:18px}
+.notes li{margin:3px 0}.notes b{color:var(--fwm-ink)}
+@media (max-width:860px){.body{grid-template-columns:minmax(0,1fr)}.kit{margin-left:0}}
+@media (max-width:520px){.pads{gap:6px}.knob{width:52px;height:52px}.screen{min-width:0;font-size:22px}.plate b{font-size:36px}}
+@media (prefers-reduced-motion:reduce){.pad{transition:none}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <button class="btn" id="play" aria-pressed="false">▶ Play</button>
+  <span id="bpmw"></span>
+  <span class="muted">Mock-up with rough preview sounds (the real Flint will be built in Rust, like Basalt). Click a pad, or keys 1–8.</span>
+</div>
+<main>
+  <section class="dev" data-device="flint" aria-label="Flint drum machine">
+    <div class="dhead">
+      <div class="plate"><b>FLIN<i>T</i></b><span>Drum machine · 8 pads</span></div>
+      <div class="kit">
+        <button class="hw" id="kprev" aria-label="Previous kit">‹</button>
+        <div class="screen" id="kitname" aria-live="polite"></div>
+        <button class="hw" id="knext" aria-label="Next kit">›</button>
+        <select class="hw" id="kitsel" aria-label="Choose a kit"></select>
+      </div>
+    </div>
+    <div class="body">
+      <div class="sec"><h3>Pads</h3><div class="pads" id="pads"></div></div>
+      <div class="sec" id="editor"></div>
+    </div>
+  </section>
+
+  <section class="grid" aria-label="Flint pattern">
+    <div class="ghead">
+      <h2>Flint · TRACK 1 plays</h2>
+      <span role="group" aria-label="Pattern" style="display:flex;gap:4px"><button class="pk" aria-pressed="true">Groove</button><button class="pk">Fill</button><button class="pk">+ New</button><button class="pk">⧉ Copy</button></span>
+      <span class="muted" style="color:inherit;opacity:.85">Click a step: on → accent → off. Each row has its own length.</span>
+    </div>
+    <div class="scroll"><div id="lanes" style="display:grid;gap:6px"></div></div>
+  </section>
+
+  <ul class="notes">
+    <li><b>A kit is 8 pads.</b> Any pad can be any drum: four kicks, two snares and two open hats is fine (try the "Four on the floor" kit).</li>
+    <li><b>Every drum comes in 4 characters:</b> Analog (round, warm), Digital (crisp, a little gritty), Noise (airy, made from noise), Vintage (thick, saturated).</li>
+    <li><b>The step grid</b> works like the sequencer you liked: one row per pad, each with its own length (here the rim runs 12 steps and the perc 7 against 16). Patterns, names and the song arrangement work exactly like Basalt's.</li>
+    <li><b>Changing a pad's sound</b> marks the kit "edited"; in the real Flint you can save it as your own kit.</li>
+    <li><b>Samples: later.</b> The goal is a pad that plays your own sample without everyone downloading it from a server.</li>
+  </ul>
+</main>
+
+<script>
+{
+const $ = (s) => document.querySelector(s);
+const TYPES = [['kick','Kick'],['snare','Snare'],['clap','Clap'],['chat','Closed hat'],['ohat','Open hat'],['tom','Tom'],['rim','Rim'],['perc','Perc']];
+const TNAME = Object.fromEntries(TYPES);
+const MODELS = [['analog','Analog','Round and warm: clean sine bodies, smooth decays.'],['digital','Digital','Crisp and bright: harder edges, a little bit-crushed.'],['noise','Noise','Airy: built mostly from filtered noise.'],['vintage','Vintage','Thick and saturated: rounder waves pushed into soft overdrive.']];
+const MNAME = Object.fromEntries(MODELS.map(([k, v]) => [k, v]));
+const P = (type, model, tune = 0.5, decay = 0.5, tone = 0.5, level = 0.8) => ({ type, model, tune, decay, tone, level });
+const std = (m) => [P('kick',m), P('snare',m), P('clap',m), P('chat',m,.5,.3), P('ohat',m), P('tom',m,.45), P('rim',m), P('perc',m)];
+const KITS = [
+  ['Basement', std('analog')],
+  ['Chrome', std('digital')],
+  ['Static', std('noise')],
+  ['Dusty', std('vintage')],
+  ['Four on the floor', [P('kick','analog',.45,.6), P('kick','vintage',.35,.7), P('kick','digital',.6,.35), P('kick','noise',.5,.4), P('snare','analog'), P('snare','noise',.6,.4), P('ohat','analog',.5,.55), P('ohat','digital',.6,.35)]],
+  ['Steel', [P('kick','digital',.55,.4,.7), P('snare','digital',.6,.35,.7), P('clap','digital'), P('chat','digital',.6,.25), P('ohat','digital',.6,.45), P('tom','digital',.6), P('rim','digital',.6), P('perc','digital',.7)]],
+  ['Sandstorm', [P('kick','vintage',.4,.65), P('snare','noise',.5,.55), P('clap','vintage'), P('chat','noise',.5,.3), P('ohat','noise',.5,.6), P('tom','vintage',.35,.6), P('rim','vintage'), P('perc','noise',.6)]],
+  ['Night Bus', [P('kick','analog',.42,.75,.3), P('snare','vintage',.45,.5,.35), P('clap','analog',.5,.6,.4), P('chat','analog',.45,.3,.4), P('ohat','vintage',.45,.6,.4), P('tom','analog',.3,.7,.4), P('rim','analog',.4,.5,.4), P('perc','vintage',.35,.5,.4)]],
+];
+let kit = 0, pads = structuredClone(KITS[0][1]), edited = false, sel = 0;
+// pattern: per pad row {len, steps: 0 off | 1 on | 2 accent}
+const row = (len, on, acc = []) => ({ len, steps: Array.from({ length: 32 }, (_, i) => (acc.includes(i) ? 2 : on.includes(i) ? 1 : 0)) });
+const lanes = [
+  row(16, [0, 4, 8, 12], [0]), row(16, [4, 12], [12]), row(16, [12]), row(16, [0, 2, 4, 6, 8, 10, 12], [2, 6, 10]),
+  row(16, [14]), row(16, [10, 11]), row(12, [3, 7, 10]), row(7, [0, 3], [5]),
+];
+let bpm = 112, playing = false;
+
+// ---------- preview sounds (rough WebAudio sketches of each character) ----------
+let ac = null, master = null, noise = null, openHat = null;
+const curves = {};
+function curve(kind) {
+  if (curves[kind]) return curves[kind];
+  const n = 2048, c = new Float32Array(n);
+  for (let i = 0; i < n; i++) {
+    const x = (i / (n - 1)) * 2 - 1;
+    c[i] = kind === 'crush' ? Math.round(x * 7) / 7 : kind === 'drive' ? Math.tanh(x * 2.6) / Math.tanh(2.6) : x;
+  }
+  return (curves[kind] = c);
+}
+function audio() {
+  if (ac) return ac;
+  ac = new AudioContext();
+  master = ac.createGain();
+  master.gain.value = 0.7;
+  const comp = ac.createDynamicsCompressor();
+  master.connect(comp).connect(ac.destination);
+  noise = ac.createBuffer(1, ac.sampleRate, ac.sampleRate);
+  const d = noise.getChannelData(0);
+  for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1;
+  return ac;
+}
+function env(g, t, peak, dec) {
+  g.gain.setValueAtTime(0.0001, t);
+  g.gain.exponentialRampToValueAtTime(peak, t + 0.002);
+  g.gain.exponentialRampToValueAtTime(0.0001, t + dec);
+}
+function osc(t, type, f, f0, sweep, dec, peak, out) {
+  const o = ac.createOscillator(), g = ac.createGain();
+  o.type = type;
+  o.frequency.setValueAtTime(f0, t);
+  o.frequency.exponentialRampToValueAtTime(f, t + sweep);
+  env(g, t, peak, dec);
+  o.connect(g).connect(out);
+  o.start(t);
+  o.stop(t + dec + 0.05);
+  return g;
+}
+function hiss(t, ftype, freq, q, dec, peak, out) {
+  const s = ac.createBufferSource(), f = ac.createBiquadFilter(), g = ac.createGain();
+  s.buffer = noise;
+  f.type = ftype;
+  f.frequency.value = freq;
+  f.Q.value = q;
+  env(g, t, peak, dec);
+  s.connect(f).connect(g).connect(out);
+  s.start(t, Math.random() * 0.5);
+  s.stop(t + dec + 0.05);
+  return g;
+}
+function metal(t, base, dec, peak, out, wave) {
+  const hp = ac.createBiquadFilter(), g = ac.createGain();
+  hp.type = 'highpass';
+  hp.frequency.value = 7000;
+  env(g, t, peak, dec);
+  for (const r of [2, 3, 4.16, 5.43, 6.79, 8.21]) {
+    const o = ac.createOscillator();
+    o.type = wave;
+    o.frequency.value = base * r;
+    o.connect(hp);
+    o.start(t);
+    o.stop(t + dec + 0.05);
+  }
+  hp.connect(g).connect(out);
+  return g;
+}
+function hit(p, t = audio().currentTime, accent = false) {
+  const m = p.model, tune = 2 ** ((p.tune - 0.5) * 2), D = 0.35 + p.decay * 1.3, T = p.tone;
+  const vol = p.level * (accent ? 1 : 0.68);
+  const out = ac.createGain();
+  out.gain.value = vol;
+  let dest = out;
+  if (m === 'digital' || m === 'vintage') {
+    const sh = ac.createWaveShaper();
+    sh.curve = curve(m === 'digital' ? 'crush' : 'drive');
+    sh.connect(out);
+    dest = sh;
+  }
+  if (m === 'vintage') {
+    const lp = ac.createBiquadFilter();
+    lp.type = 'lowpass';
+    lp.frequency.value = 4000 + T * 6000;
+    lp.connect(dest);
+    dest = lp;
+  }
+  out.connect(master);
+  const tw = m === 'analog' ? 'sine' : m === 'digital' ? 'square' : m === 'vintage' ? 'triangle' : 'sine';
+  const nz = m === 'noise' ? 1 : 0.35; // how much of the sound is noise
+  const body = m === 'noise' ? 0.45 : 1;
+  switch (p.type) {
+    case 'kick': {
+      const f = 48 * tune;
+      if (m === 'digital') { const lp = ac.createBiquadFilter(); lp.type = 'lowpass'; lp.frequency.value = 900; lp.connect(dest); osc(t, 'square', f, f * 5, 0.05, 0.35 * D, 0.9 * body, lp); }
+      else osc(t, tw, f, f * (m === 'vintage' ? 6 : 4), m === 'vintage' ? 0.09 : 0.05, 0.45 * D, body, dest);
+      hiss(t, 'lowpass', 2000 + T * 6000, 0.7, 0.02 + 0.03 * T, 0.25 + nz * 0.4, dest);
+      break;
+    }
+    case 'snare':
+      osc(t, tw, 180 * tune, 260 * tune, 0.03, 0.15 * D, 0.55 * body, dest);
+      hiss(t, 'highpass', 1200 + T * 3000, 0.8, 0.22 * D, 0.5 + nz * 0.35, dest);
+      break;
+    case 'clap':
+      for (const [o, a] of [[0, 0.7], [0.011, 0.6], [0.022, 0.8]]) hiss(t + o, 'bandpass', 1100 * tune + T * 800, 1.6, 0.03, a, dest);
+      hiss(t + 0.03, 'bandpass', 1100 * tune + T * 800, 1.2, 0.25 * D, 0.7 + nz * 0.2, dest);
+      break;
+    case 'chat':
+    case 'ohat': {
+      const dec = (p.type === 'chat' ? 0.06 : 0.45) * D;
+      if (p.type === 'chat' && openHat) { openHat.gain.cancelScheduledValues(t); openHat.gain.setTargetAtTime(0.0001, t, 0.01); } // closed hat cuts the open one
+      const g = m === 'noise' ? hiss(t, 'highpass', 6000 + T * 3000, 0.7, dec, 0.6, dest)
+        : metal(t, 40 * tune * (1 + T * 0.4), dec, m === 'digital' ? 0.35 : 0.5, dest, m === 'vintage' ? 'triangle' : 'square');
+      if (m !== 'noise') hiss(t, 'highpass', 8000, 0.7, dec * 0.8, 0.2, dest);
+      if (p.type === 'ohat') openHat = g;
+      break;
+    }
+    case 'tom':
+      osc(t, tw, 110 * tune, 180 * tune, 0.12, 0.4 * D, body, dest);
+      hiss(t, 'lowpass', 1500 + T * 2000, 0.7, 0.05, 0.15 + nz * 0.3, dest);
+      break;
+    case 'rim':
+      osc(t, m === 'analog' ? 'triangle' : tw, 420 * tune, 600 * tune, 0.01, 0.05 * D, 0.7 * body, dest);
+      hiss(t, 'bandpass', 2500 + T * 2500, 3, 0.03, 0.4 + nz * 0.3, dest);
+      break;
+    case 'perc':
+      osc(t, m === 'analog' ? 'square' : tw, 540 * tune, 545 * tune, 0.01, 0.18 * D, 0.35 * body, dest);
+      osc(t, m === 'analog' ? 'square' : tw, 800 * tune, 805 * tune, 0.01, 0.12 * D, 0.3 * body, dest);
+      if (m === 'noise') hiss(t, 'bandpass', 1800 * tune, 5, 0.12 * D, 0.5, dest);
+      break;
+  }
+  flash(pads.indexOf(p), t);
+}
+function flash(i, t) {
+  const ms = Math.max(0, (t - ac.currentTime) * 1000);
+  setTimeout(() => {
+    const el = document.querySelector(`.pad[data-i="${i}"]`);
+    if (!el) return;
+    el.classList.add('hit');
+    setTimeout(() => el.classList.remove('hit'), 110);
+  }, ms);
+}
+
+// ---------- playback: each row runs at its own length ----------
+let tick = 0, nextT = 0, timer = null, startT = 0;
+const stepDur = () => 60 / bpm / 4;
+function schedule() {
+  while (nextT < ac.currentTime + 0.12) {
+    lanes.forEach((l, i) => {
+      const s = l.steps[tick % l.len];
+      if (s) hit(pads[i], nextT, s === 2);
+    });
+    tick++;
+    nextT += stepDur();
+  }
+}
+function setPlay(on) {
+  playing = on;
+  clearInterval(timer);
+  if (on) {
+    audio().resume();
+    tick = 0;
+    startT = nextT = ac.currentTime + 0.05;
+    timer = setInterval(schedule, 25);
+    requestAnimationFrame(paint);
+  }
+  $('#play').textContent = on ? '■ Stop' : '▶ Play';
+  $('#play').setAttribute('aria-pressed', on);
+  paint();
+}
+// Moves only the playheads (classes on existing cells): never rebuilds the controls you are using.
+function paint() {
+  const cur = playing && ac ? Math.floor((ac.currentTime - startT) / stepDur()) : -1;
+  document.querySelectorAll('.cells').forEach((c, i) => {
+    const now = cur >= 0 ? cur % lanes[i].len : -1;
+    [...c.children].forEach((el, j) => el.classList.toggle('now', j === now));
+  });
+  if (playing) requestAnimationFrame(paint);
+}
+
+// ---------- UI ----------
+const padLabel = (p) => `${TNAME[p.type]}`;
+function renderKit() {
+  $('#kitname').innerHTML = `${String(kit + 1).padStart(2, '0')} ${KITS[kit][0]}${edited ? ' <small>edited</small>' : ''}`;
+  $('#kitsel').value = kit;
+}
+function renderPads() {
+  $('#pads').innerHTML = pads.map((p, i) => `<button class="pad${i === sel ? ' sel' : ''}" data-i="${i}" aria-label="Pad ${i + 1}: ${padLabel(p)}, ${MNAME[p.model]}"><span class="n">${i + 1}</span><span class="led"></span><b>${padLabel(p)}</b><small>${MNAME[p.model]}</small></button>`).join('');
+}
+const KN = [['tune', 'Tune', (v) => `${v >= 0.5 ? '+' : ''}${Math.round((v - 0.5) * 24)} st`], ['decay', 'Decay', (v) => `${Math.round(v * 100)}%`], ['tone', 'Tone', (v) => `${Math.round(v * 100)}%`], ['level', 'Level', (v) => `${Math.round(v * 100)}%`]];
+function renderEditor() {
+  const p = pads[sel];
+  $('#editor').innerHTML = `<h3>Pad ${sel + 1} sound</h3>
+    <div class="row"><span class="lab">Drum</span>${TYPES.map(([k, v]) => `<button class="hw" data-type="${k}" aria-pressed="${p.type === k}">${v}</button>`).join('')}</div>
+    <div class="row"><span class="lab">Character</span>${MODELS.map(([k, v]) => `<button class="hw" data-model="${k}" aria-pressed="${p.model === k}">${v}</button>`).join('')}</div>
+    <p class="desc">${MODELS.find((x) => x[0] === p.model)[2]}</p>
+    <div class="knobs">${KN.map(([k, l, f]) => `<div><div class="knob" role="slider" tabindex="0" aria-label="${l}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p[k] * 100)}" data-k="${k}" style="--v:${p[k]}"></div><div class="kv" data-kv="${k}">${f(p[k])}</div><div class="kl">${l}</div></div>`).join('')}</div>
+    ${p.type === 'chat' || p.type === 'ohat' ? '<p class="desc" style="margin-top:10px">A closed hat cuts off a ringing open hat, like on real drum machines.</p>' : ''}
+    <div class="later">Sample: later. The goal is to let a pad play your own sound without anyone having to download it from a server.</div>`;
+}
+function renderLanes() {
+  const cols = Math.max(16, ...lanes.map((l) => l.len));
+  $('#lanes').innerHTML = lanes.map((l, i) => `<div class="lane" style="--cols:${cols};--w:${cols * 21}px">
+      <button class="lname${i === sel ? ' sel' : ''}" data-lane="${i}" title="Pad ${i + 1}">${i + 1} · ${padLabel(pads[i])}</button>
+      <div class="cells">${Array.from({ length: cols }, (_, j) => `<button class="c${j % 4 === 0 ? ' bt' : ''}${j >= l.len ? ' out' : l.steps[j] === 2 ? ' acc' : l.steps[j] ? ' on' : ''}" data-r="${i}" data-s="${j}" aria-label="Pad ${i + 1} step ${j + 1}" ${j >= l.len ? 'tabindex="-1" aria-hidden="true"' : ''}></button>`).join('')}</div>
+      <span class="len"><button data-len="${i}" data-d="-1" aria-label="Pad ${i + 1} row shorter">−</button><span title="Steps in this row">${l.len}</span><button data-len="${i}" data-d="1" aria-label="Pad ${i + 1} row longer">+</button></span>
+    </div>`).join('');
+}
+function renderBpm() {
+  if ($('#bpmw input')) return;
+  $('#bpmw').innerHTML = `<button class="lcd bpm" id="bpm" title="Click to type a tempo">${bpm} BPM</button>`;
+}
+function all() { renderKit(); renderPads(); renderEditor(); renderLanes(); renderBpm(); }
+
+$('#kitsel').innerHTML = KITS.map(([n], i) => `<option value="${i}">${String(i + 1).padStart(2, '0')} ${n}</option>`).join('');
+const loadKit = (i) => { kit = (i + KITS.length) % KITS.length; pads = structuredClone(KITS[kit][1]); edited = false; all(); };
+const touch = () => { edited = true; renderKit(); renderPads(); renderLanes(); };
+
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  const d = b.dataset;
+  if (b.id === 'play') return setPlay(!playing);
+  if (b.id === 'kprev') return loadKit(kit - 1);
+  if (b.id === 'knext') return loadKit(kit + 1);
+  if (b.id === 'bpm') {
+    $('#bpmw').innerHTML = `<input class="bpmin" id="bpmin" inputmode="numeric" aria-label="Tempo in BPM" value="${bpm}">`;
+    const inp = $('#bpmin');
+    inp.focus();
+    inp.select();
+    const done = (ok) => {
+      if (!inp.isConnected) return;
+      const v = Math.round(Number(inp.value));
+      if (ok && v >= 40 && v <= 240) bpm = v;
+      $('#bpmw').innerHTML = '';
+      renderBpm();
+    };
+    inp.addEventListener('keydown', (k) => { if (k.key === 'Enter') done(true); if (k.key === 'Escape') done(false); k.stopPropagation(); });
+    inp.addEventListener('blur', () => done(true));
+    return;
+  }
+  if (d.i != null) { sel = Number(d.i); hit(pads[sel]); renderPads(); renderEditor(); renderLanes(); return; }
+  if (d.lane != null) { sel = Number(d.lane); hit(pads[sel]); renderPads(); renderEditor(); renderLanes(); return; }
+  if (d.type) { pads[sel].type = d.type; hit(pads[sel]); renderEditor(); return touch(); }
+  if (d.model) { pads[sel].model = d.model; hit(pads[sel]); renderEditor(); return touch(); }
+  if (d.r != null) {
+    const l = lanes[Number(d.r)], s = Number(d.s);
+    l.steps[s] = (l.steps[s] + 1) % 3;
+    b.className = `c${s % 4 === 0 ? ' bt' : ''}${l.steps[s] === 2 ? ' acc' : l.steps[s] ? ' on' : ''}`;
+    if (l.steps[s] && !playing) hit(pads[Number(d.r)], undefined, l.steps[s] === 2);
+    return;
+  }
+  if (d.len != null) { const l = lanes[Number(d.len)]; l.len = Math.max(1, Math.min(32, l.len + Number(d.d))); return renderLanes(); }
+});
+$('#kitsel').addEventListener('change', (e) => loadKit(Number(e.target.value)));
+
+// knobs: drag up/down, arrow keys, double-click resets
+let drag = null;
+document.addEventListener('pointerdown', (e) => {
+  const k = e.target.closest('.knob');
+  if (!k) return;
+  k.setPointerCapture(e.pointerId);
+  drag = { k, y: e.clientY, v0: pads[sel][k.dataset.k] };
+  e.preventDefault();
+});
+document.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  setKnob(drag.k, drag.v0 + (drag.y - e.clientY) / 180);
+});
+document.addEventListener('pointerup', () => {
+  if (drag) hit(pads[sel]);
+  drag = null;
+});
+function setKnob(k, v) {
+  const key = k.dataset.k;
+  v = Math.max(0, Math.min(1, v));
+  pads[sel][key] = v;
+  k.style.setProperty('--v', v);
+  k.setAttribute('aria-valuenow', Math.round(v * 100));
+  $(`[data-kv="${key}"]`).textContent = KN.find((x) => x[0] === key)[2](v);
+  if (!edited) { edited = true; renderKit(); }
+}
+document.addEventListener('keydown', (e) => {
+  const k = e.target.closest?.('.knob');
+  if (k && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
+    e.preventDefault();
+    setKnob(k, pads[sel][k.dataset.k] + (e.key === 'ArrowUp' ? 0.02 : -0.02));
+    return;
+  }
+  if (e.target.closest('input,select')) return;
+  if (e.key === ' ') { e.preventDefault(); setPlay(!playing); }
+  const n = Number(e.key);
+  if (n >= 1 && n <= 8 && !e.repeat) { hit(pads[n - 1]); }
+});
+document.addEventListener('dblclick', (e) => {
+  const k = e.target.closest('.knob');
+  if (k) setKnob(k, k.dataset.k === 'level' ? 0.8 : 0.5);
+});
+all();
+}
+</script>
+</body>
+</html>
