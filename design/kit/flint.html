@@ -80,10 +80,36 @@ main{padding:14px max(2vw,12px) 28px;display:grid;gap:14px;max-width:1240px;marg
 .cells{display:grid;grid-template-columns:repeat(var(--cols),minmax(18px,1fr));gap:3px}
 .c{height:34px;border:0;border-radius:5px;cursor:pointer;background:var(--fwm-roll2);padding:0}
 .c.bt{box-shadow:inset 2px 0 0 color-mix(in srgb,var(--fwm-roll-ink) 35%,transparent)}
-.c.on{background:color-mix(in srgb,var(--fwm-note) 70%,var(--fwm-roll2))}
-.c.acc{background:var(--fwm-note);box-shadow:0 0 calc(8px*var(--fwm-glow)) var(--fwm-note)}
 .c.out{visibility:hidden}
 .c.now{outline:2px solid var(--fwm-roll-ink);outline-offset:1px}
+.c{position:relative;color:var(--fwm-on-note);font:700 11px/1 var(--fwm-font-ui)}
+.c.on{background:linear-gradient(to top,var(--fwm-note) calc(var(--v)*100%),color-mix(in srgb,var(--fwm-note) 30%,var(--fwm-roll2)) 0)}
+.c.acc::after{content:"";position:absolute;top:3px;right:3px;width:7px;height:7px;border-radius:50%;background:var(--dev-acc,var(--fwm-roll-ink));box-shadow:0 0 0 2px var(--fwm-roll-ink)}
+.c .rl{position:absolute;left:3px;top:3px;color:var(--fwm-roll-ink);text-shadow:0 1px 2px var(--fwm-roll-deep)}
+.ms{display:flex;gap:3px}
+.ms button{width:30px;height:34px;border:0;border-radius:7px;background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);font-weight:800;cursor:pointer}
+.ms button[aria-pressed=true].m{background:var(--fwm-roll-ink);color:var(--fwm-roll-deep)}
+.ms button[aria-pressed=true].s{background:var(--fwm-note);color:var(--fwm-on-note)}
+.lane{grid-template-columns:118px 66px minmax(var(--w),1fr) 128px}
+.lane.off .cells{opacity:.35}
+.tools{display:flex;gap:4px;flex-wrap:wrap}
+.vel{display:grid;grid-template-columns:118px 66px minmax(var(--w),1fr) 128px;gap:8px;align-items:end;min-width:max-content;margin-top:4px}
+.vbars{display:grid;grid-template-columns:repeat(var(--cols),minmax(18px,1fr));gap:3px;height:64px;background:var(--fwm-roll-deep);border-radius:6px;padding:3px;touch-action:none;cursor:ns-resize}
+.vb{position:relative;border-radius:3px;background:color-mix(in srgb,var(--fwm-roll-ink) 6%,transparent)}
+.vb i{position:absolute;left:0;right:0;bottom:0;border-radius:3px;background:var(--fwm-note)}
+.vb.acc i{box-shadow:inset 0 3px 0 var(--fwm-roll-ink)}
+.vlab{font-size:13px;font-weight:700;align-self:center}
+.fit{display:grid;grid-template-columns:auto minmax(0,1fr);gap:10px 16px;align-items:center;background:var(--fwm-panel);border:1px solid var(--fwm-line);border-radius:12px;padding:12px}
+.fit h2{margin:0;font-size:16px}
+.fit p{margin:0;font-size:14px;color:var(--fwm-mute)}
+.mini{display:grid;grid-template-columns:90px repeat(2,minmax(110px,150px));gap:5px;background:var(--fwm-roll);padding:8px;border-radius:10px;color:var(--fwm-roll-ink)}
+.mini span,.mini button{min-height:40px;border-radius:7px;border:0;font-weight:700;font-size:13px;display:grid;place-items:center;padding:0 6px}
+.mini .h{background:none}
+.mini .t{background:var(--fwm-roll2);justify-items:start}
+.mini .bc{background:color-mix(in srgb,var(--fwm-note) 25%,var(--fwm-roll2));color:var(--fwm-roll-ink)}
+.mini button{background:color-mix(in srgb,var(--fwm-note) 40%,var(--fwm-roll2));color:var(--fwm-roll-ink);cursor:pointer}
+.mini button[aria-pressed=true]{outline:3px solid var(--fwm-note);outline-offset:1px}
+@media (max-width:700px){.fit{grid-template-columns:minmax(0,1fr)}}
 .len{display:flex;align-items:center;gap:4px}
 .len button{width:34px;height:34px;border:0;border-radius:8px;background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);cursor:pointer;font-weight:700}
 .len span{font:18px/1 var(--fwm-font-screen);background:var(--fwm-roll-deep);color:var(--fwm-note);padding:6px 6px;border-radius:6px;min-width:3.4ch;text-align:center}
@@ -112,16 +138,29 @@ main{padding:14px max(2vw,12px) 28px;display:grid;gap:14px;max-width:1240px;marg
       </div>
     </div>
     <div class="body">
-      <div class="sec"><h3>Pads</h3><div class="pads" id="pads"></div></div>
+      <div class="sec"><h3>Pads</h3><div class="pads" id="pads"></div>
+        <div style="display:flex;align-items:center;gap:14px;margin-top:12px">
+          <div style="text-align:center"><div class="knob" role="slider" tabindex="0" aria-label="Accent amount" aria-valuemin="0" aria-valuemax="100" data-g="accent" style="--v:.6"></div><div class="kv" data-gv="accent">60%</div><div class="kl">Accent</div></div>
+          <p class="desc" style="margin:0">How much louder accented steps play, for the whole kit.</p>
+        </div>
+      </div>
       <div class="sec" id="editor"></div>
+    </div>
+  </section>
+
+  <section class="fit" aria-label="How Flint fits in the studio">
+    <div class="mini" id="mini"></div>
+    <div>
+      <h2>How it fits in the studio</h2>
+      <p>Flint is one more instrument column in the song arrangement. Its patterns (Groove, Fill…) go in TRACK cells like Basalt's. Click a Flint cell and the Piano roll panel becomes this drum grid. A drum pattern is as long as its longest row; shorter rows repeat inside it and start again with each TRACK. Try clicking the Drums cells on the left.</p>
     </div>
   </section>
 
   <section class="grid" aria-label="Flint pattern">
     <div class="ghead">
-      <h2>Flint · TRACK 1 plays</h2>
-      <span role="group" aria-label="Pattern" style="display:flex;gap:4px"><button class="pk" aria-pressed="true">Groove</button><button class="pk">Fill</button><button class="pk">+ New</button><button class="pk">⧉ Copy</button></span>
-      <span class="muted" style="color:inherit;opacity:.85">Click a step: on → accent → off. Each row has its own length.</span>
+      <h2 id="ghead"></h2>
+      <span role="group" aria-label="Pattern" style="display:flex;gap:4px" id="pats"></span>
+      <span class="tools" role="group" aria-label="Step tool" id="tools"></span>
     </div>
     <div class="scroll"><div id="lanes" style="display:grid;gap:6px"></div></div>
   </section>
@@ -129,7 +168,9 @@ main{padding:14px max(2vw,12px) 28px;display:grid;gap:14px;max-width:1240px;marg
   <ul class="notes">
     <li><b>A kit is 8 pads.</b> Any pad can be any drum: four kicks, two snares and two open hats is fine (try the "Four on the floor" kit).</li>
     <li><b>Every drum comes in 4 characters:</b> Analog (round, warm), Digital (crisp, a little gritty), Noise (airy, made from noise), Vintage (thick, saturated).</li>
-    <li><b>The step grid</b> works like the sequencer you liked: one row per pad, each with its own length (here the rim runs 12 steps and the perc 7 against 16). Patterns, names and the song arrangement work exactly like Basalt's.</li>
+    <li><b>The step grid</b> works like the sequencer you liked: one row per pad, each with its own length (here the rim runs 12 steps and the perc 7 against 16).</li>
+    <li><b>Tools:</b> Draw switches steps on and off; Accent marks a step to play louder (by the Accent knob on Flint); Roll makes a step play 2, 3 or 4 quick hits (click again to change). The lane under the grid sets each step's velocity for the selected row: drag across it.</li>
+    <li><b>M / S</b> on each row mutes or solos that pad (soloing one or more rows plays only those).</li>
     <li><b>Changing a pad's sound</b> marks the kit "edited"; in the real Flint you can save it as your own kit.</li>
     <li><b>Samples: later.</b> The goal is a pad that plays your own sample without everyone downloading it from a server.</li>
   </ul>
@@ -155,12 +196,22 @@ const KITS = [
   ['Night Bus', [P('kick','analog',.42,.75,.3), P('snare','vintage',.45,.5,.35), P('clap','analog',.5,.6,.4), P('chat','analog',.45,.3,.4), P('ohat','vintage',.45,.6,.4), P('tom','analog',.3,.7,.4), P('rim','analog',.4,.5,.4), P('perc','vintage',.35,.5,.4)]],
 ];
 let kit = 0, pads = structuredClone(KITS[0][1]), edited = false, sel = 0;
-// pattern: per pad row {len, steps: 0 off | 1 on | 2 accent}
-const row = (len, on, acc = []) => ({ len, steps: Array.from({ length: 32 }, (_, i) => (acc.includes(i) ? 2 : on.includes(i) ? 1 : 0)) });
-const lanes = [
-  row(16, [0, 4, 8, 12], [0]), row(16, [4, 12], [12]), row(16, [12]), row(16, [0, 2, 4, 6, 8, 10, 12], [2, 6, 10]),
-  row(16, [14]), row(16, [10, 11]), row(12, [3, 7, 10]), row(7, [0, 3], [5]),
-];
+// A pattern: one row per pad {len, mute, solo, steps[32]: {on, acc, roll (1–4 hits), vel (0–1)}}
+const row = (len, on, acc = [], rolls = {}) => ({ len, mute: false, solo: false,
+  steps: Array.from({ length: 32 }, (_, i) => ({ on: on.includes(i) || acc.includes(i), acc: acc.includes(i), roll: rolls[i] || 1, vel: i % 4 === 0 ? 0.9 : i % 2 ? 0.6 : 0.75 })) });
+const PATTERNS = {
+  Groove: [
+    row(16, [0, 4, 8, 12], [0]), row(16, [4, 12], [12]), row(16, [12]), row(16, [0, 2, 4, 6, 8, 10, 12], [2, 6, 10]),
+    row(16, [14]), row(16, [10, 11]), row(12, [3, 7, 10]), row(7, [0, 3], [5]),
+  ],
+  Fill: [
+    row(16, [0, 6, 8, 10], [0]), row(16, [4, 12, 13, 14, 15], [15], { 13: 2, 14: 3, 15: 4 }), row(16, [4, 12]), row(16, [0, 2, 4, 6, 8, 10], [], { 10: 3 }),
+    row(16, []), row(16, [8, 9, 10, 11], [8], { 11: 2 }), row(12, [3, 7]), row(7, [0]),
+  ],
+};
+let patName = 'Groove';
+let lanes = PATTERNS[patName];
+let tool = 'draw', accentAmt = 0.6;
 let bpm = 112, playing = false;
 
 // ---------- preview sounds (rough WebAudio sketches of each character) ----------
@@ -231,9 +282,9 @@ function metal(t, base, dec, peak, out, wave) {
   hp.connect(g).connect(out);
   return g;
 }
-function hit(p, t = audio().currentTime, accent = false) {
+function hit(p, t = audio().currentTime, gain = 0.8) {
   const m = p.model, tune = 2 ** ((p.tune - 0.5) * 2), D = 0.35 + p.decay * 1.3, T = p.tone;
-  const vol = p.level * (accent ? 1 : 0.68);
+  const vol = p.level * Math.min(1.6, gain) * 0.75;
   const out = ac.createGain();
   out.gain.value = vol;
   let dest = out;
@@ -311,9 +362,13 @@ let tick = 0, nextT = 0, timer = null, startT = 0;
 const stepDur = () => 60 / bpm / 4;
 function schedule() {
   while (nextT < ac.currentTime + 0.12) {
+    const solo = lanes.some((l) => l.solo);
     lanes.forEach((l, i) => {
+      if (l.mute || (solo && !l.solo)) return;
       const s = l.steps[tick % l.len];
-      if (s) hit(pads[i], nextT, s === 2);
+      if (!s.on) return;
+      const g = (0.3 + 0.7 * s.vel) * (s.acc ? 1 + accentAmt * 0.8 : 1);
+      for (let k = 0; k < s.roll; k++) hit(pads[i], nextT + (k * stepDur()) / s.roll, g * (1 - k * 0.1));
     });
     tick++;
     nextT += stepDur();
@@ -337,6 +392,7 @@ function setPlay(on) {
 function paint() {
   const cur = playing && ac ? Math.floor((ac.currentTime - startT) / stepDur()) : -1;
   document.querySelectorAll('.cells').forEach((c, i) => {
+    if (!lanes[i]) return;
     const now = cur >= 0 ? cur % lanes[i].len : -1;
     [...c.children].forEach((el, j) => el.classList.toggle('now', j === now));
   });
@@ -363,19 +419,47 @@ function renderEditor() {
     ${p.type === 'chat' || p.type === 'ohat' ? '<p class="desc" style="margin-top:10px">A closed hat cuts off a ringing open hat, like on real drum machines.</p>' : ''}
     <div class="later">Sample: later. The goal is to let a pad play your own sound without anyone having to download it from a server.</div>`;
 }
+const cellClass = (l, j) => {
+  const st = l.steps[j];
+  return `c${j % 4 === 0 ? ' bt' : ''}${j >= l.len ? ' out' : st.on ? ' on' : ''}${st.on && st.acc && j < l.len ? ' acc' : ''}`;
+};
+const cellHtml = (l, i, j) => {
+  const st = l.steps[j], out = j >= l.len;
+  return `<button class="${cellClass(l, j)}" style="--v:${st.vel}" data-r="${i}" data-s="${j}" aria-label="Pad ${i + 1} step ${j + 1}${st.on ? (st.acc ? ', accent' : '') + (st.roll > 1 ? `, roll ×${st.roll}` : '') : ''}" ${out ? 'tabindex="-1" aria-hidden="true"' : ''}>${st.on && st.roll > 1 && !out ? `<span class="rl">×${st.roll}</span>` : ''}</button>`;
+};
 function renderLanes() {
   const cols = Math.max(16, ...lanes.map((l) => l.len));
-  $('#lanes').innerHTML = lanes.map((l, i) => `<div class="lane" style="--cols:${cols};--w:${cols * 21}px">
+  const solo = lanes.some((l) => l.solo);
+  const L = lanes[sel];
+  $('#ghead').textContent = `Drums · ${patName} · ${Math.max(...lanes.map((l) => l.len))} steps (its longest row)`;
+  $('#lanes').innerHTML = lanes.map((l, i) => `<div class="lane${l.mute || (solo && !l.solo) ? ' off' : ''}" style="--cols:${cols};--w:${cols * 21}px">
       <button class="lname${i === sel ? ' sel' : ''}" data-lane="${i}" title="Pad ${i + 1}">${i + 1} · ${padLabel(pads[i])}</button>
-      <div class="cells">${Array.from({ length: cols }, (_, j) => `<button class="c${j % 4 === 0 ? ' bt' : ''}${j >= l.len ? ' out' : l.steps[j] === 2 ? ' acc' : l.steps[j] ? ' on' : ''}" data-r="${i}" data-s="${j}" aria-label="Pad ${i + 1} step ${j + 1}" ${j >= l.len ? 'tabindex="-1" aria-hidden="true"' : ''}></button>`).join('')}</div>
+      <span class="ms"><button class="m" data-mute="${i}" aria-pressed="${l.mute}" aria-label="Mute pad ${i + 1}" title="Mute">M</button><button class="s" data-solo="${i}" aria-pressed="${l.solo}" aria-label="Solo pad ${i + 1}" title="Solo">S</button></span>
+      <div class="cells">${Array.from({ length: cols }, (_, j) => cellHtml(l, i, j)).join('')}</div>
       <span class="len"><button data-len="${i}" data-d="-1" aria-label="Pad ${i + 1} row shorter">−</button><span title="Steps in this row">${l.len}</span><button data-len="${i}" data-d="1" aria-label="Pad ${i + 1} row longer">+</button></span>
-    </div>`).join('');
+    </div>`).join('') + `<div class="vel" style="--cols:${cols};--w:${cols * 21}px"><span class="vlab">Velocity</span><span class="vlab">${sel + 1} · ${padLabel(pads[sel])}</span>
+      <div class="vbars" id="vbars" aria-label="Velocity of pad ${sel + 1}">${Array.from({ length: cols }, (_, j) => {
+        const st = L.steps[j];
+        return `<div class="vb${st.acc && st.on ? ' acc' : ''}" style="${j >= L.len ? 'visibility:hidden' : ''}">${st.on ? `<i style="height:${Math.round(st.vel * 100)}%"></i>` : ''}</div>`;
+      }).join('')}</div><span></span></div>`;
+}
+function renderTools() {
+  $('#tools').innerHTML = [['draw', 'Draw'], ['accent', 'Accent'], ['roll', 'Roll ×2 ×3 ×4']]
+    .map(([k, v]) => `<button class="pk" data-tool="${k}" aria-pressed="${tool === k}">${v}</button>`).join('');
+}
+function renderPats() {
+  $('#pats').innerHTML = Object.keys(PATTERNS).map((n) => `<button class="pk" data-pat="${n}" aria-pressed="${n === patName}">${n}</button>`).join('')
+    + `<button class="pk" data-newpat="copy" title="Copy this pattern into a new one">⧉ Copy</button>`;
+  const cell = (t) => `<button data-pat="${t}" aria-pressed="${t === patName}">${t}</button>`;
+  $('#mini').innerHTML = `<span class="h"></span><span class="h">BASS · Basalt</span><span class="h">DRUMS · Flint</span>
+    <span class="t">TRACK 1</span><span class="bc">Groove</span>${cell('Groove')}
+    <span class="t">TRACK 2</span><span class="bc">Drift</span>${cell(Object.keys(PATTERNS).includes('Fill') ? 'Fill' : 'Groove')}`;
 }
 function renderBpm() {
   if ($('#bpmw input')) return;
   $('#bpmw').innerHTML = `<button class="lcd bpm" id="bpm" title="Click to type a tempo">${bpm} BPM</button>`;
 }
-function all() { renderKit(); renderPads(); renderEditor(); renderLanes(); renderBpm(); }
+function all() { renderKit(); renderPads(); renderEditor(); renderLanes(); renderBpm(); renderTools(); renderPats(); }
 
 $('#kitsel').innerHTML = KITS.map(([n], i) => `<option value="${i}">${String(i + 1).padStart(2, '0')} ${n}</option>`).join('');
 const loadKit = (i) => { kit = (i + KITS.length) % KITS.length; pads = structuredClone(KITS[kit][1]); edited = false; all(); };
@@ -409,34 +493,77 @@ document.addEventListener('click', (e) => {
   if (d.type) { pads[sel].type = d.type; hit(pads[sel]); renderEditor(); return touch(); }
   if (d.model) { pads[sel].model = d.model; hit(pads[sel]); renderEditor(); return touch(); }
   if (d.r != null) {
-    const l = lanes[Number(d.r)], s = Number(d.s);
-    l.steps[s] = (l.steps[s] + 1) % 3;
-    b.className = `c${s % 4 === 0 ? ' bt' : ''}${l.steps[s] === 2 ? ' acc' : l.steps[s] ? ' on' : ''}`;
-    if (l.steps[s] && !playing) hit(pads[Number(d.r)], undefined, l.steps[s] === 2);
+    const r = Number(d.r), l = lanes[r], j = Number(d.s), st = l.steps[j];
+    if (tool === 'draw') st.on = !st.on;
+    else if (tool === 'accent') { st.acc = !(st.on && st.acc); st.on = true; }
+    else { st.roll = st.on ? (st.roll % 4) + 1 : 2; st.on = true; }
+    b.outerHTML = cellHtml(l, r, j);
+    if (r === sel) renderLanes();
+    if (st.on && !playing) hit(pads[r], undefined, (0.3 + 0.7 * st.vel) * (st.acc ? 1 + accentAmt * 0.8 : 1));
     return;
+  }
+  if (d.tool) { tool = d.tool; return renderTools(); }
+  if (d.mute != null) { const l = lanes[Number(d.mute)]; l.mute = !l.mute; return renderLanes(); }
+  if (d.solo != null) { const l = lanes[Number(d.solo)]; l.solo = !l.solo; return renderLanes(); }
+  if (d.pat) { patName = d.pat; lanes = PATTERNS[patName]; renderPats(); return renderLanes(); }
+  if (d.newpat) {
+    let n = 2;
+    while (PATTERNS[`${patName} ${n}`]) n++;
+    const name = `${patName} ${n}`;
+    PATTERNS[name] = structuredClone(lanes);
+    patName = name;
+    lanes = PATTERNS[name];
+    renderPats();
+    return renderLanes();
   }
   if (d.len != null) { const l = lanes[Number(d.len)]; l.len = Math.max(1, Math.min(32, l.len + Number(d.d))); return renderLanes(); }
 });
 $('#kitsel').addEventListener('change', (e) => loadKit(Number(e.target.value)));
 
-// knobs: drag up/down, arrow keys, double-click resets
-let drag = null;
+// knobs: drag up/down, arrow keys, double-click resets. Velocity lane: drag across to draw.
+let drag = null, vdrag = false;
+const knobVal = (k) => (k.dataset.g ? accentAmt : pads[sel][k.dataset.k]);
+function setVel(e) {
+  const box = $('#vbars');
+  if (!box) return;
+  const r = box.getBoundingClientRect(), cols = box.children.length;
+  const j = Math.max(0, Math.min(cols - 1, Math.floor(((e.clientX - r.left) / r.width) * cols)));
+  const v = Math.max(0.05, Math.min(1, 1 - (e.clientY - r.top) / r.height));
+  const L = lanes[sel];
+  if (j >= L.len || !L.steps[j].on) return;
+  L.steps[j].vel = v;
+  const bar = box.children[j].querySelector('i');
+  if (bar) bar.style.height = `${Math.round(v * 100)}%`;
+  const cell = document.querySelector(`.c[data-r="${sel}"][data-s="${j}"]`);
+  if (cell) cell.style.setProperty('--v', v);
+}
 document.addEventListener('pointerdown', (e) => {
+  const cap = (el) => { try { el.setPointerCapture(e.pointerId); } catch { /* not a real pointer */ } };
+  if (e.target.closest('#vbars')) { vdrag = true; cap(e.target.closest('#vbars')); setVel(e); e.preventDefault(); return; }
   const k = e.target.closest('.knob');
   if (!k) return;
-  k.setPointerCapture(e.pointerId);
-  drag = { k, y: e.clientY, v0: pads[sel][k.dataset.k] };
+  cap(k);
+  drag = { k, y: e.clientY, v0: knobVal(k) };
   e.preventDefault();
 });
 document.addEventListener('pointermove', (e) => {
+  if (vdrag) return setVel(e);
   if (!drag) return;
   setKnob(drag.k, drag.v0 + (drag.y - e.clientY) / 180);
 });
 document.addEventListener('pointerup', () => {
-  if (drag) hit(pads[sel]);
+  if (drag && !drag.k.dataset.g) hit(pads[sel]);
   drag = null;
+  vdrag = false;
 });
 function setKnob(k, v) {
+  if (k.dataset.g) {
+    accentAmt = Math.max(0, Math.min(1, v));
+    k.style.setProperty('--v', accentAmt);
+    k.setAttribute('aria-valuenow', Math.round(accentAmt * 100));
+    $('[data-gv="accent"]').textContent = `${Math.round(accentAmt * 100)}%`;
+    return;
+  }
   const key = k.dataset.k;
   v = Math.max(0, Math.min(1, v));
   pads[sel][key] = v;
@@ -449,7 +576,7 @@ document.addEventListener('keydown', (e) => {
   const k = e.target.closest?.('.knob');
   if (k && (e.key === 'ArrowUp' || e.key === 'ArrowDown')) {
     e.preventDefault();
-    setKnob(k, pads[sel][k.dataset.k] + (e.key === 'ArrowUp' ? 0.02 : -0.02));
+    setKnob(k, knobVal(k) + (e.key === 'ArrowUp' ? 0.02 : -0.02));
     return;
   }
   if (e.target.closest('input,select')) return;
@@ -459,7 +586,7 @@ document.addEventListener('keydown', (e) => {
 });
 document.addEventListener('dblclick', (e) => {
   const k = e.target.closest('.knob');
-  if (k) setKnob(k, k.dataset.k === 'level' ? 0.8 : 0.5);
+  if (k) setKnob(k, k.dataset.g ? 0.6 : k.dataset.k === 'level' ? 0.8 : 0.5);
 });
 all();
 }
