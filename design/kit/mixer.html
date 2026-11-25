@@ -267,7 +267,8 @@ function pics() {
 // ---- preview audio: three instruments → strips (fader, pan, sends) → returns → Lo-fi → Low-pass → master ----
 let A = null, timer = null, step = 0, nextT = 0;
 function level(id) { if (!A) return; const solo = Object.values(S.solo).some(Boolean); const v = P[id + '.vol'].v; A.ch[id].fader.gain.value = S.mute[id] || (solo && !S.solo[id]) ? 0 : v * v * 2; }
-async function audio() {
+// Built synchronously inside the Play click: browsers only allow sound that starts from a click.
+function audio() {
   const ctx = new AudioContext();
   const sum = ctx.createGain(), lpf = ctx.createBiquadFilter(), master = ctx.createGain(), scope = ctx.createAnalyser();
   lpf.type = 'lowpass';
@@ -275,36 +276,7 @@ async function audio() {
   const lofiIn = ctx.createGain(), lofiOut = ctx.createGain();
   sum.connect(lofiIn); lofiOut.connect(lpf); lpf.connect(master); master.connect(scope); scope.connect(ctx.destination);
   A = { ctx, sum, lp: lpf, master, scope, lofiIn, lofiOut, lofiNode: null, ch: {}, an: {} };
-  try {
-    // Tape / vinyl: a modulated delay line (wow + flutter), tanh saturation, two-pole high cut and a
-    // low cut that close in with Age, hiss (tape) or darker surface noise (vinyl), and crackle.
-    const code = `class T extends AudioWorkletProcessor{
-      static get parameterDescriptors(){return['wow','flutter','sat','age','noise','crackle','mix','vinyl'].map((n)=>({name:n,defaultValue:0}))}
-      constructor(){super();this.N=4096;this.b=[new Float32Array(4096),new Float32Array(4096)];this.w=0;this.t=0;this.l1=[0,0];this.l2=[0,0];this.hy=[0,0];this.hx=[0,0];this.nz=[0,0];this.pop=0}
-      process(i,o,p){const x=i[0],y=o[0];if(!y||!y.length)return true;const g=(k)=>p[k][0],sr=sampleRate;
-        const wow=g('wow'),fl=g('flutter'),sat=g('sat'),age=g('age'),nz=g('noise'),cr=g('crackle'),mix=g('mix'),vin=g('vinyl')>0.5;
-        const drive=1+sat*5,norm=0.5/Math.tanh(drive*0.5),fc=18000*Math.pow(3000/18000,age),a=1-Math.exp(-2*Math.PI*fc/sr);
-        const hc=20*Math.pow(vin?14:8,age),ah=Math.exp(-2*Math.PI*hc/sr),base=0.008*sr;
-        for(let s=0;s<y[0].length;s++){this.t+=1/sr;const t=this.t;
-          const mod=wow*0.003*(Math.sin(2*Math.PI*0.55*t)+0.35*Math.sin(2*Math.PI*0.93*t+1))+fl*0.00012*(Math.sin(2*Math.PI*6.7*t)+0.5*Math.sin(2*Math.PI*11.3*t));
-          const d=base+mod*sr;
-          if(cr>0&&Math.random()<cr*cr*0.0012)this.pop=(Math.random()*2-1)*(Math.random()<0.12?0.5:0.15)*cr;
-          const crack=this.pop;this.pop*=0.55;
-          for(let c=0;c<y.length;c++){const xin=x&&x.length?(x[c]||x[0])[s]:0,B=this.b[c];B[this.w]=xin;
-            let r=this.w-d;while(r<0)r+=this.N;const i0=r|0,f=r-i0,v0=B[i0]*(1-f)+B[(i0+1)%this.N]*f;
-            const dry=B[(this.w-base+this.N)%this.N];
-            let v=Math.tanh(v0*drive)*norm; // same level at -6 dB, warmer and squashed above it
-            this.l1[c]+=a*(v-this.l1[c]);this.l2[c]+=a*(this.l1[c]-this.l2[c]);v=this.l2[c];
-            const h=ah*(this.hy[c]+v-this.hx[c]);this.hx[c]=v;this.hy[c]=h;v=h;
-            const wn=Math.random()*2-1;this.nz[c]+=(vin?0.06:0.5)*(wn-this.nz[c]);
-            v+=this.nz[c]*nz*(vin?0.06:0.016)+crack;
-            y[c][s]=dry*(1-mix)+v*mix}
-          this.w=(this.w+1)%this.N}
-        return true}}
-      registerProcessor('lofi',T)`;
-    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
-    A.lofiNode = new AudioWorkletNode(ctx, 'lofi', { outputChannelCount: [2] });
-  } catch { /* no worklet here: Lo-fi is bypassed in the preview */ }
+  void loadLofi(ctx);
   // shared reverb (generated impulse) and ping-pong delay
   const rev = { pre: ctx.createDelay(0.2), conv: ctx.createConvolver(), tone: ctx.createBiquadFilter(), ret: ctx.createGain(), in: ctx.createGain() };
   rev.tone.type = 'lowpass'; rev.in.connect(rev.pre); rev.pre.connect(rev.conv); rev.conv.connect(rev.tone); rev.tone.connect(rev.ret); rev.ret.connect(sum);
@@ -324,6 +296,45 @@ async function audio() {
   for (const id in P) P[id].apply(P[id].v);
   for (const c of CH) level(c.id);
   ir(); divTime(); lofi(); onOff();
+}
+// The tape / vinyl effect runs in an AudioWorklet; it slots in when loaded (bypassed until then, or if this page can't load it).
+async function loadLofi(ctx) {
+  try {
+    // Tape / vinyl: a modulated delay line (wow + flutter), tanh saturation, two-pole high cut and a
+    // low cut that close in with Age, hiss (tape) or darker surface noise (vinyl), and crackle.
+    const code = `class T extends AudioWorkletProcessor{
+      static get parameterDescriptors(){return['wow','flutter','sat','age','noise','crackle','mix','vinyl'].map((n)=>({name:n,defaultValue:0}))}
+      constructor(){super();this.N=4096;this.b=[new Float32Array(4096),new Float32Array(4096)];this.w=0;this.t=0;this.l1=[0,0];this.l2=[0,0];this.hy=[0,0];this.hx=[0,0];this.nz=[0,0];this.pop=0}
+      process(i,o,p){const x=i[0],y=o[0];if(!y||!y.length)return true;const g=(k)=>p[k][0],sr=sampleRate;
+        const wow=g('wow'),fl=g('flutter'),sat=g('sat'),age=g('age'),nz=g('noise'),cr=g('crackle'),mix=g('mix'),vin=g('vinyl')>0.5;
+        const drive=1+sat*5,norm=0.5/Math.tanh(drive*0.5),fc=18000*Math.pow(3000/18000,age),a=1-Math.exp(-2*Math.PI*fc/sr);
+        const hc=20*Math.pow(vin?14:8,age),ah=Math.exp(-2*Math.PI*hc/sr),base=Math.round(0.008*sr);
+        for(let s=0;s<y[0].length;s++){this.t+=1/sr;const t=this.t;
+          const mod=wow*0.003*(Math.sin(2*Math.PI*0.55*t)+0.35*Math.sin(2*Math.PI*0.93*t+1))+fl*0.00012*(Math.sin(2*Math.PI*6.7*t)+0.5*Math.sin(2*Math.PI*11.3*t));
+          const d=base+mod*sr;
+          if(cr>0&&Math.random()<cr*cr*0.0012)this.pop=(Math.random()*2-1)*(Math.random()<0.12?0.5:0.15)*cr;
+          const crack=this.pop;this.pop*=0.55;
+          for(let c=0;c<y.length;c++){const xin=x&&x.length?(x[c]||x[0])[s]:0,B=this.b[c];B[this.w]=xin;
+            let r=this.w-d;while(r<0)r+=this.N;const i0=r|0,f=r-i0,v0=B[i0]*(1-f)+B[(i0+1)%this.N]*f;
+            const dry=B[(this.w-base+this.N)%this.N];
+            let v=Math.tanh(v0*drive)*norm; // same level at -6 dB, warmer and squashed above it
+            this.l1[c]+=a*(v-this.l1[c]);this.l2[c]+=a*(this.l1[c]-this.l2[c]);v=this.l2[c];
+            const h=ah*(this.hy[c]+v-this.hx[c]);this.hx[c]=v;this.hy[c]=h;v=h;
+            const wn=Math.random()*2-1;this.nz[c]+=(vin?0.06:0.5)*(wn-this.nz[c]);
+            v+=this.nz[c]*nz*(vin?0.06:0.016)+crack;
+            const out=dry*(1-mix)+v*mix;y[c][s]=out===out?out:0}
+          this.w=(this.w+1)%this.N}
+        return true}}
+      registerProcessor('lofi',T)`;
+    const load = ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+    await Promise.race([load, new Promise((_, no) => setTimeout(() => no(new Error('timeout')), 3000))]);
+    A.lofiNode = new AudioWorkletNode(ctx, 'lofi', { outputChannelCount: [2] });
+    onOff();
+  } catch (e) {
+    console.warn('Lo-fi preview unavailable here:', e);
+    const h = $('[data-unit="lofi"] .uh small');
+    if (h) h.textContent = 'preview not available in this browser';
+  }
 }
 function ir() {
   if (!A) return;
@@ -377,10 +388,13 @@ function playStep(s, t) {
   });
 }
 function tick() { while (nextT < A.ctx.currentTime + 0.12) { playStep(step, nextT); step = (step + 1) % 32; nextT += STEP; } }
-async function play(on) {
-  if (on && !A) await audio();
-  if (on) { await A.ctx.resume(); step = 0; nextT = A.ctx.currentTime + 0.05; timer = setInterval(tick, 25); }
-  else clearInterval(timer);
+function play(on) {
+  if (on && !A) audio();
+  clearInterval(timer);
+  if (on) {
+    A.ctx.resume().catch(() => {}); // inside the click, before anything waits
+    step = 0; nextT = A.ctx.currentTime + 0.05; timer = setInterval(tick, 25);
+  }
   $('#play').setAttribute('aria-pressed', on); $('#play').textContent = on ? '■ Stop' : '▶ Play';
   $('#smsg').hidden = on;
 }
