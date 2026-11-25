@@ -4,7 +4,7 @@ A collaborative, device-based music studio for the browser. This repo is the **c
 
 - Plan, phases, progress: `docs/PLAN.md`
 - Theming contract (tokens, skins, replaceable controls): `docs/THEMING.md`
-- Status: **Phases 1–3 built** (song arrangement, Flint drum machine), reviewed. **Phase 4** (playing together, mock-up `design/kit/together.html` approved): done and signed off. **Mixer + Scope** mock-up `design/kit/mixer.html` waiting for feedback. See HANDOFF START HERE. Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
+- Status: **Phases 1–3 built** (song arrangement, Flint drum machine), reviewed. **Phase 4** (playing together, mock-up `design/kit/together.html` approved): done and signed off. **Mixer + effects + Scope** approved (mock-up `design/kit/mixer.html`), being built in 4 slices: slice 1 (mixer) done. See HANDOFF START HERE. Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
 - Words: in code a **track** is an instrument lane; the song's rows (TRACK 1, TRACK 2… in the UI) are **rows**.
 - The arrangement panel is called **Song arrangement** in the UI (user, 2026-11-25: "Main sequencer" made people think of the Piano roll). In code it is still `seq` / `SeqView`.
 - Prototypes (no build step): `design/kit/index.html` (device kit, has a Sound button), `design/kit/workspace.html` (workspace), `design/kit/arrange.html` (song arrangement mock-up), `design/kit/flint.html` (Flint drum machine mock-up, with rough WebAudio preview sounds), `design/kit/together.html` (Phase 4: playing together over a pretend network), `design/kit/mixer.html` (mixer, effects and scope, with preview sound). Serve with `python3 spikes/serve.py`.

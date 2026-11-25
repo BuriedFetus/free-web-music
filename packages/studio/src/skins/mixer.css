@@ -1,0 +1,17 @@
+/* Mixer: the desk lives in the sequencer world (the app's --fwm-roll colours), so a host's
+   app theme restyles it too. Only what differs from device-base.css. */
+:where(.mixer, [data-device="mixer"]) {
+  --dev-case: var(--fwm-roll);
+  --dev-case2: var(--fwm-roll-deep);
+  --dev-edge: var(--fwm-roll2);
+  --dev-silk: var(--fwm-roll-ink);
+  --dev-acc: var(--fwm-note);
+  --dev-lcd: var(--fwm-roll-deep);
+  --dev-lcdink: var(--fwm-note);
+  --dev-btn: var(--fwm-roll-btn);
+  --dev-btn2: var(--fwm-roll2);
+  --dev-btnink: var(--fwm-roll-ink);
+  --dev-btnedge: var(--fwm-roll-deep);
+  --dev-sec: rgba(0, 0, 0, .18);
+  --dev-track: var(--fwm-roll-deep);
+}

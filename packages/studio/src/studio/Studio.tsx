@@ -175,6 +175,10 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   useEffect(() => {
     live?.setTransport({ bpm: project.bpm, swing: project.swing });
   }, [live, project.bpm, project.swing]);
+  const anySolo = tracks.some((t) => project.mix(t.id).solo);
+  useEffect(() => {
+    live?.setMaster({ level: project.masterLevel });
+  }, [live, project.masterLevel]);
   const cueRow = useCallback(
     (row: string) => {
       if (playing && rowsRef.current.some((r) => r.id === row)) sync.cue(row, wsRef.current.cueWait);
@@ -408,7 +412,9 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     <StudioContext.Provider value={ctx}>
       {live && tracks.map((t) => {
         const slot = slots.current.get(t.id);
-        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} held={held} />;
+        // Solo: when any instrument is soloed, only soloed ones are heard. Mute silences notes and live keys.
+        const audible = !t.seq.mute && (!anySolo || project.mix(t.id).solo);
+        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} held={held} audible={audible} />;
       })}
       {live && <SongEngine project={project} slotOf={slotOf} loop={ws.loop} />}
       <div className="fwm-app">
@@ -430,10 +436,11 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
 }
 
 /** Keeps one instrument's device, sequencer settings and all its patterns mirrored in the engine. */
-function TrackEngine({ project, track, slot, held }: { project: Project; track: TrackInfo; slot: number; held: HeldParams }) {
+function TrackEngine({ project, track, slot, held, audible }: { project: Project; track: TrackInfo; slot: number; held: HeldParams; audible: boolean }) {
   const { engine } = useEngine();
   const sent = useRef(new Map<string, string>()); // patternId → what the engine has
   const seqKey = useRef('');
+  const mixKey = useRef('');
   const manifest = deviceEntry(track.device)!.manifest!;
   const store = project.deviceStore(track.id, manifest)!;
   useDeviceSync(engine, store, slot, track.device, held);
@@ -442,6 +449,7 @@ function TrackEngine({ project, track, slot, held }: { project: Project; track: 
   useEffect(() => {
     sent.current = new Map();
     seqKey.current = '';
+    mixKey.current = ''; // a re-created device starts at 0 dB in the engine: send the strip again
   }, [engine, store]);
   useEffect(() => {
     if (!engine) return;
@@ -449,6 +457,13 @@ function TrackEngine({ project, track, slot, held }: { project: Project; track: 
     if (k !== seqKey.current) {
       seqKey.current = k;
       engine.setTrack(slot, track.seq);
+    }
+    const mix = project.mix(track.id);
+    const strip = { level: mix.level, pan: mix.pan, mute: !audible };
+    const mk = JSON.stringify(strip);
+    if (mk !== mixKey.current) {
+      mixKey.current = mk;
+      engine.setMix(slot, strip);
     }
     const seen = new Set<string>();
     const pads = deviceEntry(track.device)?.layout === 'pads';

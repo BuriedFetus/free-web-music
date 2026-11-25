@@ -40,6 +40,8 @@ export interface EngineTick {
   /** Per slot: modulated param values (manifest order) and mod source values [lfo, amp, filt]. */
   devices: Record<number, { eff: Float32Array; mods: [number, number, number]; step: number }>;
   /** row: id of the song row playing (song mode), rowPos: steps since that row started. */
+  /** Peak |sample| since the last tick: [slot0 L, slot0 R, slot1 L, …, master L (index 32), master R]. */
+  meters: Float32Array;
   transport: { playing: boolean; pos: number; bpm: number; time: number; row: string | null; rowPos: number; next?: string | null };
 }
 
@@ -87,6 +89,9 @@ export interface Engine {
   noteOffAt(slot: number, note: number, at: number): void;
   setParamAt(slot: number, id: string, value: number, at: number): void;
   allOff(slot: number): void;
+  /** Mixer strip: level 0..1 (0.8 = 0 dB), pan -1..1, mute, sendA / sendB 0..1. Gains glide. */
+  setMix(slot: number, settings: Partial<{ level: number; pan: number; mute: boolean | number; sendA: number; sendB: number }>): void;
+  setMaster(settings: { level?: number }): void;
   setParam(slot: number, id: string, value: number): void;
   paramIndex(slot: number, id: string): number;
   setRoute(slot: number, route: number, src: ModSourceId, target: string, depth: number): void;
@@ -116,6 +121,8 @@ export interface Engine {
 
 export const KINDS: Record<DeviceId, number>;
 export const MOD_SOURCES: Record<ModSourceId, number>;
+export const MIX: Record<'level' | 'pan' | 'mute' | 'sendA' | 'sendB', number>;
+export const MASTER_METER: number;
 
 export function createEngine(options?: {
   /** Folder holding fwm_engine.wasm, worklet.js, basalt.json, flint.json. Default: next to this module. */

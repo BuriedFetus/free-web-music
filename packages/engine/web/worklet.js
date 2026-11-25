@@ -18,9 +18,12 @@
 //                                                  (`at` in the future: waits, to the sample; in the past: joins mid-row)
 //   {t:'seek', row, pos, at}                       while playing: move so that row `row` is `pos` steps in at `at`
 //                                                  (corrects drift between people; the global clock keeps running)
+//   {t:'mix', slot, p, v}                          mixer strip: p 0 level (0.8 = 0 dB), 1 pan (-1..1), 2 mute, 3 send A, 4 send B
+//   {t:'master', p, v}                             master: p 0 level
 //   {t:'at', at, m}                                 do `m` ('on' | 'off' | 'param') at audio time `at`, to the sample
 //                                                  (other people's live keys and knob turns, played evenly)
-// Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport}.
+// Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport, meters}
+// (meters: peak per slot L/R since the last tick, then master L/R).
 // MessagePort is used everywhere for now; a SharedArrayBuffer ring comes later behind the same API.
 const UI_EVERY = 6; // blocks between UI snapshots (~16 ms at 48 kHz)
 const PAD_NOTE = 36; // drum machines: pad i = note 36 + i
@@ -364,6 +367,8 @@ export class FwmEngine extends Processor {
       case 'patdel': this.seq.delPat(m.slot, m.id); break;
       case 'song': this.seq.setSong(m.song); break;
       case 'cue': this.seq.cue(m.row, m.wait); break;
+      case 'mix': x.fwm_mix(m.slot, m.p, m.v); break;
+      case 'master': x.fwm_master(m.p, m.v); break;
       case 'seek':
         if (this.seq.playing) this.seq.seek(m.row, this.target(m));
         else this.seq.start(m.row, this.target(m));
@@ -439,7 +444,8 @@ export class FwmEngine extends Processor {
       row: sq.song ? sq.song.rows[sq.row]?.id ?? null : null, rowPos: sq.playing && sq.song ? sq.pos - sq.rowStart : 0,
       next: sq.pending,
     };
-    this.port.postMessage({ t: 'tick', scope, devices, transport }, [scope.buffer]);
+    const meters = this.view(x.fwm_meters(), x.fwm_meters_len()).slice();
+    this.port.postMessage({ t: 'tick', scope, devices, transport, meters }, [scope.buffer, meters.buffer]);
   }
 }
 

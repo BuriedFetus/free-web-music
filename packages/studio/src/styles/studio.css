@@ -8,6 +8,7 @@
 @import '../skins/cobalt.css';
 @import '../skins/flint.css';
 @import '../skins/opal.css';
+@import '../skins/mixer.css';
 @import './shell.css';
 
 .fwm-root { color: var(--fwm-ink); font: 16px/1.55 var(--fwm-font-ui); }
@@ -96,6 +97,7 @@
 /* ---------- fader ---------- */
 .fwm-env { display: flex; gap: 10px; align-items: flex-end; justify-content: center; }
 .fwm-fader { display: flex; flex-direction: column; align-items: center; gap: 4px; }
+.fwm-fader--lg .fwm-fader__track { height: 170px; }
 .fwm-fader__track { width: 44px; height: 110px; position: relative; cursor: ns-resize; touch-action: none; border-radius: 6px; }
 .fwm-fader__track::before { content: ""; position: absolute; left: 50%; top: 4px; bottom: 4px; width: 6px; margin-left: -3px; border-radius: 3px; background: var(--dev-track); box-shadow: inset 0 1px 2px rgba(0,0,0,.6); }
 .fwm-fader__cap { position: absolute; left: 4px; right: 4px; height: 20px; border-radius: calc(4px * var(--fwm-round)); background: linear-gradient(var(--dev-cap), color-mix(in srgb, var(--dev-capd) calc(var(--fwm-depth) * 100%), var(--dev-cap))); box-shadow: 0 calc(3px * var(--fwm-depth)) calc(4px * var(--fwm-depth)) rgba(0,0,0,calc(.5 * var(--fwm-depth))); }

@@ -5,10 +5,11 @@ import type { Peer } from '../collab/presence';
 import { useStudio } from './context';
 import { DeviceView } from './views/DeviceView';
 import { LibraryView } from './views/LibraryView';
+import { MixerView } from './views/MixerView';
 import { RollView } from './views/RollView';
 import { SeqView } from './views/SeqView';
 
-const VIEWS = { seq: 'Song arrangement', roll: 'Piano roll', device: 'Device', library: 'Library' } as const;
+const VIEWS = { seq: 'Song arrangement', roll: 'Piano roll', device: 'Device', mixer: 'Mixer', library: 'Library' } as const;
 type ViewId = keyof typeof VIEWS;
 
 interface Layout {
@@ -86,10 +87,11 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
               {L.max === i ? '⤡' : '⤢'}
             </button>
           </header>
-          <div className={'fwm-pb' + (v === 'seq' || v === 'roll' ? ' is-blue' : '')}>
+          <div className={'fwm-pb' + (v === 'seq' || v === 'roll' || v === 'mixer' ? ' is-blue' : '')}>
             {v === 'seq' && <SeqView peers={peers} />}
             {v === 'roll' && <RollView peers={peers} />}
             {v === 'device' && <DeviceView peers={peers} />}
+            {v === 'mixer' && <MixerView peers={peers} />}
             {v === 'library' && <LibraryView />}
           </div>
         </section>
@@ -109,7 +111,9 @@ function PaneContext({ view }: { view: ViewId }) {
   const text =
     view === 'seq'
       ? `${n} instrument${n === 1 ? '' : 's'} · ${r} TRACK${r === 1 ? '' : 's'}`
-      : 'Bring a device in to add an instrument';
+      : view === 'mixer'
+        ? `${n} channel${n === 1 ? '' : 's'} + master`
+        : 'Bring a device in to add an instrument';
   return <span className="fwm-ctx">{text}</span>;
 }
 

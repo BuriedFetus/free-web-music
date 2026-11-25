@@ -2,14 +2,14 @@ import { useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
 import type { FaderProps } from './types';
 
 const clamp01 = (v: number) => Math.min(1, Math.max(0, v));
-// Track geometry (px): cap travel inside a 110px track with a 20px cap and 4px margins.
-const H = 110;
+// Track geometry (px): cap travel inside a 110px track (170px when large) with a 20px cap and 4px margins.
 const CAP = 20;
 const PAD = 4;
-const y = (v: number) => PAD + (1 - v) * (H - CAP - 2 * PAD) + CAP / 2;
 
-/** Vertical fader. Click or drag anywhere on the track, arrow keys, double-click = default. */
-export function Fader({ value, onChange, label, format, modulation, presence = [], defaultValue, onGestureStart, onGestureEnd }: FaderProps) {
+/** Vertical fader. Click or drag anywhere on the track, arrow keys, double-click = default. size 'lg' = mixer height. */
+export function Fader({ value, onChange, label, format, size = 'md', modulation, presence = [], defaultValue, onGestureStart, onGestureEnd }: FaderProps) {
+  const H = size === 'lg' ? 170 : 110;
+  const y = (v: number) => PAD + (1 - v) * (H - CAP - 2 * PAD) + CAP / 2;
   const [active, setActive] = useState(false);
   const ref = useRef<HTMLDivElement>(null);
   const peer = presence[0];
@@ -27,7 +27,7 @@ export function Fader({ value, onChange, label, format, modulation, presence = [
   const lo = modulation && clamp01(value + modulation.low);
   const hi = modulation && clamp01(value + modulation.high);
   return (
-    <div className={'fwm-fader' + (active ? ' is-mine' : '') + (peer ? ' is-peer' : '')}
+    <div className={'fwm-fader' + (size === 'lg' ? ' fwm-fader--lg' : '') + (active ? ' is-mine' : '') + (peer ? ' is-peer' : '')}
       style={peer ? ({ '--fwm-who': peer.color } as React.CSSProperties) : undefined}>
       <div ref={ref} className="fwm-fader__track" role="slider" tabIndex={0} aria-label={label}
         aria-valuemin={0} aria-valuemax={100} aria-valuenow={Math.round(value * 100)} aria-valuetext={format?.(value)}

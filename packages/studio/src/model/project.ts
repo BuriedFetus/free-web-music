@@ -6,7 +6,10 @@
 // Layout (top-level types never conflict when two people start at once):
 //   fwm.meta       Y.Map    { schema, bpm, swing, keyRoot, keyScale }
 //   fwm.order      Y.Array  track ids, in display order
+//   fwm.meta       also holds the master: masterLevel
 //   fwm.tracks     Y.Map    trackId → Y.Map { device, name, seq: Y.Map{dir,rate,own,mute},
+//                                              mixer as flat keys (no nested map to race over):
+//                                              'mix.level', 'mix.pan', 'mix.solo', 'mix.rev', 'mix.dly',
 //                                              params: Y.Map<paramId, number>, routes: Y.Array<Route>,
 //                                              pats: Y.Array<patternId> (this instrument's patterns, in order) }
 //   fwm.patterns   Y.Map    `${trackId}|${patternId}` → Y.Map { name, len, notes: Y.Map<noteId, Note>,
@@ -53,6 +56,27 @@ export interface TrackInfo {
   name: string;
   seq: SeqSettings;
 }
+/**
+ * An instrument's mixer strip. Mute is the instrument's `seq.mute` (one Mute, shown in the Song
+ * arrangement and the Mixer). level: 0..1 (0.8 = 0 dB); pan: -1..1; rev / dly: send amounts 0..1.
+ */
+export interface MixSettings {
+  level: number;
+  pan: number;
+  solo: boolean;
+  rev: number;
+  dly: number;
+}
+export const DEFAULT_MIX: MixSettings = { level: 0.8, pan: 0, solo: false, rev: 0, dly: 0 };
+/** Fader position (0..1) in dB, as the engine applies it: gain = (v / 0.8)³, so 0.8 = 0 dB, 1 = +5.8 dB. */
+export const faderDb = (v: number) => (v <= 0 ? -Infinity : 60 * Math.log10(Math.min(1, v) / 0.8));
+const MIX_KEYS = Object.keys(DEFAULT_MIX) as (keyof MixSettings)[];
+function clampMix<K extends keyof MixSettings>(k: K, v: MixSettings[K]): MixSettings[K] {
+  if (k === 'solo') return !!v as MixSettings[K];
+  const n = Number(v);
+  if (!Number.isFinite(n)) return DEFAULT_MIX[k];
+  return (k === 'pan' ? Math.max(-1, Math.min(1, n)) : Math.max(0, Math.min(1, n))) as MixSettings[K];
+}
 export interface PatternInfo {
   id: string;
   name: string;
@@ -66,6 +90,8 @@ export interface SongFile {
   bpm: number;
   swing: number;
   key: SongKey;
+  /** Master fader (0..1, 0.8 = 0 dB). Missing in older files: 0 dB. */
+  master?: { level: number };
   tracks: {
     id: string;
     device: DeviceId;
@@ -74,6 +100,8 @@ export interface SongFile {
     seq: SeqSettings;
     params: Record<string, number>;
     routes: Route[];
+    /** Missing in older files: defaults. */
+    mix?: MixSettings;
     patterns: { id: string; name: string; len: number; notes: Note[]; auto: Record<string, number>; lens?: Record<string, number> }[];
   }[];
   rows: SongRow[];
@@ -199,6 +227,35 @@ export class Project {
     });
   }
 
+  // ---- mixer (shared like everything in the song) ----
+  mix(track: string): MixSettings {
+    const t = this.tracksMap.get(track);
+    const out = { ...DEFAULT_MIX };
+    if (!t) return out;
+    for (const k of MIX_KEYS) {
+      const v = t.get('mix.' + k);
+      if (v != null) (out as Record<string, unknown>)[k] = clampMix(k, v as never);
+    }
+    return out;
+  }
+  /** Fader and knob moves (merge into one undo step while dragging). Solo is its own step. */
+  setMix(track: string, patch: Partial<MixSettings>) {
+    const t = this.tracksMap.get(track);
+    if (!t) return;
+    const write = () => {
+      for (const k of MIX_KEYS) if (patch[k] != null) t.set('mix.' + k, clampMix(k, patch[k] as never));
+    };
+    if (patch.solo != null) this.action(write);
+    else this.transact(write);
+  }
+  get masterLevel(): number {
+    const v = this.meta.get('masterLevel') as number | undefined;
+    return v != null && Number.isFinite(v) ? Math.max(0, Math.min(1, v)) : DEFAULT_MIX.level;
+  }
+  setMasterLevel(v: number) {
+    this.transact(() => this.meta.set('masterLevel', Math.max(0, Math.min(1, v))));
+  }
+
   // ---- the song as a whole: name, save state, file, INIT ----
   get songName(): string {
     return (this.meta.get('name') as string) || 'Untitled';
@@ -219,6 +276,7 @@ export class Project {
       bpm: this.bpm,
       swing: this.swing,
       key: this.key,
+      master: { level: this.masterLevel },
       tracks: this.tracks().map((t) => {
         const m = this.tracksMap.get(t.id)!;
         return {
@@ -229,6 +287,7 @@ export class Project {
           seq: t.seq,
           params: (m.get('params') as Y.Map<number>).toJSON() as Record<string, number>,
           routes: (m.get('routes') as Y.Array<Route>).toArray(),
+          mix: this.mix(t.id),
           patterns: this.patternList(t.id).map((p) => ({
             ...p,
             notes: this.notes(t.id, p.id).map(([, n]) => n),
@@ -279,6 +338,8 @@ export class Project {
       this.meta.set('name', file.name || 'Untitled');
       this.meta.set('bpm', Math.max(40, Math.min(240, Math.round(file.bpm || 120))));
       this.meta.set('swing', Math.max(0, Math.min(0.6, file.swing || 0)));
+      const ml = Number(file.master?.level);
+      if (Number.isFinite(ml)) this.meta.set('masterLevel', Math.max(0, Math.min(1, ml)));
       if (file.key) {
         this.meta.set('keyRoot', file.key.root);
         this.meta.set('keyScale', SCALES[file.key.scale] ? file.key.scale : 'chromatic');
@@ -301,6 +362,7 @@ export class Project {
         const routes = new Y.Array<Route>();
         routes.push((ft.routes ?? []).filter((r) => canRoute(manifest, r.src, r.target)).slice(0, MAX_ROUTES));
         t.set('routes', routes);
+        for (const k of MIX_KEYS) if (ft.mix?.[k] != null) t.set('mix.' + k, clampMix(k, ft.mix[k] as never));
         const pats = new Y.Array<string>();
         t.set('pats', pats);
         this.tracksMap.set(ft.id, t);

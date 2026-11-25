@@ -1,6 +1,14 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-25): Mixer + Scope mock-up, waiting for the user's feedback
+## START HERE (2026-11-25): building the Mixer (slice 1 of 4 done)
+The user approved the mock-up ("Alright you can push this!"). Slices and progress: PLAN.md "Mixer and effects".
+Slice 1 (mixer strips, master, meters, Mixer panel) is built. Next: slice 2, Reverb + Delay + sends + the draggable
+chain (shown when the Mixer panel is maximised: pass `L.max === i` from Workspace to MixerView). Engine plan: each
+effect is a stage with in ➜ out; Reverb / Delay stages add their send-fed return; the chain order is a list in the
+song (`fwm.meta` or a new top-level `fwm.fx` map). Lo-fi DSP = the mock-up's tape/vinyl worklet, ported to Rust.
+Screenshot of a given panel layout: my scratch server's `/lay?<ms>&<v1,v2,v3,v4>&<query>` (sets user + layout).
+
+## Earlier (2026-11-25): Mixer + Scope mock-up
 The user tested Phase 4 ("tested it's amazing!", and is relaxed about live delay: "even if it's 200ms who cares we
 just want to play around"). They renamed the Main sequencer panel to **Song arrangement** (done, a430158) and asked for
 a **main mixer** (a Reverb and a Delay send knob per instrument; expanding the Mixer shows Reverb / Delay / Lo-fi /

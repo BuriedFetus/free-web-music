@@ -276,3 +276,50 @@ describe('Project (undo of structure)', () => {
   });
 });
 
+
+describe('Project (mixer)', () => {
+  it('strips start at 0 dB, centre, no sends; changes reach everyone; files keep them', () => {
+    const [you, mira] = pair();
+    const id = you.addTrack(m, undefined, 0);
+    expect(mira.mix(id)).toEqual({ level: 0.8, pan: 0, solo: false, rev: 0, dly: 0 });
+    you.setMix(id, { level: 0.5, pan: -0.4, rev: 0.3 });
+    mira.setMix(id, { dly: 0.6, solo: true }); // at the same time, different settings: both kept
+    expect(you.mix(id)).toEqual({ level: 0.5, pan: -0.4, solo: true, rev: 0.3, dly: 0.6 });
+    expect(mira.mix(id)).toEqual(you.mix(id));
+    you.setMix(id, { level: 7, pan: -9 });
+    expect(you.mix(id)).toMatchObject({ level: 1, pan: -1 });
+    you.setMasterLevel(0.6);
+    expect(mira.masterLevel).toBe(0.6);
+    const file = you.toFile();
+    expect(file.master).toEqual({ level: 0.6 });
+    mira.initSong(m);
+    expect(you.masterLevel).toBe(0.8);
+    you.loadFile(file, { basalt: m }, null);
+    expect(mira.mix(id)).toMatchObject({ level: 1, pan: -1, rev: 0.3, dly: 0.6, solo: true });
+    expect(mira.masterLevel).toBe(0.6);
+  });
+
+  it('a mixer change counts as unsaved, and undo is per person', () => {
+    const [you, mira] = pair();
+    const id = you.addTrack(m, undefined, 0);
+    you.markSaved('s1');
+    expect(you.unsaved).toBe(false);
+    mira.setMix(id, { level: 0.3 });
+    expect(you.unsaved).toBe(true);
+    you.setMix(id, { pan: 0.5 });
+    you.undo();
+    expect(you.mix(id)).toMatchObject({ level: 0.3, pan: 0 });
+  });
+
+  it('older song files without a mixer load at 0 dB', () => {
+    const [you] = pair();
+    you.addTrack(m, undefined, 0);
+    const file = you.toFile();
+    delete file.master;
+    for (const t of file.tracks) delete t.mix;
+    you.setMasterLevel(0.2);
+    you.loadFile(file, { basalt: m }, null);
+    expect(you.masterLevel).toBe(0.8);
+    expect(you.mix(you.trackIds()[0])).toEqual({ level: 0.8, pan: 0, solo: false, rev: 0, dly: 0 });
+  });
+});

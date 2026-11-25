@@ -1,8 +1,9 @@
 //! free-web-music audio engine.
 //!
-//! A `Rack` holds device slots (one per track instrument for now). The host (the AudioWorklet)
-//! queues timestamped events, calls `fwm_render` once per 128-frame block, and reads the
-//! master output, the scope ring and each device's modulated parameter values from memory.
+//! A `Rack` holds device slots (one per track instrument for now). Each slot's sound goes through
+//! its mixer strip, then the master. The host (the AudioWorklet) queues timestamped events, calls
+//! `fwm_render` once per 128-frame block, and reads the master output, the scope ring, the meters
+//! and each device's modulated parameter values from memory.
 //!
 //! Built as `no_std` for wasm32 (no allocator, nothing can allocate on the audio thread).
 //! Native builds use std so `cargo test` works.
@@ -13,11 +14,13 @@ pub mod device;
 pub mod devices;
 pub mod dsp;
 pub mod events;
+pub mod mixer;
 
 use device::{Device, ModSource, RouteError};
 use devices::basalt::Basalt;
 use devices::flint::Flint;
 use events::{Event, Kind, Queue};
+use mixer::Mixer;
 
 #[cfg(all(target_arch = "wasm32", not(test)))]
 #[panic_handler]
@@ -81,6 +84,9 @@ pub struct Rack {
     tmp_r: [f32; BLOCK],
     pub scope: [f32; SCOPE_LEN],
     pub scope_pos: usize,
+    pub mixer: Mixer,
+    /// Meter snapshot for the host (see `Mixer::take_meters`).
+    pub meters: [f32; (MAX_SLOTS + 1) * 2],
 }
 
 impl Rack {
@@ -96,6 +102,8 @@ impl Rack {
             tmp_r: [0.0; BLOCK],
             scope: [0.0; SCOPE_LEN],
             scope_pos: 0,
+            mixer: Mixer::new(sample_rate),
+            meters: [0.0; (MAX_SLOTS + 1) * 2],
         }
     }
 
@@ -111,6 +119,7 @@ impl Rack {
             d.prepare(self.sample_rate);
         }
         self.slots[slot] = s;
+        self.mixer.reset(slot);
         true
     }
 
@@ -152,6 +161,7 @@ impl Rack {
             let (l, r) = (&mut self.tmp_l[from..to], &mut self.tmp_r[from..to]);
             if let Some(d) = self.slots[i].device() {
                 d.render(l, r);
+                self.mixer.strip(i, l, r);
                 for (o, x) in self.out_l[from..to].iter_mut().zip(l.iter()) {
                     *o += *x;
                 }
@@ -190,6 +200,7 @@ impl Rack {
         }
         core::mem::swap(&mut self.queue, &mut self.carry);
 
+        self.mixer.master(&mut self.out_l[..n], &mut self.out_r[..n]);
         for k in 0..n {
             self.scope[self.scope_pos] = 0.5 * (self.out_l[k] + self.out_r[k]);
             self.scope_pos = (self.scope_pos + 1) % SCOPE_LEN;
@@ -328,4 +339,39 @@ pub extern "C" fn fwm_mod_source(slot: u32, src: u32) -> f32 {
         (Some(d), Some(s)) => d.mod_source_value(s),
         _ => 0.0,
     }
+}
+
+// ---- mixer ----
+
+/// A strip setting: param 0 level (0..1, 0.8 = 0 dB), 1 pan (-1..1), 2 mute (0/1), 3 send A, 4 send B.
+#[no_mangle]
+pub extern "C" fn fwm_mix(slot: u32, param: u32, value: f32) {
+    if let Some(r) = rack() {
+        r.mixer.set(slot as usize, param, value);
+    }
+}
+
+/// A master setting: param 0 level (0..1, 0.8 = 0 dB).
+#[no_mangle]
+pub extern "C" fn fwm_master(param: u32, value: f32) {
+    if let Some(r) = rack() {
+        r.mixer.set_master(param, value);
+    }
+}
+
+/// Peak levels since the last call, `(MAX_SLOTS + 1) * 2` floats: [slot0 L, slot0 R, …, master L, master R].
+#[no_mangle]
+pub extern "C" fn fwm_meters() -> *const f32 {
+    match rack() {
+        Some(r) => {
+            r.mixer.take_meters(&mut r.meters);
+            r.meters.as_ptr()
+        }
+        None => core::ptr::null(),
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn fwm_meters_len() -> u32 {
+    ((MAX_SLOTS + 1) * 2) as u32
 }

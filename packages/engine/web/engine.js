@@ -12,6 +12,10 @@
 
 export const KINDS = { basalt: 1, flint: 2 };
 export const MOD_SOURCES = { lfo: 0, amp: 1, filt: 2 };
+/** Mixer strip settings. level: 0..1 (0.8 = 0 dB), pan: -1..1, mute: 0/1, sendA / sendB: 0..1. */
+export const MIX = { level: 0, pan: 1, mute: 2, sendA: 3, sendB: 4 };
+/** Peak meter index of the master in `tick.meters` (L; R is the next one). */
+export const MASTER_METER = 32;
 
 const DEFAULT_URLS = () => ({
   wasm: new URL('./fwm_engine.wasm', import.meta.url).href,
@@ -159,6 +163,14 @@ export async function createEngine({ base, context, manifests } = {}) {
       if (!tr || !tr.playing || tr.row == null) return null;
       const spm = (tr.bpm / 60) * 4 / 1000;
       return { row: tr.row, pos: tr.rowPos + (ctxAt(at) - tr.time) * 1000 * spm, next: tr.next ?? null, stepsPerMs: spm };
+    },
+    /** Mixer strip of a slot: e.g. setMix(0, { level: 0.8, pan: 0, mute: false }). Gains glide, no clicks. */
+    setMix(slot, settings) {
+      for (const k in settings) if (k in MIX) send({ t: 'mix', slot, p: MIX[k], v: Number(settings[k]) });
+    },
+    /** Master: setMaster({ level }). */
+    setMaster(settings) {
+      if (settings.level != null) send({ t: 'master', p: 0, v: settings.level });
     },
     /** Song mode: one of a slot's patterns, {len, notes, auto: {paramId: (value|null)[]}}. */
     setPat(slot, id, { len, notes, auto = {}, lens }) {

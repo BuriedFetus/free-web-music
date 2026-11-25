@@ -30,6 +30,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'songs') return runSongs(p, engineRef, ok, out);
   if (role === 'flint') return runFlint(p, engineRef, ok, out);
   if (role === 'drums') return runDrums(p, engineRef, ok, out);
+  if (role === 'mixer') return runMixer(p, engineRef, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
@@ -736,6 +737,80 @@ async function runTogether(
     }
   } catch (e) {
     out.push(`FAIL ${role}: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: the Mixer panel. Levels, pan, mute and solo are checked on the engine's own meters. */
+async function runMixer(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  // Peak per slot / master over a while, from the engine's meters (they are cleared every tick).
+  const level = async (ms: number) => {
+    const pk = new Float32Array(34);
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      const m = engineRef.current?.last?.meters;
+      if (m) for (let i = 0; i < 34; i++) pk[i] = Math.max(pk[i], m[i]);
+      await sleep(20);
+    }
+    return pk;
+  };
+  try {
+    await sleep(300);
+    const a = p.addTrack(m, undefined, 0);
+    const b = p.addTrack(m, undefined, 0);
+    for (const id of [a, b]) for (const st of [0, 2, 4, 6, 8, 10, 12, 14]) p.addNote(id, p.patternList(id)[0].id, { s: st, l: 2, m: id === a ? 36 : 48, v: 0.9 });
+    const sel = $<HTMLSelectElement>('[aria-label="Panel 4 view"]')!;
+    sel.value = 'mixer';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(200);
+    ok(document.querySelectorAll('.fwm-strip').length === 3, `the Mixer shows a strip per instrument + master (${document.querySelectorAll('.fwm-strip').length})`);
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    btn('▶ Play')!.click();
+    await sleep(600);
+    let L = await level(800);
+    ok(L[0] > 0.02 && L[2] > 0.02 && L[32] > 0.02, `meters: both strips and the master move (${L[0].toFixed(3)}, ${L[2].toFixed(3)}, master ${L[32].toFixed(3)})`);
+    const bar = $<HTMLElement>('.fwm-strip .fwm-meter i');
+    ok(parseFloat(bar?.style.getPropertyValue('--lvl') ?? '0') > 10, `the meter bar moves on screen (${bar?.style.getPropertyValue('--lvl')})`);
+    const a0 = L[0];
+    p.setMix(a, { level: 0.4 }); // -18 dB
+    await sleep(200);
+    L = await level(800);
+    const db = 20 * Math.log10(L[0] / a0);
+    ok(db < -15 && db > -21, `fader down to 0.4 = about -18 dB on strip 1 (${db.toFixed(1)} dB)`);
+    ok($('.fwm-strip__db')?.textContent === '-18.1 dB', `the strip shows its level ("${$('.fwm-strip__db')?.textContent}")`);
+    p.setMix(a, { level: 0.8 });
+    p.setMix(a, { pan: -1 });
+    await sleep(200);
+    L = await level(600);
+    ok(L[0] > 0.02 && L[1] < 0.001, `pan hard left: right side silent (L ${L[0].toFixed(3)}, R ${L[1].toFixed(4)})`);
+    p.setMix(a, { pan: 0 });
+    ($('[aria-label="Mute Basalt"]') as HTMLButtonElement).click();
+    await sleep(200);
+    L = await level(600);
+    ok(L[0] < 0.001 && L[2] > 0.02 && !!p.track(a)?.seq.mute, `M mutes strip 1 (the same Mute as the arrangement) (${L[0].toFixed(4)})`);
+    ($('[aria-label="Mute Basalt"]') as HTMLButtonElement).click();
+    ($('[aria-label="Solo Basalt 2"]') as HTMLButtonElement).click();
+    await sleep(200);
+    L = await level(600);
+    ok(L[0] < 0.001 && L[2] > 0.02, `S on Basalt 2: only it is heard (${L[0].toFixed(4)} / ${L[2].toFixed(3)})`);
+    ($('[aria-label="Solo Basalt 2"]') as HTMLButtonElement).click();
+    const fader = $<HTMLElement>('.fwm-strip [role=slider][aria-label="Level"]')!;
+    fader.focus();
+    fader.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowDown', bubbles: true }));
+    await sleep(100);
+    ok(Math.abs(p.mix(a).level - 0.75) < 1e-6, `arrow key on the fader moves it (level ${p.mix(a).level})`);
+    p.setMasterLevel(0);
+    await sleep(200);
+    L = await level(500);
+    ok(L[32] < 0.001, `master fader down: silence (${L[32].toFixed(4)})`);
+    p.setMasterLevel(0.8);
+    btn('■ Stop')!.click();
+  } catch (e) {
+    out.push(`FAIL mixer: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
