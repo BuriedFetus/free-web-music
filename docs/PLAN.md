@@ -84,6 +84,22 @@ The core does no networking. The host owns providers, persistence and storage.
 - Verify: `gh repo view BuriedFetus/free-web-music` and `git status` clean.
 - No code until Phase 0 design is approved.
 
+## Milestones (updated 2026-11-25)
+| Phase | Status |
+|---|---|
+| 0 Design + tech tests | ✅ done, approved |
+| 1 Engine + Basalt | ✅ done |
+| 2 Shared project, presence, undo | ✅ done |
+| 3 Sequencer → Song arrangement, songs, Flint (drums) | ✅ done, reviewed ("drums and tracks are good") |
+| 4 Playing together (shared Play, clock sync, live keys Even/Tight, people chips) | ✅ done, signed off ("amazing") |
+| 6 Mixer (strips, meters, master) — pulled forward | ✅ built, waiting for review |
+| 7 (part) Effects: Reverb, Delay, sends, draggable chain, tape/vinyl Lo-fi, main Low-pass — pulled forward | ✅ built, waiting for review |
+| Extra: Scope panel, pattern previews in the arrangement | ✅ built, waiting for review |
+| **Next: 5 More instruments** (Cobalt chip lead + arp, Quartz FM keys, Opal), one per slice, mock-up first | ⏭ ask the user which first |
+| Later in 7: insert effects per instrument, routing view, global modulators | open |
+| 8 Hand-off package for the friend's app | open |
+| Later | Tape/recorder, time/pitch, 3D view, sample pads for Flint | open |
+
 ## Phases (each = design screen → you approve → build → review)
 | # | Goal | You see / approve |
 |---|---|---|
