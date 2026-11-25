@@ -275,3 +275,8 @@
 .fwm-sends .fwm-knob svg { width: 40px; height: 40px; }
 .fwm-quartz { background: var(--dev-texture, none), linear-gradient(160deg, var(--dev-case), color-mix(in srgb, var(--dev-case2) calc(var(--fwm-depth) * 100%), var(--dev-case))); }
 .fwm-quartz .fwm-gstep { width: 120px; }
+.fwm-opal__mod { display: flex; flex-wrap: wrap; align-items: center; gap: 8px 14px; }
+.fwm-opal__mod .fwm-seg { margin: 0; }
+.fwm-opal__src { display: inline-flex; align-items: center; gap: 6px; }
+.fwm-opal__hint { flex: 1 1 260px; margin: 0; font-size: 12px; }
+.fwm-opal__mod .fwm-mods { flex: 1 0 100%; margin: 0; }

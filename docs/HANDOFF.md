@@ -1,12 +1,14 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-25, later): Opal built; Geode planned
-**Opal** (pad synth, device kind 4) is built and tested end to end (engine `tests/opal.rs`, browser `?e2e=opal`,
-harness `?opal`), in full auto at the user's request (no mock-up round). Waiting for the user to listen: presets,
-levels, chorus. **Geode** ("grow a sound", a beginner-friendly take on breeding sounds) is planned in PLAN.md;
-draft mock-up `design/kit/geode.html` not reviewed yet. The user is short on weekly budget: keep turns lean.
-Next: Opal feedback, then Geode, then Quartz.
+## START HERE (2026-11-25, end of day): Opal approved + modulation; Quartz built; SEND knobs
+- **Opal** approved by the user ("perfect"), now with Basalt-style modulation (Assign LFO / Amp env / Swell env, then click a knob).
+- **Quartz** FM keys built and tested (`tests/quartz.rs`, `?e2e=quartz`, harness `?quartz`): waiting for the user's ears.
+- **SEND knobs** (Reverb / Delay) on every instrument's header = the Mixer strip's sends, both ways (`devices/Sends.tsx`, `DeviceHost.sends`).
+- **Geode** (beginner "grow a sound") planned in PLAN.md, draft mock-up `design/kit/geode.html` not reviewed.
+- The user is low on weekly budget: keep turns lean. Next: Quartz feedback (maybe modulation like Opal's), then Geode.
+- Device kit artifacts are stale (Opal's skin is now pearl; Quartz's panel is new): republish when the user asks.
 
+### Earlier today: Opal built
 ### Before that: Garnet + My look + arrangement drag and drop
 Since the last notes: **My look** (each person's own stylesheet from their AI agent, docs/LOOKS.md) and the
 **song arrangement cells** (double-click / Delete empties; drag to another TRACK = same pattern, Ctrl = copy;

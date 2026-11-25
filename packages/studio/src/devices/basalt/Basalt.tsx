@@ -277,7 +277,7 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
 
 // ---- param-bound controls ------------------------------------------------------------------
 
-interface ParamCtx {
+export interface ParamCtx {
   store: DeviceStore;
   slot: number;
   assign: ModSourceId | null;
@@ -318,12 +318,12 @@ function useParam(ctx: ParamCtx, id: string) {
   };
 }
 
-function ParamKnob({ ctx, id, size }: { ctx: ParamCtx; id: string; size?: 'md' | 'lg' }) {
+export function ParamKnob({ ctx, id, size, format }: { ctx: ParamCtx; id: string; size?: 'md' | 'lg'; format?: (v: number) => string }) {
   const { Knob } = usePrimitives();
   const p = useParam(ctx, id);
   return (
     <div className={'fwm-target' + (p.target ? ' is-target' : '')} onPointerDownCapture={p.onTargetDown}>
-      <Knob value={p.value} onChange={p.onChange} label={p.spec.label} format={p.format} size={size}
+      <Knob value={p.value} onChange={p.onChange} label={p.spec.label} format={format ?? p.format} size={size}
         modulation={p.modulation} defaultValue={p.spec.default} presence={p.presence}
         onGestureStart={p.onGestureStart} onGestureEnd={p.onGestureEnd} />
     </div>

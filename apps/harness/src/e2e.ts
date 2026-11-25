@@ -1,3 +1,4 @@
+import { deviceEntry } from '@fwm/studio';
 // In-page end-to-end test for two tabs (no browser automation needed). Results are POSTed to ./log.
 //   tab A: ?e2e=a&room=R   plays, turns Cutoff, adds a note, plays a key
 //   tab B: ?e2e=b&room=R   checks it sees and hears all of that, and that its undo is its own
@@ -1279,6 +1280,24 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
     ($('.fwm-opal [aria-label="Stack: 1"]') as HTMLButtonElement).click();
     await until('stack in engine', () => engineRef.current!.last!.devices[slot].eff[2] === 0, 2000);
     ok(true, 'Stack 1 reaches the engine');
+    // modulation, as on Basalt: Assign LFO, click Cutoff → a route; the engine's cutoff moves
+    [...document.querySelectorAll<HTMLButtonElement>('.fwm-opal .fwm-btn--assign')][0].click();
+    await sleep(50);
+    const cutK = $('.fwm-opal [role=slider][aria-label="Cutoff"]')!.closest('.fwm-target')!;
+    ok(cutK.classList.contains('is-target'), 'Assign LFO: Cutoff becomes a target');
+    cutK.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1 }));
+    await sleep(100);
+    const st = p.deviceStore(p.trackIds()[0], deviceEntry('opal')!.manifest!)!.getState();
+    ok(st.routes.some((r) => r.src === 'lfo' && r.target === 'cut'), `route LFO → Cutoff added (${st.routes.map((r) => r.src + '>' + r.target).join(',')})`);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    const seen = new Set<string>();
+    const t1 = performance.now();
+    while (performance.now() - t1 < 1500) {
+      seen.add(engineRef.current!.last!.devices[slot].eff[9].toFixed(2));
+      await sleep(40);
+    }
+    document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+    ok(seen.size > 4, `the engine's cutoff moves with the LFO (${seen.size} values)`);
     // SEND knobs = the Mixer strip's sends, both ways
     const tid = p.trackIds()[0];
     const rev = $('.fwm-opal .fwm-sends [role=slider][aria-label="Reverb"]')!;

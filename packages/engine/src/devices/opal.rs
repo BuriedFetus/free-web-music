@@ -9,7 +9,7 @@
 //! Voices: a note re-pressed takes its own voice back; otherwise a free voice, else the oldest
 //! released one, else the oldest.
 
-use crate::device::{Device, ModSource, RouteError};
+use crate::device::{Device, ModSource, RouteError, MAX_ROUTES};
 use crate::dsp::env::{Adsr, AdsrCoefs, AdsrTimes};
 use crate::dsp::osc::{Osc, Wave};
 use crate::dsp::rng::Rng;
@@ -47,23 +47,24 @@ pub mod p {
     pub const CHORUS: usize = 20;
     pub const WIDTH: usize = 21;
     pub const LVL: usize = 22;
-    pub const COUNT: usize = 23;
+    pub const LWAVE: usize = 23;
+    pub const COUNT: usize = 24;
 }
 
 /// Parameter ids, in index order (they match `devices/opal.json`).
 pub const IDS: [&str; p::COUNT] = [
     "w1", "shape", "stack", "detune", "w2", "int2", "fine2", "mix2", "air", "cut", "res", "fenv", "swell", "atk", "dec", "sus",
-    "rel", "drift", "rate", "move", "chorus", "width", "lvl",
+    "rel", "drift", "rate", "move", "chorus", "width", "lvl", "lwave",
 ];
 
 /// "Warm Pad".
 pub fn defaults() -> [f32; p::COUNT] {
-    [0.0, 0.3, 2.0, 0.35, 1.0, 3.0, 0.55, 0.3, 0.05, 0.45, 0.2, 0.35, 0.45, 0.45, 0.6, 0.8, 0.55, 0.3, 0.3, 0.25, 1.0, 0.7, 0.7]
+    [0.0, 0.3, 2.0, 0.35, 1.0, 3.0, 0.55, 0.3, 0.05, 0.45, 0.2, 0.35, 0.45, 0.45, 0.6, 0.8, 0.55, 0.3, 0.3, 0.25, 1.0, 0.7, 0.7, 0.0]
 }
 
 fn discrete_max(i: usize) -> Option<f32> {
     match i {
-        p::W1 | p::W2 | p::STACK | p::CHORUS => Some(3.0),
+        p::W1 | p::W2 | p::STACK | p::CHORUS | p::LWAVE => Some(3.0),
         p::INT2 => Some(4.0),
         _ => None,
     }
@@ -86,6 +87,25 @@ pub fn attack_s(v: f32) -> f32 {
 }
 pub fn release_s(v: f32) -> f32 {
     sq_map(v, 0.02, 10.0)
+}
+
+/// A source may not modulate its own controls (no feedback loops).
+fn route_allowed(src: ModSource, target: usize) -> bool {
+    if target >= p::COUNT || discrete_max(target).is_some() {
+        return false;
+    }
+    match src {
+        ModSource::Lfo => target != p::RATE,
+        ModSource::AmpEnv => !(p::ATK..=p::REL).contains(&target),
+        ModSource::FiltEnv => target != p::SWELL,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Route {
+    src: ModSource,
+    target: usize,
+    depth: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -145,6 +165,12 @@ pub struct Opal {
     fs: f32,
     params: [f32; p::COUNT],
     sm: [f32; p::COUNT],
+    /// Values after modulation (what the sound uses, and what the knobs' arcs show).
+    eff: [f32; p::COUNT],
+    routes: [Option<Route>; MAX_ROUTES],
+    /// The voice played last: its envelopes are the Amp env / Filter env sources.
+    last: usize,
+    lfo_prev: f32,
     primed: bool,
     v: [Voice; VOICES],
     vc: [VCtl; VOICES],
@@ -174,6 +200,10 @@ impl Opal {
             fs: 48_000.0,
             params: d,
             sm: d,
+            eff: d,
+            routes: [None; MAX_ROUTES],
+            last: 0,
+            lfo_prev: 0.0,
             primed: false,
             v: [Voice::new(); VOICES],
             vc: [VCtl::default(); VOICES],
@@ -207,13 +237,42 @@ impl Opal {
 
     fn control(&mut self) {
         let fs = self.fs;
-        let s = &self.sm;
+        // Movement / LFO: Sine, Triangle, Square or Random (a new value each cycle)
+        let rate = exp_map(self.eff[p::RATE], 0.05, 8.0);
+        let ph = (self.lfo + rate * CTL as f32 / fs) % 1.0;
+        let wrapped = ph < self.lfo;
+        self.lfo = ph;
+        self.lfo_out = match self.params[p::LWAVE] as u32 {
+            1 => 1.0 - 4.0 * libm::fabsf(ph - 0.5),
+            2 => if ph < 0.5 { 1.0 } else { -1.0 },
+            3 => {
+                if wrapped {
+                    self.lfo_prev = self.rng.bipolar();
+                }
+                self.lfo_prev
+            }
+            _ => sinf(ph * TAU),
+        };
+        // routes: depth × source added to the knob's value
+        let lv = &self.v[self.last];
+        let (amp_l, filt_l) = if lv.live { (lv.amp.level, lv.filt.level) } else { (0.0, 0.0) };
+        self.eff = self.sm;
+        for r in self.routes.iter().flatten() {
+            let src = match r.src {
+                ModSource::Lfo => self.lfo_out,
+                ModSource::AmpEnv => amp_l,
+                ModSource::FiltEnv => filt_l,
+            };
+            self.eff[r.target] += r.depth * src;
+        }
+        for i in 0..p::COUNT {
+            if discrete_max(i).is_none() {
+                self.eff[i] = clamp01(self.eff[i]);
+            }
+        }
+        let s = &self.eff;
         self.amp_c = AdsrCoefs::new(&AdsrTimes { a: attack_s(s[p::ATK]), d: sq_map(s[p::DEC], 0.05, 8.0), s: s[p::SUS], r: release_s(s[p::REL]) }, fs);
         self.filt_c = AdsrCoefs::new(&AdsrTimes { a: attack_s(s[p::SWELL]), d: 2.5, s: 0.35, r: release_s(s[p::REL]) }, fs);
-        // Movement LFO (sine), advanced CTL samples at a time
-        let rate = exp_map(s[p::RATE], 0.05, 8.0);
-        self.lfo = (self.lfo + rate * CTL as f32 / fs) % 1.0;
-        self.lfo_out = sinf(self.lfo * TAU);
         let n = STACKS[self.params[p::STACK] as usize];
         let det = s[p::DETUNE] * s[p::DETUNE] * 40.0; // cents at the outer oscillators
         let drift_ct = s[p::DRIFT] * 9.0;
@@ -273,14 +332,30 @@ impl Device for Opal {
         self.params.get(index).copied().unwrap_or(0.0)
     }
     fn effective(&self) -> &[f32] {
-        &self.params
+        &self.eff
     }
-    fn set_route(&mut self, _slot: usize, _src: ModSource, _target: usize, _depth: f32) -> Result<(), RouteError> {
-        Err(RouteError::NotAllowed)
+    fn set_route(&mut self, slot: usize, src: ModSource, target: usize, depth: f32) -> Result<(), RouteError> {
+        if slot >= MAX_ROUTES {
+            return Err(RouteError::NoSlot);
+        }
+        if !route_allowed(src, target) {
+            return Err(RouteError::NotAllowed);
+        }
+        self.routes[slot] = Some(Route { src, target, depth: depth.clamp(-1.0, 1.0) });
+        Ok(())
     }
-    fn clear_route(&mut self, _slot: usize) {}
-    fn mod_source_value(&self, _src: ModSource) -> f32 {
-        0.0
+    fn clear_route(&mut self, slot: usize) {
+        if slot < MAX_ROUTES {
+            self.routes[slot] = None;
+        }
+    }
+    fn mod_source_value(&self, src: ModSource) -> f32 {
+        let v = &self.v[self.last];
+        match src {
+            ModSource::Lfo => self.lfo_out,
+            ModSource::AmpEnv => if v.live { v.amp.level } else { 0.0 },
+            ModSource::FiltEnv => if v.live { v.filt.level } else { 0.0 },
+        }
     }
     fn note_on(&mut self, note: u8, velocity: f32) {
         if velocity <= 0.0 {
@@ -310,6 +385,7 @@ impl Device for Opal {
         v.age = self.clock;
         v.amp.gate_on();
         v.filt.gate_on();
+        self.last = i;
         self.ctl_n = 0; // its pitch and filter are worked out before the next sample
     }
     fn note_off(&mut self, note: u8) {
@@ -334,7 +410,8 @@ impl Device for Opal {
             self.sm[i] = if discrete_max(i).is_some() { self.params[i] } else { self.sm[i] + (self.params[i] - self.sm[i]) * k };
         }
         self.primed = true;
-        let s = self.sm;
+        // the per-period values below are worked out at the first sample of every block
+        self.ctl_n = 0;
         let w1 = Wave::from_index(self.params[p::W1] as u32);
         let w2 = Wave::from_index(self.params[p::W2] as u32);
         let stack = STACKS[self.params[p::STACK] as usize];
@@ -348,22 +425,24 @@ impl Device for Opal {
             gl[j] = libm::cosf(a) * norm * 1.414;
             gr[j] = libm::sinf(a) * norm * 1.414;
         }
-        let rk = 2.0 * (1.0 - 0.96 * s[p::RES]);
-        let mix2 = s[p::MIX2] * 0.8;
-        let mix1 = 1.0 - s[p::MIX2] * 0.45;
-        let air = s[p::AIR] * s[p::AIR] * 0.6;
-        let gain = s[p::LVL] * s[p::LVL] * 0.42;
+        let (mut rk, mut mix1, mut mix2, mut air, mut gain, mut width) = (2.0f32, 1.0f32, 0.0f32, 0.0f32, 0.0f32, 0.0f32);
         // chorus mode: (rate Hz, depth ms); Juno-like: I slow, II faster and deeper, I+II a quick shimmer
         let mode = self.params[p::CHORUS] as usize;
         let (crate_, cdepth) = [(0.0, 0.0), (0.5, 1.7), (0.85, 2.1), (6.0, 0.3)][mode];
         let wet_goal = if mode == 0 { 0.0 } else { 1.0 };
         let wet_k = one_pole_coef(0.03, fs);
         let clp = one_pole_coef(1.0 / (TAU * 9000.0), fs);
-        let width = s[p::WIDTH];
         for i in 0..n {
             if self.ctl_n == 0 {
                 self.control();
-                self.shape_now = clamp01(s[p::SHAPE] + s[p::MOVE] * 0.35 * self.lfo_out);
+                let e = &self.eff;
+                self.shape_now = clamp01(e[p::SHAPE] + e[p::MOVE] * 0.35 * self.lfo_out);
+                rk = 2.0 * (1.0 - 0.96 * e[p::RES]);
+                mix2 = e[p::MIX2] * 0.8;
+                mix1 = 1.0 - e[p::MIX2] * 0.45;
+                air = e[p::AIR] * e[p::AIR] * 0.6;
+                gain = e[p::LVL] * e[p::LVL] * 0.42;
+                width = e[p::WIDTH];
             }
             self.ctl_n = (self.ctl_n + 1) % CTL;
             let shape = self.shape_now;

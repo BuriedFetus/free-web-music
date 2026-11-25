@@ -33,6 +33,7 @@ fn plain(o: &mut Opal) {
 #[test]
 fn manifest_matches_the_engine() {
     let json = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/devices/opal.json")).unwrap();
+    let json = json.split("\"modSources\"").next().unwrap().to_string();
     let ids: Vec<String> = json.split("\"id\": \"").skip(2).map(|s| s.split('"').next().unwrap().to_string()).collect();
     assert_eq!(ids, IDS.iter().map(|s| s.to_string()).collect::<Vec<_>>());
     let defs: Vec<f32> = json
@@ -155,4 +156,29 @@ fn eight_voices_of_seven_fit_the_cpu_budget() {
     let share = t.elapsed().as_secs_f32() / secs;
     println!("8 voices × 7 oscillators + chorus: {:.1}% of a core", share * 100.0);
     assert!(share < 0.15);
+}
+
+#[test]
+fn routes_move_the_knobs_and_the_sound() {
+    use fwm_engine::device::ModSource;
+    let mut o = opal(48_000.0);
+    o.set_param(p::RATE, 1.0); // 8 Hz
+    assert!(o.set_route(0, ModSource::Lfo, p::CUT, 0.5).is_ok());
+    assert!(o.set_route(1, ModSource::Lfo, p::RATE, 0.5).is_err(), "the LFO can't move its own rate");
+    assert!(o.set_route(1, ModSource::AmpEnv, p::ATK, 0.5).is_err());
+    assert!(o.set_route(1, ModSource::FiltEnv, p::STACK, 0.5).is_err(), "enums can't be modulated");
+    assert!(o.set_route(1, ModSource::AmpEnv, p::WIDTH, -0.5).is_ok());
+    o.note_on(60, 1.0);
+    let mut cuts = vec![];
+    for _ in 0..40 {
+        let _ = render(&mut o, 1200);
+        cuts.push(o.effective()[p::CUT]);
+    }
+    let (lo, hi) = cuts.iter().fold((1.0f32, 0.0f32), |(a, b), &c| (a.min(c), b.max(c)));
+    println!("cutoff under LFO: {lo:.2} … {hi:.2}");
+    assert!(hi - lo > 0.6, "the LFO sweeps the cutoff");
+    assert!(o.effective()[p::WIDTH] < 0.7 - 0.2, "the amp env narrows the width while the note sounds");
+    o.clear_route(0);
+    let _ = render(&mut o, 1200);
+    assert!((o.effective()[p::CUT] - 0.45).abs() < 0.02, "a cleared route lets go");
 }

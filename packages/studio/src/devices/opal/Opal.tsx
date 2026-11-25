@@ -1,17 +1,20 @@
 // Opal: pad synth, front panel. The synth family layout: two oscillator rows with the FILTER block on
 // the right, then AMP and MOTION (Drift, Movement, the ensemble chorus, Width). Only theme primitives
 // and --dev-* tokens.
-import { type CSSProperties } from 'react';
+import { useEffect, useState, type CSSProperties } from 'react';
+import type { ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
-import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
+import { useDeviceState, useDeviceSync, useModSources } from '../../engine/useDeviceSync';
 import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
-import type { DeviceProps } from '../basalt/Basalt';
-import { GKnob, StepDial, defaultsOf } from '../garnet/Garnet';
+import { ParamKnob, type DeviceProps, type ParamCtx } from '../basalt/Basalt';
+import { StepDial, defaultsOf } from '../garnet/Garnet';
 import { Scope } from '../Scope';
 import { Sends } from '../Sends';
 import { OPAL_FORMAT, OPAL_PRESETS } from './presets';
 
 const CHORUS = ['Off', 'I', 'II', 'I+II'];
+const SRC: [ModSourceId, string][] = [['lfo', 'LFO'], ['amp', 'Amp env'], ['filt', 'Swell env']];
+const SRC_LABEL = Object.fromEntries(SRC) as Record<ModSourceId, string>;
 
 export function Opal({ store, host, slot, user = { name: 'You', color: 'var(--fwm-me)' } }: DeviceProps) {
   const { engine, status } = useEngine();
@@ -31,7 +34,26 @@ export function Opal({ store, host, slot, user = { name: 'You', color: 'var(--fw
     host?.paramChanged?.(id, v);
   };
   const people = host?.people ?? [{ userId: 'me', name: user.name, color: user.color }];
-  const knob = (id: string, size?: 'lg') => <GKnob key={id} store={store} host={host} id={id} set={set} size={size} fmt={OPAL_FORMAT} />;
+  // modulation, as on Basalt: press Assign, then click the knob it should move
+  const [assign, setAssign] = useState<ModSourceId | null>(null);
+  useEffect(() => {
+    if (!assign) return;
+    const end = (e: Event) => {
+      if ((e.target as HTMLElement).closest('.fwm-target.is-target, .fwm-btn--assign')) return;
+      setAssign(null);
+    };
+    const esc = (e: KeyboardEvent) => e.key === 'Escape' && setAssign(null);
+    document.addEventListener('pointerdown', end, true);
+    document.addEventListener('keydown', esc);
+    return () => {
+      document.removeEventListener('pointerdown', end, true);
+      document.removeEventListener('keydown', esc);
+    };
+  }, [assign]);
+  const mods = useModSources(status === 'on' ? engine : null, slot);
+  const ctx: ParamCtx = { store, slot, assign, setAssign, host };
+  const knob = (id: string, size?: 'lg') => <ParamKnob key={id} ctx={ctx} id={id} size={size} format={OPAL_FORMAT[id]} />;
+  const m = store.manifest;
   const dial = (id: string) => <StepDial key={id} store={store} host={host} id={id} set={set} />;
   const chorus = Math.round(state.params.chorus ?? 0);
 
@@ -114,6 +136,36 @@ export function Opal({ store, host, slot, user = { name: 'You', color: 'var(--fw
             {['width', 'lvl'].map((id) => knob(id))}
           </div>
         </div>
+      </div>
+
+      <div className="fwm-brk">Modulation</div>
+      <div className="fwm-opal__mod">
+        <div className="fwm-seg" role="group" aria-label="LFO wave">
+          {m.params.find((p) => p.id === 'lwave')!.options!.map((w, i) => (
+            <P.Button key={w} variant="seg" label={`LFO ${w}`} pressed={Math.round(state.params.lwave ?? 0) === i} onPress={() => set('lwave', i)}>{w}</P.Button>
+          ))}
+        </div>
+        {SRC.map(([id, label], i) => (
+          <span key={id} className="fwm-opal__src">
+            <span className="fwm-led" style={{ opacity: mods ? 0.25 + 0.75 * (id === 'lfo' ? (mods[0] + 1) / 2 : mods[i]) : 0.6 }} />
+            <P.Button variant="assign" pressed={assign === id} label={`Assign ${label}`} onPress={() => setAssign((a) => (a === id ? null : id))} />
+          </span>
+        ))}
+        <p className="fwm-silk fwm-opal__hint">{assign ? `Now click the knob ${SRC_LABEL[assign]} should move (Esc: cancel).` : 'Press Assign, then click a knob: the LFO (Rate, wave) or an envelope of the note played last moves it.'}</p>
+        <ul className="fwm-mods">
+          {state.routes.map((r, i) => {
+            const name = `${SRC_LABEL[r.src]} → ${m.params.find((p) => p.id === r.target)?.label ?? r.target}`;
+            return (
+              <li key={r.src + r.target}>
+                <span>{name}</span>
+                <input type="range" min={-100} max={100} value={Math.round(r.depth * 100)} aria-label={`Depth of ${name}`}
+                  onChange={(e) => store.setRouteDepth(i, Number(e.target.value) / 100)}
+                  onPointerDown={() => host?.touch(`route:${r.src}>${r.target}`)} onPointerUp={() => host?.touch(null)} />
+                <button type="button" aria-label={`Remove ${name}`} onClick={() => store.removeRoute(i)}>×</button>
+              </li>
+            );
+          })}
+        </ul>
       </div>
     </div>
   );
