@@ -776,6 +776,18 @@ export class Project {
     if (!c) return;
     this.action(() => (pat ? c.set(track, pat) : c.delete(track)));
   }
+  /** Put an instrument's pattern in a row (drag and drop in the song arrangement): the same pattern, or with
+   *  `copy` a separate copy of it ("Groove 2"). One undo step. Returns the pattern now in the cell. */
+  placePattern(row: string, track: string, pat: string, copy = false): string | null {
+    const c = this.rowMap(row)?.get('cells') as Y.Map<string> | undefined;
+    if (!c || !this.patMap(track, pat)) return null;
+    let id: string | null = pat;
+    this.action(() => {
+      if (copy) id = this.addPattern(track, pat);
+      if (id) c.set(track, id);
+    });
+    return id;
+  }
   /** How long a pattern takes to play once in a track, in steps of the song clock (rate ½× = twice as long). */
   playLen(track: string, pat: string | null | undefined): number {
     const info = this.patternInfo(track, pat);

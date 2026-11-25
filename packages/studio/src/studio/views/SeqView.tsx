@@ -1,7 +1,9 @@
 // Song arrangement (the main sequencer; the UI calls it "Song arrangement"). Instruments across the top, song rows (TRACK 1, TRACK 2…)
 // down the side; each cell picks the pattern that instrument plays in that row. A row lasts as long as
 // its longest pattern; shorter ones repeat inside it. Click a cell to edit its pattern in the Piano roll.
-import { useState } from 'react';
+// Drag a cell to another TRACK of the same instrument to play its pattern there too (hold Ctrl or Alt when
+// dropping for a separate copy); double-click a cell (or Delete) to empty it. Everything is undoable.
+import { createContext, useContext, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { Peer } from '../../collab/presence';
 import { deviceEntry, LIBRARY } from '../../devices/registry';
 import { BAR, PAD_NOTE, PADS, type SongRow, type TrackInfo } from '../../model/project';
@@ -16,11 +18,83 @@ export function lenLabel(n: number): string {
   return [b ? `${b} bar${b > 1 ? 's' : ''}` : '', r ? `${r} step${r > 1 ? 's' : ''}` : ''].filter(Boolean).join(' ');
 }
 
+/** A cell being dragged: which pattern, where the pointer is, which cell it is over. */
+interface Drag {
+  track: string;
+  pat: string;
+  name: string;
+  from: string;
+  x: number;
+  y: number;
+  over: { row: string; track: string } | null;
+  copy: boolean;
+}
+interface DragApi {
+  drag: Drag | null;
+  start(e: RPointerEvent, row: string, track: string, pat: string, name: string): void;
+  /** True right after a drag ends (the click that follows must not select the cell). */
+  justDragged: React.MutableRefObject<boolean>;
+}
+const DragCtx = createContext<DragApi | null>(null);
+
 export function SeqView({ peers }: { peers: Peer[] }) {
   const st = useStudio();
   const { project, ws, setWs, toast } = st;
   const tracks = project.tracks();
   const rows = project.rows();
+  const rowName = (id: string) => `TRACK ${rows.findIndex((r) => r.id === id) + 1}`;
+  const [drag, setDrag] = useState<Drag | null>(null);
+  const justDragged = useRef(false);
+  const start = (e: RPointerEvent, from: string, track: string, pat: string, name: string) => {
+    if (e.button !== 0) return;
+    const x0 = e.clientX;
+    const y0 = e.clientY;
+    let cur: Drag | null = null;
+    // the panel that scrolls: dragging near its top or bottom edge scrolls it, to reach every TRACK
+    let scroller: HTMLElement | null = e.currentTarget as HTMLElement;
+    while (scroller && !(scroller.scrollHeight > scroller.clientHeight + 1 && /auto|scroll/.test(getComputedStyle(scroller).overflowY))) scroller = scroller.parentElement;
+    const move = (ev: PointerEvent) => {
+      if (!cur && Math.hypot(ev.clientX - x0, ev.clientY - y0) < 6) return;
+      if (scroller) {
+        const r = scroller.getBoundingClientRect();
+        if (ev.clientY < r.top + 36) scroller.scrollTop -= 14;
+        else if (ev.clientY > r.bottom - 36) scroller.scrollTop += 14;
+      }
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-cell-row]');
+      cur = { track, pat, name, from, x: ev.clientX, y: ev.clientY, copy: ev.ctrlKey || ev.altKey || ev.metaKey,
+        over: el ? { row: el.dataset.cellRow!, track: el.dataset.cellTrack! } : null };
+      setDrag(cur);
+    };
+    const end = (drop: boolean, ev?: PointerEvent) => {
+      removeEventListener('pointermove', move);
+      removeEventListener('pointerup', up);
+      removeEventListener('pointercancel', cancel);
+      removeEventListener('keydown', esc, true);
+      setDrag(null);
+      if (!cur) return;
+      justDragged.current = true;
+      setTimeout(() => (justDragged.current = false), 0);
+      const o = cur.over;
+      if (!drop || !o || o.track !== track || o.row === from) return;
+      const copy = ev ? ev.ctrlKey || ev.altKey || ev.metaKey : cur.copy;
+      const id = project.placePattern(o.row, track, pat, copy);
+      if (!id) return;
+      setWs({ row: o.row, track });
+      toast(copy ? `${project.patternInfo(track, id)?.name}: a separate copy of ${name}, in ${rowName(o.row)}` : `${name} also plays in ${rowName(o.row)} (the same pattern: editing it changes both)`,
+        { label: 'Undo', run: () => project.undo() });
+    };
+    const up = (ev: PointerEvent) => end(true, ev);
+    const cancel = () => end(false);
+    const esc = (ev: KeyboardEvent) => {
+      if (ev.key !== 'Escape') return;
+      ev.stopPropagation();
+      end(false);
+    };
+    addEventListener('pointermove', move);
+    addEventListener('pointerup', up);
+    addEventListener('pointercancel', cancel);
+    addEventListener('keydown', esc, true);
+  };
   const addable = LIBRARY.filter((d) => d.available && d.manifest);
   const addInstrument = (d: (typeof addable)[number]) => {
     const id = project.addTrack(d.manifest!, d.presets?.[0], 0, ws.row);
@@ -38,10 +112,11 @@ export function SeqView({ peers }: { peers: Peer[] }) {
             onChange={(e) => project.setSwing(Number(e.target.value) / 100)} />
         </label>
         <span>{Math.round(project.swing * 100)}%</span>
-        <span className="fwm-sqtip">Click a cell to edit its pattern in the Piano roll. A TRACK lasts as long as its longest pattern.</span>
+        <span className="fwm-sqtip">Click a cell to edit its pattern in the Piano roll. Drag it to another TRACK to play it there too (hold Ctrl for a separate copy); double-click to empty it. A TRACK lasts as long as its longest pattern.</span>
       </div>
       {tracks.length === 0 && <p className="fwm-empty">No instruments yet. Add Basalt from the Library, or with + Instrument.</p>}
-      <div className="fwm-arrw">
+      <DragCtx.Provider value={{ drag, start, justDragged }}>
+      <div className={'fwm-arrw' + (drag ? ' is-dragging' : '')}>
         <div className="fwm-arr">
           <div className="fwm-arow" style={cols}>
             <span />
@@ -61,6 +136,20 @@ export function SeqView({ peers }: { peers: Peer[] }) {
             onClick={() => setWs({ row: project.addRow() })}>+ Add TRACK</button>
         </div>
       </div>
+      </DragCtx.Provider>
+      {drag && (
+        <div className={'fwm-dragghost' + (drag.over && drag.over.track === drag.track && drag.over.row !== drag.from ? ' is-ok' : '')}
+          style={{ left: drag.x + 14, top: drag.y + 10 }} aria-hidden="true">
+          <b>{drag.name}</b>
+          <span>
+            {!drag.over || drag.over.row === drag.from
+              ? 'drop on another TRACK'
+              : drag.over.track !== drag.track
+                ? 'only in its own instrument'
+                : `→ ${rowName(drag.over.row)} · ${drag.copy ? 'separate copy' : 'same pattern (Ctrl: copy)'}`}
+          </span>
+        </div>
+      )}
     </div>
   );
 }
@@ -136,20 +225,43 @@ function Row({ row, index, tracks, peers, canDelete }: { row: SongRow; index: nu
 }
 
 function Cell({ row, rowName, rowLen, track: t, now }: { row: string; rowName: string; rowLen: number; track: TrackInfo; now: boolean }) {
-  const { project, ws, setWs, slotOf } = useStudio();
+  const { project, ws, setWs, slotOf, toast } = useStudio();
+  const dnd = useContext(DragCtx)!;
   const info = project.patternInfo(t.id, project.cell(row, t.id));
   const on = row === ws.row && t.id === ws.track;
-  const select = () => setWs({ row, track: t.id });
+  const select = () => {
+    if (!dnd.justDragged.current) setWs({ row, track: t.id });
+  };
+  const d = dnd.drag;
+  const over = d?.over?.row === row && d.over.track === t.id;
+  const dragCls =
+    (d && d.from === row && d.track === t.id ? ' is-drag-src' : '') +
+    (over && d.from !== row ? (d.track === t.id ? ' is-drop-ok' : ' is-drop-no') : '');
+  const cellAttrs = { 'data-cell-row': row, 'data-cell-track': t.id };
+  const empty = () => {
+    if (!info) return;
+    project.setCell(row, t.id, null);
+    toast(`${info.name} taken out of ${rowName} (it stays in ${t.name}'s patterns)`, { label: 'Undo', run: () => project.undo() });
+  };
   if (!info)
     return (
-      <button type="button" className={'fwm-cell' + (on ? ' is-on' : '')} onClick={select} aria-label={`${rowName}, ${t.name}: silent`}>
+      <button type="button" className={'fwm-cell' + (on ? ' is-on' : '') + dragCls} onClick={select} aria-label={`${rowName}, ${t.name}: silent`} {...cellAttrs}>
         <span className="fwm-cell__empty">—</span>
       </button>
     );
   const reps = rowLen / project.playLen(t.id, info.id);
   const idx = project.patternList(t.id).findIndex((p) => p.id === info.id);
   return (
-    <button type="button" className={'fwm-cell has' + (on ? ' is-on' : '')} onClick={select}
+    <button type="button" className={'fwm-cell has' + (on ? ' is-on' : '') + dragCls} onClick={select} {...cellAttrs}
+      onPointerDown={(e) => dnd.start(e, row, t.id, info.id, info.name)}
+      onDoubleClick={empty}
+      onKeyDown={(e) => {
+        if (e.key === 'Delete' || e.key === 'Backspace') {
+          e.preventDefault();
+          empty();
+        }
+      }}
+      title={`${info.name}: drag to another TRACK (Ctrl: a separate copy), double-click to empty`}
       style={{ '--k': idx % 4, '--tw': `${(project.playLen(t.id, info.id) / rowLen) * 100}%` } as React.CSSProperties}
       aria-label={`${rowName}, ${t.name}: ${info.name}`}>
       <span className="fwm-cell__top">

@@ -65,6 +65,38 @@ describe('Project (shared)', () => {
     expect(mira.deviceStore(id, m)!.getState().params.cut).toBe(0.8);
   });
 
+  it('song arrangement: place a pattern in another TRACK (same or a copy), empty a cell; each one undo step', () => {
+    const [you, mira] = pair();
+    const t = you.addTrack(m, undefined, 0);
+    const r1 = you.rows()[0].id;
+    const r2 = you.addRow();
+    const groove = you.cell(r1, t)!;
+    // same pattern: both cells play it, edits change both
+    expect(you.placePattern(r2, t, groove)).toBe(groove);
+    expect(mira.cell(r2, t)).toBe(groove);
+    you.undo();
+    expect(you.cell(r2, t)).toBeNull();
+    // a separate copy: a new pattern with the same notes and length, named after it
+    you.addNote(t, groove, { s: 0, l: 1, m: 48, v: 0.8 });
+    const copy = you.placePattern(r2, t, groove, true)!;
+    expect(copy).not.toBe(groove);
+    expect(you.notes(t, copy).map(([, n]) => n.m)).toEqual(you.notes(t, groove).map(([, n]) => n.m));
+    expect(you.patternInfo(t, copy)!.name).toBe(`${you.patternInfo(t, groove)!.name} 2`);
+    expect(mira.cell(r2, t)).toBe(copy);
+    you.undo(); // one step: the copy and the cell both go
+    expect(you.cell(r2, t)).toBeNull();
+    expect(you.patternList(t).map((p) => p.id)).toEqual([groove]);
+    // empty a cell (double-click): the pattern stays with the instrument
+    you.setCell(r1, t, null);
+    expect(you.cell(r1, t)).toBeNull();
+    expect(you.patternList(t).map((p) => p.id)).toEqual([groove]);
+    you.undo();
+    expect(you.cell(r1, t)).toBe(groove);
+    // a pattern of another instrument can't be placed
+    const t2 = you.addTrack(m, undefined, 0);
+    expect(you.placePattern(r2, t2, groove)).toBeNull();
+  });
+
   it('clear pattern is undoable', () => {
     const [you] = pair();
     const id = you.addTrack(m);

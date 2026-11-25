@@ -35,6 +35,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'scope') return runScope(p, engineRef, ok, out);
   if (role === 'garnet') return runGarnet(p, engineRef, ok, out);
   if (role === 'look') return runLook(s.doc, ok, out);
+  if (role === 'arrange') return runArrange(p, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
@@ -1158,6 +1159,75 @@ async function runLook(doc: Y.Doc, ok: (c: boolean, l: string) => void, out: str
     ok(!$('.fwm-look'), 'Escape closes it');
   } catch (e) {
     out.push(`FAIL look: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: song arrangement cells. Drag a cell to another TRACK (same pattern; Ctrl = a separate copy),
+ *  not into another instrument, Escape cancels; double-click or Delete empties a cell; all undoable. */
+async function runArrange(p: Project, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  const cellEl = (row: string, track: string) => $(`[data-cell-row="${row}"][data-cell-track="${track}"]`)!;
+  const mid = (el: Element) => { const r = el.getBoundingClientRect(); return { x: r.left + r.width / 2, y: r.top + r.height / 2 }; };
+  const fire = (target: EventTarget, type: string, x: number, y: number, mods: PointerEventInit = {}) =>
+    target.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', button: 0, buttons: type === 'pointerup' ? 0 : 1, isPrimary: true, ...mods }));
+  const dragCell = async (from: Element, to: Element, mods: PointerEventInit = {}, finish = true) => {
+    const a = mid(from), b = mid(to);
+    fire(from, 'pointerdown', a.x, a.y);
+    for (let k = 1; k <= 8; k++) { fire(window, 'pointermove', a.x + ((b.x - a.x) * k) / 8, a.y + ((b.y - a.y) * k) / 8, mods); await sleep(16); }
+    if (finish) { fire(window, 'pointerup', b.x, b.y, mods); from.dispatchEvent(new MouseEvent('click', { bubbles: true })); }
+    await sleep(120);
+  };
+  try {
+    await sleep(300);
+    const t = p.addTrack(m, undefined, 0);
+    const t2 = p.addTrack(m, undefined, 0);
+    const r1 = p.rows()[0].id;
+    const r2 = p.addRow();
+    const r3 = p.addRow();
+    await sleep(200);
+    const groove = p.cell(r1, t)!;
+    // a short panel: dragging to its bottom edge scrolls it
+    const pb = cellEl(r1, t).closest('.fwm-pb') as HTMLElement;
+    const top0 = pb.scrollTop;
+    { const a = mid(cellEl(r1, t)); const r = pb.getBoundingClientRect();
+      fire(cellEl(r1, t), 'pointerdown', a.x, a.y);
+      for (let k = 0; k < 6; k++) { fire(window, 'pointermove', a.x, r.bottom - 10); await sleep(20); }
+      document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+      fire(window, 'pointerup', 0, 0);
+      await sleep(80); }
+    ok(pb.scrollHeight <= pb.clientHeight + 1 || pb.scrollTop > top0, `dragging to the edge of the panel scrolls it (${top0} → ${pb.scrollTop})`);
+    ($('[aria-label="Maximise panel"]') as HTMLButtonElement).click(); // the arrangement fills the window: every TRACK in view
+    await sleep(200);
+    await dragCell(cellEl(r1, t), cellEl(r2, t));
+    ok(p.cell(r2, t) === groove, 'drag a cell to another TRACK: the same pattern plays there');
+    ok(p.cell(r1, t) === groove, 'the original stays');
+    await dragCell(cellEl(r1, t), cellEl(r3, t), { ctrlKey: true });
+    const c = p.cell(r3, t);
+    ok(!!c && c !== groove && p.patternInfo(t, c)!.name === `${p.patternInfo(t, groove)!.name} 2`, `hold Ctrl: a separate copy (${c && p.patternInfo(t, c)?.name})`);
+    const before = p.cell(r2, t2);
+    await dragCell(cellEl(r1, t), cellEl(r2, t2));
+    ok(p.cell(r2, t2) === before, 'it can not go into another instrument');
+    await dragCell(cellEl(r1, t), cellEl(r3, t2), {}, false);
+    ok(!!$('.fwm-dragghost') && cellEl(r3, t2).classList.contains('is-drop-no'), 'while dragging: a label follows, the wrong column says no');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(80);
+    ok(!$('.fwm-dragghost'), 'Escape cancels the drag');
+    fire(window, 'pointerup', 0, 0);
+    cellEl(r2, t).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    await sleep(100);
+    ok(p.cell(r2, t) === null && p.patternList(t).some((x) => x.id === groove), 'double-click empties the cell; the pattern stays with the instrument');
+    btn('Undo')!.click();
+    await sleep(100);
+    ok(p.cell(r2, t) === groove, 'Undo puts it back');
+    cellEl(r2, t).focus();
+    cellEl(r2, t).dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
+    await sleep(100);
+    ok(p.cell(r2, t) === null, 'Delete on a cell empties it too');
+  } catch (e) {
+    out.push(`FAIL arrange: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

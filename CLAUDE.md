@@ -19,7 +19,7 @@ Node comes from nvm: run `. ~/.nvm/nvm.sh` first in a fresh shell if `node` is m
 
 ## Browser checks (headless Firefox, no automation tools needed)
 Build (`npm run build -w apps/harness`), serve the repo root with COOP/COEP and a POST endpoint that appends the body to a log file, and use a fresh Firefox profile whose `user.js` sets `media.autoplay.default` to 0.
-- Two people: open `dist/index.html?e2e=a&room=R` and `dist/index.html?e2e=b&room=R` in ONE `firefox --headless` command (two tabs share BroadcastChannel). Each tab POSTs PASS/FAIL lines to `./log`. Playing together (shared Play, live keys, chips): `?e2e=ta` + `?e2e=tb`. Single-tab roles: multi, switch, roll, song, songs, flint, drums, mixer, fx, scope, garnet, look (add `&newuser`).
+- Two people: open `dist/index.html?e2e=a&room=R` and `dist/index.html?e2e=b&room=R` in ONE `firefox --headless` command (two tabs share BroadcastChannel). Each tab POSTs PASS/FAIL lines to `./log`. Playing together (shared Play, live keys, chips): `?e2e=ta` + `?e2e=tb`. Single-tab roles: multi, switch, roll, song, songs, flint, drums, mixer, fx, scope, garnet, look, arrange (add `&newuser`).
 - Basalt alone: `dist/index.html?basalt&selftest`.
 - Screenshots: `firefox --headless --screenshot out.png URL` (add `?seednow&room=<random>` for a populated studio).
 
