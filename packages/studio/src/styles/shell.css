@@ -296,6 +296,7 @@
 
 /* effects chain: the sound flows left to right, arrows between the steps */
 .fwm-fxrack { padding: 0 10px 12px; }
+.fwm-fxview .fwm-fxrack { padding-top: 10px; }
 .fwm-fxflow { display: flex; align-items: stretch; overflow-x: auto; padding: 2px 2px 10px; scrollbar-width: thin; }
 .fwm-fxstep { display: flex; align-items: stretch; flex: none; }
 .fwm-arrow { flex: none; display: grid; place-items: center; width: 34px; font-size: 28px; line-height: 1; color: var(--fwm-note); text-shadow: 0 0 calc(8px * var(--fwm-glow)) var(--fwm-note); }

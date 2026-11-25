@@ -1,4 +1,4 @@
-// The effects chain, shown when the Mixer panel is maximised. It is drawn the way the sound flows:
+// The effects chain: its own panel (Effects in the panel menu), and below the Mixer when that panel is maximised. It is drawn the way the sound flows:
 // INSTRUMENTS ➜ effect ➜ effect ➜ … ➜ MASTER. Drag an effect by its title to move it (or ◀ ▶),
 // onto the shelf to take it out (or ×), and back from the shelf to put it in. Shared like the rest.
 import { useRef, useState, type DragEvent } from 'react';

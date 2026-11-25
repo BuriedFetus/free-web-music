@@ -137,3 +137,13 @@ export function MixerView({ peers, expanded = false, onExpand }: { peers: Peer[]
     </div>
   );
 }
+
+/** The effects chain on its own, as a panel (the same rack the maximised Mixer shows). */
+export function FxView({ peers }: { peers: Peer[] }) {
+  const tokens = useDeviceTokens('mixer');
+  return (
+    <div className="fwm-mixer mixer fwm-fxview" data-device="mixer" style={tokens as CSSProperties}>
+      <FxRack peers={peers} />
+    </div>
+  );
+}
