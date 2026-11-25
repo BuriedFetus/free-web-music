@@ -100,3 +100,24 @@ fn a_new_device_in_a_slot_starts_at_unity() {
     let (a, _) = peaks(&mut r, 40);
     assert!(a > 0.05, "not muted any more: {a}");
 }
+
+#[test]
+fn the_scope_probe_follows_one_slot_or_the_master() {
+    let mut r = rack_with_note(); // slot 0 plays
+    assert!(r.add_device(1, DeviceKind::Basalt)); // slot 1 silent
+    r.probe_src = 1;
+    peaks(&mut r, 40);
+    assert!(r.probe.iter().all(|&x| x == 0.0), "slot 1 is silent");
+    r.probe_src = 0;
+    peaks(&mut r, 40);
+    let p0 = r.probe.iter().fold(0f32, |m, x| m.max(x.abs()));
+    assert!(p0 > 0.05, "slot 0 sounds: {p0}");
+    r.mixer.set(0, MIX_LEVEL, 0.4);
+    peaks(&mut r, 40);
+    let p1 = r.probe.iter().fold(0f32, |m, x| m.max(x.abs()));
+    assert!(p1 < p0 * 0.2, "after its fader: {p1} vs {p0}");
+    r.probe_src = PROBE_MASTER;
+    r.mixer.set_master(MASTER_LEVEL, 0.0);
+    peaks(&mut r, 60);
+    assert!(r.probe.iter().all(|x| x.abs() < 1e-4), "master probe is after the master fader");
+}

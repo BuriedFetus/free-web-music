@@ -42,6 +42,8 @@ export interface EngineTick {
   /** row: id of the song row playing (song mode), rowPos: steps since that row started. */
   /** Peak |sample| since the last tick: [slot0 L, slot0 R, slot1 L, …, master L (index 32), master R]. */
   meters: Float32Array;
+  /** The Scope panel's source (see setProbe), oldest → newest, 4096 samples; only while a probe is set. */
+  probe?: Float32Array;
   transport: { playing: boolean; pos: number; bpm: number; time: number; row: string | null; rowPos: number; next?: string | null };
 }
 
@@ -96,6 +98,8 @@ export interface Engine {
   setFx(settings: Partial<Record<FxParam, number | boolean>>): void;
   /** Chain order; effects left out are not in the chain. */
   setChain(names: FxId[]): void;
+  /** Scope panel source: 'master', a slot (after its fader), or null = off. */
+  setProbe(src: 'master' | number | null): void;
   setParam(slot: number, id: string, value: number): void;
   paramIndex(slot: number, id: string): number;
   setRoute(slot: number, route: number, src: ModSourceId, target: string, depth: number): void;

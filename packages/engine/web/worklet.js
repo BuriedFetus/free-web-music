@@ -21,6 +21,7 @@
 //   {t:'mix', slot, p, v}                          mixer strip: p 0 level (0.8 = 0 dB), 1 pan (-1..1), 2 mute, 3 send A, 4 send B
 //   {t:'master', p, v}                             master: p 0 level
 //   {t:'fx', p, v}                                 master effects setting (numbers: see FX_PARAMS in engine.js)
+//   {t:'probe', src}                               Scope panel source: -2 off, -1 master, 0.. a slot (tick then carries `probe`)
 //   {t:'chain', ids:[…]}                           effects chain order (0 reverb, 1 delay, 2 lo-fi, 3 low-pass)
 //   {t:'at', at, m}                                 do `m` ('on' | 'off' | 'param') at audio time `at`, to the sample
 //                                                  (other people's live keys and knob turns, played evenly)
@@ -372,6 +373,7 @@ export class FwmEngine extends Processor {
       case 'mix': x.fwm_mix(m.slot, m.p, m.v); break;
       case 'master': x.fwm_master(m.p, m.v); break;
       case 'fx': x.fwm_fx(m.p, m.v); break;
+      case 'probe': x.fwm_probe(m.src); this.probeOn = m.src > -2; break;
       case 'chain': { const c = [255, 255, 255, 255]; (m.ids || []).slice(0, 4).forEach((id, i) => (c[i] = id)); x.fwm_fx_chain(c[0], c[1], c[2], c[3]); break; }
       case 'seek':
         if (this.seq.playing) this.seq.seek(m.row, this.target(m));
@@ -449,7 +451,19 @@ export class FwmEngine extends Processor {
       next: sq.pending,
     };
     const meters = this.view(x.fwm_meters(), x.fwm_meters_len()).slice();
-    this.port.postMessage({ t: 'tick', scope, devices, transport, meters }, [scope.buffer, meters.buffer]);
+    const out = { t: 'tick', scope, devices, transport, meters };
+    const transfer = [scope.buffer, meters.buffer];
+    if (this.probeOn) {
+      const n = x.fwm_probe_len();
+      const r = this.view(x.fwm_probe_ptr(), n);
+      const p = x.fwm_probe_pos();
+      const probe = new Float32Array(n); // oldest → newest
+      probe.set(r.subarray(p), 0);
+      probe.set(r.subarray(0, p), n - p);
+      out.probe = probe;
+      transfer.push(probe.buffer);
+    }
+    this.port.postMessage(out, transfer);
   }
 }
 

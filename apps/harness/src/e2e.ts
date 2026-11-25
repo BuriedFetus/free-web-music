@@ -32,6 +32,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'drums') return runDrums(p, engineRef, ok, out);
   if (role === 'mixer') return runMixer(p, engineRef, ok, out);
   if (role === 'fx') return runFx(p, engineRef, ok, out);
+  if (role === 'scope') return runScope(p, engineRef, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
@@ -937,6 +938,66 @@ async function runFx(p: Project, engineRef: { current: Engine | null }, ok: (c: 
     ok(none < 0.005, `Reverb out of the chain: no tail even with its knob up (${none.toFixed(4)})`);
   } catch (e) {
     out.push(`FAIL fx: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: the Scope panel follows the master or one instrument, draws, freezes and shows a spectrum. */
+async function runScope(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  const pixels = () => {
+    const c = $<HTMLCanvasElement>('.fwm-scopev canvas')!;
+    const d = c.getContext('2d')!.getImageData(0, 0, c.width, c.height).data;
+    let h = 0;
+    for (let i = 0; i < d.length; i += 64) h = (h * 31 + d[i]) | 0;
+    return h;
+  };
+  const peak = () => Math.max(...Array.from(engineRef.current?.last?.probe ?? [0]).map(Math.abs));
+  try {
+    await sleep(300);
+    const a = p.addTrack(m, undefined, 0);
+    const b = p.addTrack(m, undefined, 0);
+    for (const st of [0, 2, 4, 6, 8, 10, 12, 14]) p.addNote(a, p.patternList(a)[0].id, { s: st, l: 2, m: 48, v: 0.9 });
+    const sel = $<HTMLSelectElement>('[aria-label="Panel 3 view"]')!;
+    sel.value = 'scope';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(200);
+    ok(!!$('.fwm-scopev canvas'), 'Scope is a panel view');
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    btn('▶ Play')!.click();
+    await sleep(800);
+    ok(peak() > 0.02, `master: the engine sends the scope what you hear (peak ${peak().toFixed(3)})`);
+    const h1 = pixels();
+    await sleep(300);
+    ok(pixels() !== h1, 'the picture moves while playing');
+    const src = $<HTMLSelectElement>('[aria-label="What the scope shows"]')!;
+    src.value = b; // the silent instrument
+    src.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(400);
+    ok(peak() < 1e-4 && /silent/.test($('.fwm-scopev__read')!.textContent ?? ''), `one instrument: Basalt 2 is silent (${peak().toFixed(5)})`);
+    src.value = a;
+    src.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(400);
+    ok(peak() > 0.02 && /peak/.test($('.fwm-scopev__read')!.textContent ?? ''), `one instrument: Basalt plays ("${$('.fwm-scopev__read')!.textContent}")`);
+    btn('Freeze')!.click();
+    await sleep(100);
+    const f1 = pixels();
+    await sleep(400);
+    ok(pixels() === f1, 'Freeze holds the picture');
+    btn('Freeze')!.click();
+    btn('Spectrum')!.click();
+    await sleep(500);
+    ok(/top -?\d+ dB/.test($('.fwm-scopev__read')!.textContent ?? ''), `spectrum shows ("${$('.fwm-scopev__read')!.textContent}")`);
+    btn('■ Stop')!.click();
+    sel.value = 'roll';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(300);
+    ok(!engineRef.current?.last?.probe, 'closing the Scope stops the probe (nothing extra sent)');
+  } catch (e) {
+    out.push(`FAIL scope: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

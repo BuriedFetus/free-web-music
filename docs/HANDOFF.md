@@ -1,6 +1,10 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-25, later): Mixer slices 1–3 done, Scope (slice 4) next
+## START HERE (2026-11-25, evening): Mixer + effects + Scope all done; ask the user what's next
+All four slices are built (PLAN.md "Mixer and effects"). Next: the user's review, then Phase 5 instruments
+(Cobalt, Quartz, Opal), mock-up first. The Studio artifact (HEVoA3TExTjSF2bRmVUUei) is still an old build.
+
+## Earlier (2026-11-25, later): Mixer slices 1–3 done
 The user said "just do Slice 2 - 3 in one go" and asked that Song arrangement cells preview their pattern: all done
 (PLAN.md "Mixer and effects"). Things learnt: the Dattorro tank applies its decay gain twice per half loop (formula
 uses 1.5 not 3); Lo-fi must not delay the mix when off (it made the whole studio 8 ms late, caught by

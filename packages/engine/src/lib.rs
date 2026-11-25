@@ -33,6 +33,11 @@ fn panic(_: &core::panic::PanicInfo) -> ! {
 pub const BLOCK: usize = 128;
 pub const MAX_SLOTS: usize = 16;
 pub const SCOPE_LEN: usize = 2048;
+/// The Scope panel's probe: the master or one slot (post-fader), longer for slow zooms and the spectrum.
+pub const PROBE_LEN: usize = 4096;
+/// Probe source: off, or the master (after effects and master fader); 0.. = a slot.
+pub const PROBE_OFF: i32 = -2;
+pub const PROBE_MASTER: i32 = -1;
 
 /// Device kinds the host can create. New devices get a new number here and a new arm in `Slot`.
 #[derive(Clone, Copy, PartialEq, Eq, Debug)]
@@ -89,6 +94,9 @@ pub struct Rack {
     pub mixer: Mixer,
     /// The master effects chain (Reverb, Delay, Lo-fi, Low-pass), after the strips, before the master fader.
     pub fx: Fx,
+    pub probe: [f32; PROBE_LEN],
+    pub probe_pos: usize,
+    pub probe_src: i32,
     /// Meter snapshot for the host (see `Mixer::take_meters`).
     pub meters: [f32; (MAX_SLOTS + 1) * 2],
 }
@@ -108,6 +116,9 @@ impl Rack {
             scope_pos: 0,
             mixer: Mixer::new(sample_rate),
             fx: Fx::new(sample_rate),
+            probe: [0.0; PROBE_LEN],
+            probe_pos: 0,
+            probe_src: PROBE_OFF,
             meters: [0.0; (MAX_SLOTS + 1) * 2],
         }
     }
@@ -167,6 +178,12 @@ impl Rack {
             if let Some(d) = self.slots[i].device() {
                 d.render(l, r);
                 self.mixer.strip(i, l, r, Some((&mut self.fx.sends, from)));
+                if self.probe_src == i as i32 {
+                    for (a, b) in l.iter().zip(r.iter()) {
+                        self.probe[self.probe_pos] = 0.5 * (a + b);
+                        self.probe_pos = (self.probe_pos + 1) % PROBE_LEN;
+                    }
+                }
                 for (o, x) in self.out_l[from..to].iter_mut().zip(l.iter()) {
                     *o += *x;
                 }
@@ -207,6 +224,18 @@ impl Rack {
 
         self.fx.process(&mut self.out_l, &mut self.out_r, n);
         self.mixer.master(&mut self.out_l[..n], &mut self.out_r[..n]);
+        if self.probe_src == PROBE_MASTER {
+            for k in 0..n {
+                self.probe[self.probe_pos] = 0.5 * (self.out_l[k] + self.out_r[k]);
+                self.probe_pos = (self.probe_pos + 1) % PROBE_LEN;
+            }
+        } else if self.probe_src >= 0 && self.slots.get(self.probe_src as usize).map_or(true, |s| matches!(s, Slot::Empty)) {
+            // the probed slot is empty: keep the picture moving (silence), not frozen
+            for _ in 0..n {
+                self.probe[self.probe_pos] = 0.0;
+                self.probe_pos = (self.probe_pos + 1) % PROBE_LEN;
+            }
+        }
         for k in 0..n {
             self.scope[self.scope_pos] = 0.5 * (self.out_l[k] + self.out_r[k]);
             self.scope_pos = (self.scope_pos + 1) % SCOPE_LEN;
@@ -400,4 +429,32 @@ pub extern "C" fn fwm_fx_chain(a: u32, b: u32, c: u32, d: u32) {
     if let Some(r) = rack() {
         r.fx.set_chain(&[a as u8, b as u8, c as u8, d as u8]);
     }
+}
+
+// ---- scope probe ----
+
+/// What the Scope panel watches: -2 off, -1 the master (after effects), 0.. a slot (after its fader).
+#[no_mangle]
+pub extern "C" fn fwm_probe(src: i32) {
+    if let Some(r) = rack() {
+        if r.probe_src != src {
+            r.probe.fill(0.0);
+        }
+        r.probe_src = src;
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn fwm_probe_ptr() -> *const f32 {
+    rack().map_or(core::ptr::null(), |r| r.probe.as_ptr())
+}
+
+#[no_mangle]
+pub extern "C" fn fwm_probe_pos() -> u32 {
+    rack().map_or(0, |r| r.probe_pos as u32)
+}
+
+#[no_mangle]
+pub extern "C" fn fwm_probe_len() -> u32 {
+    PROBE_LEN as u32
 }

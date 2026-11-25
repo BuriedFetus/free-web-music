@@ -188,6 +188,10 @@ export async function createEngine({ base, context, manifests } = {}) {
     setChain(names) {
       send({ t: 'chain', ids: names.map((n) => FX_IDS[n]).filter((i) => i != null) });
     },
+    /** What the Scope panel watches: 'master', a slot number (after its fader), or null (off). Ticks then carry `probe`. */
+    setProbe(src) {
+      send({ t: 'probe', src: src === 'master' ? -1 : src == null ? -2 : src });
+    },
     /** Song mode: one of a slot's patterns, {len, notes, auto: {paramId: (value|null)[]}}. */
     setPat(slot, id, { len, notes, auto = {}, lens }) {
       const byIndex = {};

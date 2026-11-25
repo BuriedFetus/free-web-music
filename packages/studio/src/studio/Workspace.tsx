@@ -6,10 +6,11 @@ import { useStudio } from './context';
 import { DeviceView } from './views/DeviceView';
 import { LibraryView } from './views/LibraryView';
 import { MixerView } from './views/MixerView';
+import { ScopeView } from './views/ScopeView';
 import { RollView } from './views/RollView';
 import { SeqView } from './views/SeqView';
 
-const VIEWS = { seq: 'Song arrangement', roll: 'Piano roll', device: 'Device', mixer: 'Mixer', library: 'Library' } as const;
+const VIEWS = { seq: 'Song arrangement', roll: 'Piano roll', device: 'Device', mixer: 'Mixer', scope: 'Scope', library: 'Library' } as const;
 type ViewId = keyof typeof VIEWS;
 
 interface Layout {
@@ -87,11 +88,12 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
               {L.max === i ? '⤡' : '⤢'}
             </button>
           </header>
-          <div className={'fwm-pb' + (v === 'seq' || v === 'roll' || v === 'mixer' ? ' is-blue' : '')}>
+          <div className={'fwm-pb' + (v === 'seq' || v === 'roll' || v === 'mixer' || v === 'scope' ? ' is-blue' : '')}>
             {v === 'seq' && <SeqView peers={peers} />}
             {v === 'roll' && <RollView peers={peers} />}
             {v === 'device' && <DeviceView peers={peers} />}
             {v === 'mixer' && <MixerView peers={peers} expanded={L.max === i} onExpand={() => save({ ...L, max: i })} />}
+            {v === 'scope' && <ScopeView />}
             {v === 'library' && <LibraryView />}
           </div>
         </section>
@@ -113,6 +115,8 @@ function PaneContext({ view }: { view: ViewId }) {
       ? `${n} instrument${n === 1 ? '' : 's'} · ${r} TRACK${r === 1 ? '' : 's'}`
       : view === 'mixer'
         ? `${n} channel${n === 1 ? '' : 's'} + master`
+        : view === 'scope'
+          ? 'What you hear, drawn live'
         : 'Bring a device in to add an instrument';
   return <span className="fwm-ctx">{text}</span>;
 }
