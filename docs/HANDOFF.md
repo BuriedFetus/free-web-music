@@ -5,7 +5,9 @@ The user tested Phase 4 ("tested it's amazing!", and is relaxed about live delay
 just want to play around"). They renamed the Main sequencer panel to **Song arrangement** (done, a430158) and asked for
 a **main mixer** (a Reverb and a Delay send knob per instrument; expanding the Mixer shows Reverb / Delay / Lo-fi /
 main Low-pass settings) and an **Oscilloscope** as its own panel. Mock-up: `design/kit/mixer.html` (rough WebAudio
-preview sound; `#effects` opens it expanded). Proposed chain: instruments (fader, pan, mute/solo, post-fader sends)
+preview sound; `#effects` opens it expanded). **Lo-fi is tape / vinyl** (the user rejected a bit-crusher): wow + flutter (modulated delay line),
+level-matched tanh saturation, Age (2-pole high cut + low cut), hiss or darker vinyl surface noise, crackle; Tape / Vinyl
+presets. Proposed chain: instruments (fader, pan, mute/solo, post-fader sends)
 + Reverb return + Delay return → Lo-fi → Low-pass → Master. Everything shared in the doc. Build only after sign-off;
 then plan slices (likely: 1 mixer strips + master in the engine, 2 Reverb + Delay, 3 Lo-fi + Low-pass, 4 Scope panel).
 
