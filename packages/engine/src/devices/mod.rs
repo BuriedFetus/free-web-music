@@ -2,3 +2,4 @@
 
 pub mod basalt;
 pub mod flint;
+pub mod garnet;

@@ -95,7 +95,7 @@ The core does no networking. The host owns providers, persistence and storage.
 | 6 Mixer (strips, meters, master) — pulled forward | ✅ built, waiting for review |
 | 7 (part) Effects: Reverb, Delay, sends, draggable chain, tape/vinyl Lo-fi, main Low-pass — pulled forward | ✅ built, waiting for review |
 | Extra: Scope panel, pattern previews in the arrangement | ✅ built, waiting for review |
-| **Next: 5 More instruments** (Cobalt chip lead + arp, Quartz FM keys, Opal), one per slice, mock-up first | ⏭ ask the user which first |
+| **5 More instruments**: **Garnet** (string synth, mock-up `design/kit/garnet.html` approved 2026-11-25) first, then Opal (pads), then Quartz (FM keys, two oscillator rows + filter block on the right). Cobalt parked | 🔨 Garnet slice 1 of 3 done |
 | Later in 7: insert effects per instrument, routing view, global modulators | open |
 | 8 Hand-off package for the friend's app | open |
 | Later | Tape/recorder, time/pitch, 3D view, sample pads for Flint | open |
@@ -160,6 +160,13 @@ The core does no networking. The host owns providers, persistence and storage.
 - [ ] Flint: sample pads (later; goal: no download from a server for everyone)
 - [ ] "Own seq": plumbing done (flag reaches the engine), waits for a device with a built-in sequencer (Cobalt, Phase 5)
 - [x] ~~Play/stop is local per person~~ shared since Phase 4
+
+### Phase 5 progress: Garnet (string synth)
+User's asks (2026-11-25): fake strings you can strum; the scale's notes lit; Chord mode with chord types, each chord built in the song's key; a guitar-like analog sound. Family layout for the synths: two rows with the filter (Garnet: amp) block on the right.
+- [x] Mock-up with real sound (`design/kit/garnet.html`): Chords mode (strips = chords of the key; Triad / 7th / sus2 / sus4 / add9 / Power; guitar voicings found by a search over shapes), Notes mode (frets 0–12, scale lit, root brightest, slide by dragging), Pick / Body / Amp / Play controls, 7 presets. `?selftest` checks tuning and levels offline at 44.1 / 48 kHz, `?livetest` a live strum
+- [x] Slice 1, engine: `src/devices/garnet.rs` (device kind 3): six Karplus–Strong strings with pick position and hardness, tuning-compensated loop (tests: within 0.2 cents on every string at 44.1 and 48 kHz), notes given to strings like a guitarist's hand (strums land on the right strings), Ring (how long a string sounds after note-off), palm mute, vibrato, Slide (off by default: legato glides one string), body (Nylon / Steel / Hollow / Electric) and amp (Drive 2× oversampled and level-matched, Cab, Presence) with RBJ biquads (`dsp/biquad.rs`). String loops come from the static pool (now 4 MiB), one block per slot, reused. Manifest `devices/garnet.json`. Tests `tests/garnet.rs` (10). ~1.7% of a core for six strings
+- [ ] Slice 2, device in the studio: Garnet panel (Pick / Body rows, Amp block, Play row, presets, shared knobs and presence), skin `skins/garnet.css` (in the kit already), Library entry, `engine.js` kind
+- [ ] Slice 3, the neck: Chords and Notes modes from the song's Key (no key = C major), strum with the Strum speed, played notes recorded into the Piano roll (each string a few ms after the last)
 
 ### Mixer and effects (pulled forward from Phases 6–7 at the user's request; mock-up `design/kit/mixer.html`, approved 2026-11-25)
 - [x] Slice 1, mixer: engine strips per slot (level with a cubic fader curve, 0.8 = 0 dB; balance pan; mute; ~10 ms gain glide) and master, peak meters (`src/mixer.rs`, `fwm_mix / fwm_master / fwm_meters`, `engine.setMix / setMaster`, `tick.meters`); shared mixer settings in the song (`Project.mix / setMix / masterLevel`, flat `mix.*` keys on each track, saved in song files); **Mixer** panel (`views/MixerView.tsx`, skin `skins/mixer.css`): strips with M / S (M is the instrument's one Mute), Pan, large fader with L/R meters, dB, master. Solo is resolved by the studio. Tests: `tests/mixer.rs`, project tests, browser `?e2e=mixer`

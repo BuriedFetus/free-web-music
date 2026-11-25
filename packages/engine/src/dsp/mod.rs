@@ -1,6 +1,7 @@
 //! DSP building blocks shared by all devices.
 //! Rules: no allocation, no locking, no unbounded loops. Everything here runs on the audio thread.
 
+pub mod biquad;
 pub mod env;
 pub mod halfband;
 pub mod lfo;

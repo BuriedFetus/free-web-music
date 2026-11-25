@@ -6,8 +6,9 @@
 
 #[cfg(target_arch = "wasm32")]
 mod pool {
-    /// 2^19 floats = 2 MiB: room for every effect at sample rates up to 96 kHz.
-    pub const SIZE: usize = 1 << 19;
+    /// 2^20 floats = 4 MiB: room for every effect at sample rates up to 96 kHz, plus the string loops of
+    /// a Garnet in every slot (each slot keeps its block, see `Rack::add_device`).
+    pub const SIZE: usize = 1 << 20;
     static mut MEM: [f32; SIZE] = [0.0; SIZE];
     static mut USED: usize = 0;
     /// Start carving from the beginning again (a new rack).
@@ -35,6 +36,7 @@ mod pool {
 }
 
 pub use pool::reset as reset_pool;
+pub use pool::take as take_mem;
 
 /// A circular delay line. `read(d)` is the sample written `d` samples ago (d ≥ 1).
 pub struct Line {

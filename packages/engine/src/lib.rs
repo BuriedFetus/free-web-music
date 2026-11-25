@@ -20,6 +20,7 @@ pub mod mixer;
 use device::{Device, ModSource, RouteError};
 use devices::basalt::Basalt;
 use devices::flint::Flint;
+use devices::garnet::Garnet;
 use events::{Event, Kind, Queue};
 use fx::Fx;
 use mixer::Mixer;
@@ -44,6 +45,7 @@ pub const PROBE_MASTER: i32 = -1;
 pub enum DeviceKind {
     Basalt = 1,
     Flint = 2,
+    Garnet = 3,
 }
 
 impl DeviceKind {
@@ -51,6 +53,7 @@ impl DeviceKind {
         match i {
             1 => Some(DeviceKind::Basalt),
             2 => Some(DeviceKind::Flint),
+            3 => Some(DeviceKind::Garnet),
             _ => None,
         }
     }
@@ -60,6 +63,7 @@ pub enum Slot {
     Empty,
     Basalt(Basalt),
     Flint(Flint),
+    Garnet(Garnet),
 }
 
 impl Slot {
@@ -68,6 +72,7 @@ impl Slot {
             Slot::Empty => None,
             Slot::Basalt(d) => Some(d),
             Slot::Flint(d) => Some(d),
+            Slot::Garnet(d) => Some(d),
         }
     }
 
@@ -76,6 +81,7 @@ impl Slot {
             Slot::Empty => None,
             Slot::Basalt(d) => Some(d),
             Slot::Flint(d) => Some(d),
+            Slot::Garnet(d) => Some(d),
         }
     }
 }
@@ -99,6 +105,8 @@ pub struct Rack {
     pub probe_src: i32,
     /// Meter snapshot for the host (see `Mixer::take_meters`).
     pub meters: [f32; (MAX_SLOTS + 1) * 2],
+    /// Each slot's Garnet string memory, taken from the pool the first time and reused after.
+    garnet_mem: [Option<(*mut f32, usize)>; MAX_SLOTS],
 }
 
 impl Rack {
@@ -120,6 +128,7 @@ impl Rack {
             probe_pos: 0,
             probe_src: PROBE_OFF,
             meters: [0.0; (MAX_SLOTS + 1) * 2],
+            garnet_mem: [None; MAX_SLOTS],
         }
     }
 
@@ -130,6 +139,16 @@ impl Rack {
         let mut s = match kind {
             DeviceKind::Basalt => Slot::Basalt(Basalt::new()),
             DeviceKind::Flint => Slot::Flint(Flint::new()),
+            DeviceKind::Garnet => {
+                // the old device in this slot (if any) goes first: its memory is about to be reused
+                self.slots[slot] = Slot::Empty;
+                let (ptr, len) = *self.garnet_mem[slot].get_or_insert_with(|| {
+                    let m = fx::line::take_mem(devices::garnet::MEM);
+                    (m.as_mut_ptr(), m.len())
+                });
+                // Safety: the block belongs to this slot only, and the device that used it was just dropped.
+                Slot::Garnet(Garnet::with_memory(unsafe { core::slice::from_raw_parts_mut(ptr, len) }))
+            }
         };
         if let Some(d) = s.device() {
             d.prepare(self.sample_rate);
