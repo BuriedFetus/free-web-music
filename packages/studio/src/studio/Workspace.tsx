@@ -8,7 +8,7 @@ import { LibraryView } from './views/LibraryView';
 import { RollView } from './views/RollView';
 import { SeqView } from './views/SeqView';
 
-const VIEWS = { seq: 'Main sequencer', roll: 'Piano roll', device: 'Device', library: 'Library' } as const;
+const VIEWS = { seq: 'Song arrangement', roll: 'Piano roll', device: 'Device', library: 'Library' } as const;
 type ViewId = keyof typeof VIEWS;
 
 interface Layout {

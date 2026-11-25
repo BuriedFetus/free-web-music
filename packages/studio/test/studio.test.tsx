@@ -114,7 +114,7 @@ describe('<Studio>', () => {
     const p = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
     const id = p.trackIds()[0];
-    const seq = screen.getByRole('region', { name: 'Main sequencer' });
+    const seq = screen.getByRole('region', { name: 'Song arrangement' });
     fireEvent.click(within(seq).getByRole('button', { name: 'Rename Basalt' }));
     const input = within(seq).getByRole('textbox', { name: 'Rename Basalt' });
     fireEvent.change(input, { target: { value: 'Bass' } });

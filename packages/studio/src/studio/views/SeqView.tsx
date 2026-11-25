@@ -1,4 +1,4 @@
-// Main sequencer = the song arrangement. Instruments across the top, song rows (TRACK 1, TRACK 2…)
+// Song arrangement (the main sequencer; the UI calls it "Song arrangement"). Instruments across the top, song rows (TRACK 1, TRACK 2…)
 // down the side; each cell picks the pattern that instrument plays in that row. A row lasts as long as
 // its longest pattern; shorter ones repeat inside it. Click a cell to edit its pattern in the Piano roll.
 import { useState } from 'react';
