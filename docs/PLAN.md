@@ -95,7 +95,7 @@ The core does no networking. The host owns providers, persistence and storage.
 | 6 Mixer (strips, meters, master) — pulled forward | ✅ built, waiting for review |
 | 7 (part) Effects: Reverb, Delay, sends, draggable chain, tape/vinyl Lo-fi, main Low-pass — pulled forward | ✅ built, waiting for review |
 | Extra: Scope panel, pattern previews in the arrangement | ✅ built, waiting for review |
-| **5 More instruments**: **Garnet** (string synth, mock-up `design/kit/garnet.html` approved 2026-11-25) first, then Opal (pads), then Quartz (FM keys, two oscillator rows + filter block on the right). Cobalt parked | ✅ Garnet built (3 slices), waiting for review; next Opal mock-up |
+| **5 More instruments**: **Garnet** (string synth, mock-up `design/kit/garnet.html` approved 2026-11-25) first, then Opal (pads), then Quartz (FM keys, two oscillator rows + filter block on the right). Cobalt parked | ✅ Garnet built and approved (+ Distortion); next Opal mock-up |
 | Later in 7: insert effects per instrument, routing view, global modulators | open |
 | 8 Hand-off package for the friend's app | open |
 | Later | Tape/recorder, time/pitch, 3D view, sample pads for Flint | open |

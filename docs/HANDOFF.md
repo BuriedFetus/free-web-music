@@ -1,6 +1,16 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-25, late night): Garnet approved ("amazing", with Distortion); My look built
+## START HERE (2026-11-26): Garnet + My look + arrangement drag and drop done; next the Opal mock-up
+Since the last notes: **My look** (each person's own stylesheet from their AI agent, docs/LOOKS.md) and the
+**song arrangement cells** (double-click / Delete empties; drag to another TRACK = same pattern, Ctrl = copy;
+into another instrument = a copy, melodies↔melodic and drums↔drum machines only; onto + Add TRACK = a new
+TRACK; edge scrolling; one undo step each, `Project.placePattern`). All tested (`?e2e=look`, `?e2e=arrange`),
+pushed. Waiting for the user to try them. Next: the **Opal** pad mock-up with sound (Juno-style chorus,
+unison, slow motion; family layout: two oscillator rows + filter block on the right), then Quartz.
+Browser test gotchas: in a 682 px headless window the arrangement panel is short (maximise it before dragging);
+Firefox can't drag `<button>` natively, so drags are pointer-based.
+
+## Earlier (2026-11-25, late night): Garnet approved ("amazing", with Distortion); My look built
 The user tested Garnet and its Distortion knob: approved. Then asked that friends can restyle the UI with their
 own AI agent without changing anyone else's: built as **My look** (docs/LOOKS.md, PLAN.md "My look"). Next: the
 user's review of My look, then the Opal mock-up (pads, with sound).
