@@ -1,6 +1,15 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-24, evening): Phase 4 done (slices 1–3), waiting for the user's review
+## START HERE (2026-11-25): Mixer + Scope mock-up, waiting for the user's feedback
+The user tested Phase 4 ("tested it's amazing!", and is relaxed about live delay: "even if it's 200ms who cares we
+just want to play around"). They renamed the Main sequencer panel to **Song arrangement** (done, a430158) and asked for
+a **main mixer** (a Reverb and a Delay send knob per instrument; expanding the Mixer shows Reverb / Delay / Lo-fi /
+main Low-pass settings) and an **Oscilloscope** as its own panel. Mock-up: `design/kit/mixer.html` (rough WebAudio
+preview sound; `#effects` opens it expanded). Proposed chain: instruments (fader, pan, mute/solo, post-fader sends)
++ Reverb return + Delay return → Lo-fi → Low-pass → Master. Everything shared in the doc. Build only after sign-off;
+then plan slices (likely: 1 mixer strips + master in the engine, 2 Reverb + Delay, 3 Lo-fi + Low-pass, 4 Scope panel).
+
+## Earlier (2026-11-24, evening): Phase 4 done (slices 1–3), waiting for the user's review
 The user said "Go ahead with slice 2 & slice 3 then commit and push" and left for work; next session starts with
 their review of Phase 4 (ask how playing together feels: Even vs Tight, the chips, Play alone).
 - Slice 2: `collab/liveTiming.ts` (LiveTiming: when to play another person's key / knob turn), worklet timed

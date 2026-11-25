@@ -1,0 +1,429 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Mixer and Scope</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Figtree:wght@400;600;800&family=VT323&family=Big+Shoulders+Display:wght@800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="skins/app.css">
+<link rel="stylesheet" href="skins/device-base.css">
+<link rel="stylesheet" href="skins/basalt.css">
+<link rel="stylesheet" href="skins/flint.css">
+<style>
+/* VOICE studio tool: calm chrome; the mixer is a dark desk, the effects are small hardware units
+   IDEA a mixing desk: one strip per instrument, sends to shared reverb and delay, then the master
+   PICTURE strips with live meters, the effects rack with a drawing per unit, and a big glowing scope
+   COLOUR theme tokens only (skins/*.css): sequencer world --fwm-roll*, levels --fwm-note, hot --fwm-rec
+   TYPE tokens: display for nameplates, screen for readouts, ui for everything else
+   LAYOUT top bar, Mixer panel (⤢ widens it and shows the effects rack) beside the Scope panel, then notes */
+*{box-sizing:border-box;min-width:0}
+[hidden]{display:none!important}
+html,body{margin:0}
+body{background:var(--fwm-bg);color:var(--fwm-ink);font:15px/1.45 var(--fwm-font-ui);overflow-x:clip}
+button,select{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fwm-me);outline-offset:2px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px max(2vw,12px);background:var(--fwm-panel);border-bottom:1px solid var(--fwm-line)}
+.bar h1{margin:0 8px 0 0;font:900 24px/1 var(--fwm-font-display);letter-spacing:.03em}
+.grow{flex:1}
+.btn{min-height:40px;padding:0 14px;border-radius:calc(9px*var(--fwm-round));border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;font-weight:600;white-space:nowrap}
+.btn[aria-pressed=true]{background:var(--fwm-me);color:var(--fwm-on-me);border-color:var(--fwm-me)}
+.btn.sm{min-height:32px;padding:0 9px;font-size:13px}
+.lcd{font:22px/1 var(--fwm-font-screen);background:var(--fwm-roll-deep);color:var(--fwm-note);padding:8px 10px;border-radius:7px;white-space:nowrap}
+.hint{font-size:13px;color:var(--fwm-mute)}
+main{padding:12px max(2vw,12px) 28px;display:grid;gap:12px}
+.work{display:grid;grid-template-columns:minmax(0,1.35fr) minmax(0,1fr);gap:12px;align-items:start}
+.work.wide>*{grid-column:1/-1}
+@media (max-width:1000px){.work{grid-template-columns:minmax(0,1fr)}}
+.panel{background:var(--fwm-panel);border:1px solid var(--fwm-line);border-radius:calc(12px*var(--fwm-round));overflow:hidden}
+.ph{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:8px 10px;border-bottom:1px solid var(--fwm-line)}
+.ph h2{margin:0;font-size:16px}
+.ib{width:36px;height:36px;border-radius:8px;border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;font-size:16px}
+.desk{background:var(--fwm-roll-deep);padding:10px;display:flex;gap:8px;overflow-x:auto;scrollbar-width:thin}
+.strip{flex:none;width:104px;display:grid;gap:8px;justify-items:center;padding:8px 6px;border-radius:10px;background:var(--fwm-roll);color:var(--fwm-roll-ink)}
+.strip.master{width:118px;background:var(--fwm-roll2);margin-left:auto}
+.plate{width:100%;height:40px;border-radius:7px;display:grid;place-items:center;background:var(--dev-texture),linear-gradient(160deg,var(--dev-case),var(--dev-case2));background-size:5px 5px,auto;color:var(--dev-silk);font:900 15px/1 var(--fwm-font-display);letter-spacing:.05em;text-transform:uppercase;box-shadow:inset 0 -4px 0 var(--dev-acc)}
+.plate small{display:block;font:600 10px/1 var(--fwm-font-ui);letter-spacing:0;text-transform:none;opacity:.8;margin-top:2px}
+.mplate{width:100%;height:40px;border-radius:7px;display:grid;place-items:center;background:var(--fwm-roll-ink);color:var(--fwm-roll-deep);font:900 16px/1 var(--fwm-font-display);letter-spacing:.08em}
+.sends{display:grid;grid-template-columns:1fr 1fr;gap:4px;width:100%}
+.kn{display:grid;justify-items:center;gap:1px;font-size:11px;line-height:1.1;text-align:center;user-select:none}
+.kn .v{font:15px/1 var(--fwm-font-screen);color:var(--fwm-note);min-height:15px;white-space:nowrap}
+.knob{width:40px;height:40px;cursor:ns-resize;touch-action:none;border-radius:50%}
+.knob.big{width:76px;height:76px}
+.knob svg{width:100%;height:100%;display:block}
+.knob .trk{fill:none;stroke:color-mix(in srgb,var(--fwm-roll-ink) 22%,transparent);stroke-width:4;stroke-linecap:round}
+.knob .arc{fill:none;stroke:var(--fwm-note);stroke-width:4;stroke-linecap:round;filter:drop-shadow(0 0 calc(3px*var(--fwm-glow)) var(--fwm-note))}
+.knob .cap{fill:var(--fwm-roll2);stroke:color-mix(in srgb,var(--fwm-roll-ink) 30%,transparent)}
+.knob .tick{stroke:var(--fwm-roll-ink);stroke-width:3;stroke-linecap:round}
+.fz{display:flex;gap:6px;align-items:stretch;height:170px}
+.meter{width:10px;border-radius:5px;background:color-mix(in srgb,var(--fwm-roll-ink) 12%,transparent);position:relative;overflow:hidden}
+.meter i{position:absolute;left:0;right:0;bottom:0;height:0;background:linear-gradient(to top,var(--fwm-note) 70%,var(--fwm-rec));}
+.meter b{position:absolute;left:0;right:0;height:2px;background:var(--fwm-roll-ink);bottom:0}
+.fader{writing-mode:vertical-lr;direction:rtl;width:34px;height:170px;margin:0;accent-color:var(--fwm-note);cursor:ns-resize}
+.db{font:16px/1 var(--fwm-font-screen);color:var(--fwm-note)}
+.ms{display:flex;gap:4px}
+.ms button{min-width:36px;min-height:30px;border-radius:6px;border:0;background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);font-weight:800;cursor:pointer}
+.ms button[aria-pressed=true].m{background:var(--fwm-rec);color:var(--fwm-on-rec)}
+.ms button[aria-pressed=true].s{background:var(--fwm-note);color:var(--fwm-on-note)}
+.chain{font-size:12px;color:var(--fwm-roll-ink);opacity:.8;text-align:center}
+.rack{display:none;padding:10px;gap:10px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));border-top:1px solid var(--fwm-line)}
+.work.wide .rack{display:grid}
+.unit{border-radius:calc(10px*var(--fwm-round));background:linear-gradient(160deg,var(--fwm-roll2),var(--fwm-roll));color:var(--fwm-roll-ink);padding:10px;display:grid;gap:8px;box-shadow:inset 0 1px 0 color-mix(in srgb,var(--fwm-roll-ink) 25%,transparent),0 calc(4px*var(--fwm-depth)) calc(10px*var(--fwm-depth)) color-mix(in srgb,var(--fwm-bg) 60%,transparent)}
+.unit.off{opacity:.6}
+.uh{display:flex;align-items:center;gap:8px}
+.uh b{font:900 18px/1 var(--fwm-font-display);letter-spacing:.06em;text-transform:uppercase}
+.uh small{opacity:.75;font-size:12px}
+.uh .btn{margin-left:auto;background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);border:0}
+.uh .btn[aria-pressed=true]{background:var(--fwm-note);color:var(--fwm-on-note)}
+.pic{height:64px;border-radius:7px;background:var(--fwm-roll-deep);overflow:hidden}
+.pic svg{width:100%;height:100%;display:block}
+.pic .ln{fill:none;stroke:var(--fwm-note);stroke-width:2;filter:drop-shadow(0 0 calc(4px*var(--fwm-glow)) var(--fwm-note))}
+.pic .fl{fill:color-mix(in srgb,var(--fwm-note) 25%,transparent)}
+.knobs{display:flex;flex-wrap:wrap;gap:6px 10px;justify-content:space-between}
+.seg{display:flex;flex-wrap:wrap;gap:4px}
+.seg button{min-height:30px;padding:0 8px;border-radius:6px;border:0;background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);font-weight:700;cursor:pointer;font-size:13px}
+.seg button[aria-pressed=true]{background:var(--fwm-roll-ink);color:var(--fwm-roll-deep)}
+.scopewrap{position:relative;height:340px;background:var(--fwm-roll-deep)}
+.scopewrap canvas{position:absolute;inset:0;width:100%;height:100%}
+.scopewrap .msg{position:absolute;inset:0;display:grid;place-items:center;color:var(--fwm-roll-ink);opacity:.7;font-size:14px;pointer-events:none}
+.notes{font-size:14px;color:var(--fwm-mute);max-width:86ch;margin:0;padding-left:20px}
+.notes li{margin:4px 0}
+.notes b{color:var(--fwm-ink)}
+h3{margin:4px 0 0;font-size:16px}
+@media (max-width:600px){.strip{width:92px}.fader,.fz{height:140px}.scopewrap{height:240px}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <h1>Mixer &amp; Scope</h1>
+  <button class="btn" id="play" aria-pressed="false">▶ Play</button>
+  <span class="lcd">110 BPM</span>
+  <span class="hint">Mock-up with rough preview sounds: press Play, then turn the sends and the effects.</span>
+</div>
+
+<main>
+  <div class="work" id="work">
+    <section class="panel mix" aria-label="Mixer">
+      <div class="ph"><h2>Mixer</h2><span class="hint" id="mixhint">⤢ shows the effects: Reverb, Delay, Lo-fi, Low-pass</span><span class="grow"></span>
+        <button class="ib" id="expand" aria-pressed="false" title="Expand: show the effect settings" aria-label="Expand the mixer">⤢</button></div>
+      <div class="desk" id="desk"></div>
+      <div class="rack" id="rack"></div>
+    </section>
+    <section class="panel" aria-label="Scope">
+      <div class="ph"><h2>Scope</h2>
+        <select class="btn sm" id="src" aria-label="What the scope shows"></select>
+        <div class="seg" role="group" aria-label="Mode"><button data-mode="wave" aria-pressed="true">Wave</button><button data-mode="spec" aria-pressed="false">Spectrum</button></div>
+        <div class="seg" role="group" aria-label="Time per screen" id="zoom"></div>
+        <span class="grow"></span><button class="btn sm" id="freeze" aria-pressed="false">Freeze</button></div>
+      <div class="scopewrap"><canvas id="scope"></canvas><div class="msg" id="smsg">Press Play to see the sound</div></div>
+    </section>
+  </div>
+
+  <section>
+    <h3>What this proposes</h3>
+    <ul class="notes">
+      <li><b>One strip per instrument</b>, in the order of the Song arrangement: level fader with a meter, Pan, Mute, Solo, and two <b>sends</b>: how much of the instrument goes to the shared Reverb and Delay. The master strip sums everything.</li>
+      <li><b>⤢ expands the Mixer</b> and shows the effects rack: Reverb and Delay (shared, fed by the sends), then <b>Lo-fi</b> and the <b>main Low-pass</b> on the whole mix. Signal path: instruments + Reverb + Delay → Lo-fi → Low-pass → Master.</li>
+      <li><b>The Delay follows the tempo</b> (1/16 to dotted 1/4). Ping-pong bounces left and right.</li>
+      <li><b>Everything is shared</b> like the instruments: faders, sends and effect settings are in the song; others see your hand on a fader, and undo is per person.</li>
+      <li><b>The Scope is its own panel</b> (pick it in any of the four panel slots): the master or one instrument, a steady trigger so waves stand still, time zoom, Freeze, and a Spectrum view.</li>
+      <li>The sounds here are rough browser previews; the real ones run in the studio's audio engine like Basalt and Flint.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+{
+const $ = (s, r = document) => r.querySelector(s);
+const BPM = 110, STEP = 60 / BPM / 4;
+const CH = [
+  { id: 'bass', name: 'Bass', dev: 'basalt', sub: 'Basalt' },
+  { id: 'lead', name: 'Lead', dev: 'basalt', sub: 'Basalt' },
+  { id: 'drums', name: 'Drums', dev: 'flint', sub: 'Flint' },
+];
+const hz = (v, lo, hi) => lo * Math.pow(hi / lo, v);
+const fmtHz = (f) => (f >= 1000 ? (f / 1000).toFixed(f >= 10000 ? 0 : 1) + 'k' : Math.round(f) + '');
+const pct = (v) => Math.round(v * 100) + '%';
+const dB = (v) => (v < 0.001 ? '−∞ dB' : (20 * Math.log10(v * v * 2)).toFixed(1) + ' dB');
+const DIV = [['1/16', 0.25], ['1/8', 0.5], ['1/8.', 0.75], ['1/4', 1], ['1/4.', 1.5]];
+
+// every control: value 0..1, default, label, display, what it does in the preview
+const P = {};
+const def = (id, d, label, show, apply) => (P[id] = { v: d, d, label, show, apply: apply || (() => {}) });
+for (const c of CH) {
+  def(`${c.id}.vol`, 0.75, 'Level', dB, () => level(c.id));
+  def(`${c.id}.pan`, 0.5, 'Pan', (v) => (Math.abs(v - 0.5) < 0.01 ? 'C' : (v < 0.5 ? 'L' : 'R') + Math.round(Math.abs(v - 0.5) * 200)), (v) => A && (A.ch[c.id].pan.pan.value = v * 2 - 1));
+  def(`${c.id}.rev`, { bass: 0.1, lead: 0.35, drums: 0.15 }[c.id], 'Reverb', pct, (v) => A && (A.ch[c.id].rev.gain.value = v));
+  def(`${c.id}.dly`, { bass: 0, lead: 0.4, drums: 0.05 }[c.id], 'Delay', pct, (v) => A && (A.ch[c.id].dly.gain.value = v));
+}
+def('master.vol', 0.8, 'Master', dB, (v) => A && (A.master.gain.value = v * v * 2));
+def('rev.size', 0.45, 'Size', (v) => (0.4 + v * 5.6).toFixed(1) + 's', () => irSoon());
+def('rev.pre', 0.2, 'Pre-delay', (v) => Math.round(v * 100) + 'ms', (v) => A && (A.rev.pre.delayTime.value = v * 0.1));
+def('rev.tone', 0.6, 'Tone', (v) => fmtHz(hz(v, 800, 16000)), (v) => A && (A.rev.tone.frequency.value = hz(v, 800, 16000)));
+def('rev.ret', 0.7, 'Return', pct, (v) => A && (A.rev.ret.gain.value = v));
+def('dly.fb', 0.45, 'Feedback', pct, (v) => A && (A.dly.fbL.gain.value = A.dly.fbR.gain.value = v * 0.9));
+def('dly.tone', 0.55, 'Tone', (v) => fmtHz(hz(v, 500, 14000)), (v) => A && (A.dly.tone.frequency.value = hz(v, 500, 14000)));
+def('dly.ret', 0.6, 'Return', pct, (v) => A && (A.dly.ret.gain.value = v));
+def('lofi.bits', 0.35, 'Bits', (v) => Math.round(16 - v * 13), () => lofi());
+def('lofi.rate', 0.3, 'Rate', (v) => fmtHz(hz(1 - v, 2000, 48000)), () => lofi());
+def('lofi.noise', 0.2, 'Hiss', pct, () => lofi());
+def('lofi.mix', 0.6, 'Mix', pct, () => lofi());
+def('lp.cut', 0.75, 'Cutoff', (v) => fmtHz(hz(v, 60, 20000)), (v) => A && A.lp.frequency.setTargetAtTime(hz(v, 60, 20000), A.ctx.currentTime, 0.02));
+def('lp.res', 0.2, 'Resonance', (v) => (0.7 + v * 14).toFixed(1), (v) => A && (A.lp.Q.value = 0.7 + v * 14));
+const S = { mute: {}, solo: {}, div: 2, pp: true, on: { rev: true, dly: true, lofi: false, lp: true } };
+
+// ---- knobs: drag up/down, wheel, arrow keys; double-click = default ----
+function knob(id, big) {
+  const p = P[id];
+  return `<div class="kn"><div class="knob${big ? ' big' : ''}" role="slider" tabindex="0" data-k="${id}" aria-label="${p.label}" aria-valuemin="0" aria-valuemax="100" aria-valuenow="${Math.round(p.v * 100)}" aria-valuetext="${p.show(p.v)}">${knobSvg(p.v)}</div><span>${p.label}</span><span class="v" data-v="${id}">${p.show(p.v)}</span></div>`;
+}
+function knobSvg(v) {
+  const a0 = -225, a = a0 + v * 270, r = 15, c = 20;
+  const pt = (deg, rr = r) => [c + rr * Math.cos((deg * Math.PI) / 180), c + rr * Math.sin((deg * Math.PI) / 180)];
+  const arc = (from, to) => { const [x1, y1] = pt(from), [x2, y2] = pt(to); return `M${x1} ${y1}A${r} ${r} 0 ${to - from > 180 ? 1 : 0} 1 ${x2} ${y2}`; };
+  const [tx, ty] = pt(a, 8);
+  return `<svg viewBox="0 0 40 40" aria-hidden="true"><path class="trk" d="${arc(a0, 45)}"/>${v > 0.003 ? `<path class="arc" d="${arc(a0, a)}"/>` : ''}<circle class="cap" cx="20" cy="20" r="10"/><line class="tick" x1="20" y1="20" x2="${tx}" y2="${ty}"/></svg>`;
+}
+function set(id, v) {
+  const p = P[id];
+  p.v = Math.min(1, Math.max(0, v));
+  p.apply(p.v);
+  for (const k of document.querySelectorAll(`[data-k="${id}"]`)) {
+    if (k.classList.contains('knob')) { k.innerHTML = knobSvg(p.v); k.setAttribute('aria-valuenow', Math.round(p.v * 100)); k.setAttribute('aria-valuetext', p.show(p.v)); }
+    else k.value = p.v;
+  }
+  for (const e of document.querySelectorAll(`[data-v="${id}"]`)) e.textContent = p.show(p.v);
+  if (id.startsWith('dly') || id.startsWith('rev') || id.startsWith('lp') || id.startsWith('lofi')) pics();
+}
+
+// ---- render ----
+function strip(c) {
+  return `<div class="strip" data-device="${c.dev}" aria-label="${c.name} channel">
+    <div class="plate">${c.name}<small>${c.sub}</small></div>
+    <div class="sends">${knob(c.id + '.rev')}${knob(c.id + '.dly')}</div>
+    ${knob(c.id + '.pan')}
+    <div class="fz"><div class="meter" data-meter="${c.id}"><i></i><b></b></div><input type="range" class="fader" min="0" max="1" step="0.005" value="${P[c.id + '.vol'].v}" data-k="${c.id}.vol" aria-label="${c.name} level"></div>
+    <span class="db" data-v="${c.id}.vol">${dB(P[c.id + '.vol'].v)}</span>
+    <div class="ms"><button class="m" data-mute="${c.id}" aria-pressed="false" title="Mute">M</button><button class="s" data-solo="${c.id}" aria-pressed="false" title="Solo">S</button></div>
+  </div>`;
+}
+function render() {
+  $('#desk').innerHTML = CH.map(strip).join('') + `<div class="strip master" aria-label="Master">
+    <div class="mplate">MASTER</div>
+    <div class="chain" id="chain"></div>
+    <div class="fz"><div class="meter" data-meter="master"><i></i><b></b></div><input type="range" class="fader" min="0" max="1" step="0.005" value="${P['master.vol'].v}" data-k="master.vol" aria-label="Master level"></div>
+    <span class="db" data-v="master.vol">${dB(P['master.vol'].v)}</span></div>`;
+  const unit = (id, name, sub, body) => `<div class="unit${S.on[id] ? '' : ' off'}" data-unit="${id}"><div class="uh"><b>${name}</b><small>${sub}</small><button class="btn sm" data-on="${id}" aria-pressed="${S.on[id]}">${S.on[id] ? 'On' : 'Off'}</button></div>${body}</div>`;
+  $('#rack').innerHTML =
+    unit('rev', 'Reverb', 'shared · fed by the sends', `<div class="pic" id="pic-rev"></div><div class="knobs">${knob('rev.size')}${knob('rev.pre')}${knob('rev.tone')}${knob('rev.ret')}</div>`)
+    + unit('dly', 'Delay', 'shared · follows the tempo', `<div class="pic" id="pic-dly"></div><div class="seg" role="group" aria-label="Delay time">${DIV.map(([l], i) => `<button data-div="${i}" aria-pressed="${S.div === i}">${l}</button>`).join('')}<button data-pp aria-pressed="${S.pp}">Ping-pong</button></div><div class="knobs">${knob('dly.fb')}${knob('dly.tone')}${knob('dly.ret')}</div>`)
+    + unit('lofi', 'Lo-fi', 'whole mix', `<div class="pic" id="pic-lofi"></div><div class="knobs">${knob('lofi.bits')}${knob('lofi.rate')}${knob('lofi.noise')}${knob('lofi.mix')}</div>`)
+    + unit('lp', 'Low-pass', 'whole mix', `<div class="pic" id="pic-lp"></div><div class="knobs" style="justify-content:space-around">${knob('lp.cut', true)}${knob('lp.res')}</div>`);
+  chain();
+  pics();
+}
+function chain() {
+  const on = ['rev', 'dly', 'lofi', 'lp'].filter((k) => S.on[k]).map((k) => ({ rev: 'Reverb', dly: 'Delay', lofi: 'Lo-fi', lp: 'Low-pass' })[k]);
+  $('#chain').textContent = on.length ? on.join(' · ') : 'No effects';
+}
+// small drawings that show what each effect does
+function pics() {
+  const W = 240, H = 64, svg = (d) => `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${d}</svg>`;
+  const r = $('#pic-rev'), d = $('#pic-dly'), l = $('#pic-lofi'), f = $('#pic-lp');
+  if (!r) return;
+  const sz = 0.4 + P['rev.size'].v * 5.6, pre = P['rev.pre'].v * 100;
+  let path = `M0 ${H}`;
+  for (let x = 0; x <= W; x += 3) { const t = (x / W) * 6000 - pre; path += ` L${x} ${t < 0 ? H : H - (H - 6) * Math.exp((-t / 1000) * (6.9 / sz)) * (0.6 + 0.4 * Math.random())}`; }
+  r.innerHTML = svg(`<path class="fl" d="${path} L${W} ${H}Z"/>`);
+  const beat = DIV[S.div][1], fb = P['dly.fb'].v * 0.9;
+  let bars = '';
+  for (let k = 0, a = 1; k < 12 && a > 0.03; k++, a *= fb) { const x = 8 + k * beat * 40; if (x > W - 6) break; bars += `<rect class="fl" x="${x}" y="${H - 4 - a * (H - 10)}" width="6" height="${a * (H - 10)}" rx="2" transform="translate(0 ${S.pp ? (k % 2 ? 2 : -2) : 0})"/>`; }
+  d.innerHTML = svg(bars);
+  const bits = Math.round(16 - P['lofi.bits'].v * 13), q = Math.pow(2, Math.min(bits, 6) - 1), hold = 1 + P['lofi.rate'].v * 14;
+  let w = '';
+  for (let x = 0; x <= W; x++) { const xs = Math.floor(x / hold) * hold; const y = Math.round(Math.sin((xs / W) * Math.PI * 4) * q) / q; w += (x ? 'L' : 'M') + x + ' ' + (H / 2 - y * (H / 2 - 6)); }
+  l.innerHTML = svg(`<path class="ln" d="${w}"/>`);
+  const fc = hz(P['lp.cut'].v, 60, 20000), Q = 0.7 + P['lp.res'].v * 14;
+  let c = '';
+  for (let x = 0; x <= W; x += 2) { const fr = hz(x / W, 20, 20000), rr = fr / fc, mag = 1 / Math.sqrt((1 - rr * rr) ** 2 + (rr / Q) ** 2), db = Math.max(-40, Math.min(18, 20 * Math.log10(mag))); c += (x ? 'L' : 'M') + x + ' ' + (H * 0.35 - db * (H * 0.6 / 40)); }
+  f.innerHTML = svg(`<path class="ln" d="${c}"/>`);
+}
+
+// ---- preview audio: three instruments → strips (fader, pan, sends) → returns → Lo-fi → Low-pass → master ----
+let A = null, timer = null, step = 0, nextT = 0;
+function level(id) { if (!A) return; const solo = Object.values(S.solo).some(Boolean); const v = P[id + '.vol'].v; A.ch[id].fader.gain.value = S.mute[id] || (solo && !S.solo[id]) ? 0 : v * v * 2; }
+async function audio() {
+  const ctx = new AudioContext();
+  const sum = ctx.createGain(), lpf = ctx.createBiquadFilter(), master = ctx.createGain(), scope = ctx.createAnalyser();
+  lpf.type = 'lowpass';
+  scope.fftSize = 8192;
+  const lofiIn = ctx.createGain(), lofiOut = ctx.createGain();
+  sum.connect(lofiIn); lofiOut.connect(lpf); lpf.connect(master); master.connect(scope); scope.connect(ctx.destination);
+  A = { ctx, sum, lp: lpf, master, scope, lofiIn, lofiOut, lofiNode: null, ch: {}, an: {} };
+  try {
+    const code = `class L extends AudioWorkletProcessor{static get parameterDescriptors(){return[{name:'bits',defaultValue:16},{name:'rate',defaultValue:48000},{name:'mix',defaultValue:0},{name:'noise',defaultValue:0}]}
+      constructor(){super();this.ph=0;this.h=[0,0]}
+      process(i,o,p){const x=i[0],y=o[0];if(!x||!x.length)return true;const q=Math.pow(2,p.bits[0]-1),st=Math.max(1,sampleRate/p.rate[0]),m=p.mix[0],nz=p.noise[0];let ph=this.ph;
+      for(let c=0;c<y.length;c++){const a=x[c]||x[0],b=y[c];let h=this.h[c]||0;ph=this.ph;for(let n=0;n<b.length;n++){ph+=1;if(ph>=st){ph-=st;h=Math.round(a[n]*q)/q}b[n]=a[n]*(1-m)+(h+(Math.random()*2-1)*nz*0.03)*m}this.h[c]=h}this.ph=ph;return true}}
+      registerProcessor('lofi',L)`;
+    await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
+    A.lofiNode = new AudioWorkletNode(ctx, 'lofi', { outputChannelCount: [2] });
+  } catch { /* no worklet here: Lo-fi is bypassed in the preview */ }
+  // shared reverb (generated impulse) and ping-pong delay
+  const rev = { pre: ctx.createDelay(0.2), conv: ctx.createConvolver(), tone: ctx.createBiquadFilter(), ret: ctx.createGain(), in: ctx.createGain() };
+  rev.tone.type = 'lowpass'; rev.in.connect(rev.pre); rev.pre.connect(rev.conv); rev.conv.connect(rev.tone); rev.tone.connect(rev.ret); rev.ret.connect(sum);
+  const dly = { in: ctx.createGain(), L: ctx.createDelay(2), R: ctx.createDelay(2), fbL: ctx.createGain(), fbR: ctx.createGain(), tone: ctx.createBiquadFilter(), ret: ctx.createGain(), mg: ctx.createChannelMerger(2), mono: ctx.createGain() };
+  dly.tone.type = 'lowpass';
+  dly.in.connect(dly.tone); dly.tone.connect(dly.L); dly.L.connect(dly.fbL); dly.fbL.connect(dly.R); dly.R.connect(dly.fbR); dly.fbR.connect(dly.L);
+  dly.L.connect(dly.mg, 0, 0); dly.R.connect(dly.mg, 0, 1); dly.mg.connect(dly.ret); dly.ret.connect(sum);
+  A.rev = rev; A.dly = dly;
+  A.an.master = scope;
+  for (const c of CH) {
+    const ch = { in: ctx.createGain(), fader: ctx.createGain(), pan: ctx.createStereoPanner(), rev: ctx.createGain(), dly: ctx.createGain(), an: ctx.createAnalyser() };
+    ch.an.fftSize = 4096;
+    ch.in.connect(ch.fader); ch.fader.connect(ch.pan); ch.pan.connect(sum); ch.pan.connect(ch.an);
+    ch.pan.connect(ch.rev); ch.rev.connect(rev.in); ch.pan.connect(ch.dly); ch.dly.connect(dly.in);
+    A.ch[c.id] = ch; A.an[c.id] = ch.an;
+  }
+  for (const id in P) P[id].apply(P[id].v);
+  for (const c of CH) level(c.id);
+  ir(); divTime(); lofi(); onOff();
+}
+function ir() {
+  if (!A) return;
+  const { ctx } = A, len = Math.floor(ctx.sampleRate * (0.4 + P['rev.size'].v * 5.6)), b = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = b.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 3.2); }
+  A.rev.conv.buffer = b;
+}
+let irT = 0;
+const irSoon = () => { clearTimeout(irT); irT = setTimeout(ir, 120); };
+function divTime() { if (A) A.dly.L.delayTime.value = A.dly.R.delayTime.value = DIV[S.div][1] * 60 / BPM; }
+function lofi() {
+  const n = A?.lofiNode;
+  if (!n) return;
+  const t = A.ctx.currentTime;
+  n.parameters.get('bits').setValueAtTime(16 - P['lofi.bits'].v * 13, t);
+  n.parameters.get('rate').setValueAtTime(hz(1 - P['lofi.rate'].v, 2000, 48000), t);
+  n.parameters.get('noise').setValueAtTime(P['lofi.noise'].v, t);
+  n.parameters.get('mix').setValueAtTime(S.on.lofi ? P['lofi.mix'].v : 0, t);
+}
+function onOff() {
+  if (!A) return;
+  A.rev.in.gain.value = S.on.rev ? 1 : 0;
+  A.dly.in.gain.value = S.on.dly ? 1 : 0;
+  A.lofiIn.disconnect();
+  if (A.lofiNode) { A.lofiIn.connect(A.lofiNode); A.lofiNode.disconnect(); A.lofiNode.connect(A.lofiOut); } else A.lofiIn.connect(A.lofiOut);
+  lofi();
+  A.lp.type = S.on.lp ? 'lowpass' : 'allpass';
+  if (!S.on.lp) A.lp.frequency.value = 20000;
+  else P['lp.cut'].apply(P['lp.cut'].v);
+  // ping-pong: the delay's two sides alternate left / right; off: both in the middle
+  const D = A.dly;
+  for (const n of [D.L, D.R, D.mg, D.mono]) n.disconnect();
+  D.L.connect(D.fbL); D.R.connect(D.fbR);
+  if (S.pp) { D.L.connect(D.mg, 0, 0); D.R.connect(D.mg, 0, 1); D.mg.connect(D.ret); }
+  else { D.L.connect(D.mono); D.R.connect(D.mono); D.mono.connect(D.ret); }
+}
+
+// a 2-bar loop
+const BASS = [36, 0, 0, 36, 0, 0, 39, 0, 36, 0, 0, 34, 0, 31, 0, 0, 36, 0, 0, 36, 0, 0, 39, 0, 41, 0, 39, 0, 36, 0, 34, 0];
+const LEAD = { 0: 72, 6: 75, 12: 79, 22: 77, 28: 75 };
+const mtof = (m) => 440 * Math.pow(2, (m - 69) / 12);
+function voice(id, t, fn) { const g = A.ctx.createGain(); g.connect(A.ch[id].in); fn(g); }
+function playStep(s, t) {
+  const { ctx } = A;
+  if (BASS[s]) voice('bass', t, (g) => { const o = ctx.createOscillator(), f = ctx.createBiquadFilter(); o.type = 'sawtooth'; o.frequency.value = mtof(BASS[s]); f.type = 'lowpass'; f.Q.value = 6; f.frequency.setValueAtTime(1400, t); f.frequency.exponentialRampToValueAtTime(180, t + 0.22); g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.4, t + 0.005); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); o.connect(f).connect(g); o.start(t); o.stop(t + 0.32); });
+  if (LEAD[s]) voice('lead', t, (g) => { const o = ctx.createOscillator(), f = ctx.createBiquadFilter(); o.type = 'square'; o.frequency.value = mtof(LEAD[s]); f.type = 'lowpass'; f.frequency.value = 2600; g.gain.setValueAtTime(0.0001, t); g.gain.exponentialRampToValueAtTime(0.14, t + 0.01); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.45); o.connect(f).connect(g); o.start(t); o.stop(t + 0.5); });
+  voice('drums', t, (g) => {
+    if (s % 8 === 0) { const o = ctx.createOscillator(); o.frequency.setValueAtTime(150, t); o.frequency.exponentialRampToValueAtTime(42, t + 0.12); g.gain.setValueAtTime(0.9, t); g.gain.exponentialRampToValueAtTime(0.0001, t + 0.3); o.connect(g); o.start(t); o.stop(t + 0.32); }
+    const noise = (dur, hp, amp) => { const n = ctx.createBufferSource(), b = ctx.createBuffer(1, Math.ceil(ctx.sampleRate * dur), ctx.sampleRate), d = b.getChannelData(0); for (let i = 0; i < d.length; i++) d[i] = Math.random() * 2 - 1; const f = ctx.createBiquadFilter(), e = ctx.createGain(); f.type = 'highpass'; f.frequency.value = hp; n.buffer = b; e.gain.setValueAtTime(amp, t); e.gain.exponentialRampToValueAtTime(0.0001, t + dur); n.connect(f).connect(e).connect(g); n.start(t); };
+    if (s % 8 === 4) noise(0.18, 1200, 0.5);
+    if (s % 2 === 0) noise(0.04, 7000, s % 4 === 2 ? 0.16 : 0.08);
+  });
+}
+function tick() { while (nextT < A.ctx.currentTime + 0.12) { playStep(step, nextT); step = (step + 1) % 32; nextT += STEP; } }
+async function play(on) {
+  if (on && !A) await audio();
+  if (on) { await A.ctx.resume(); step = 0; nextT = A.ctx.currentTime + 0.05; timer = setInterval(tick, 25); }
+  else clearInterval(timer);
+  $('#play').setAttribute('aria-pressed', on); $('#play').textContent = on ? '■ Stop' : '▶ Play';
+  $('#smsg').hidden = on;
+}
+
+// ---- meters and scope (moving parts only) ----
+const buf = new Float32Array(8192), spec = new Float32Array(4096);
+let mode = 'wave', zoomMs = 20, frozen = false;
+const css = (n) => getComputedStyle(document.body).getPropertyValue(n).trim();
+function frame() {
+  if (A && $('#play').getAttribute('aria-pressed') === 'true') {
+    for (const m of document.querySelectorAll('[data-meter]')) {
+      const an = A.an[m.dataset.meter], n = an.fftSize;
+      an.getFloatTimeDomainData(buf.subarray(0, n));
+      let pk = 0; for (let i = 0; i < n; i++) pk = Math.max(pk, Math.abs(buf[i]));
+      const h = Math.min(1, Math.max(0, 1 + (20 * Math.log10(pk + 1e-6)) / 48)) * 100;
+      m.firstChild.style.height = h + '%';
+      const hold = Number(m.dataset.hold || 0) * 0.985; m.dataset.hold = Math.max(hold, h); m.lastChild.style.bottom = `calc(${Math.max(hold, h)}% - 2px)`;
+    }
+    if (!frozen) drawScope();
+  }
+  requestAnimationFrame(frame);
+}
+function drawScope() {
+  const cv = $('#scope'), g = cv.getContext('2d'), W = (cv.width = cv.clientWidth * devicePixelRatio), H = (cv.height = cv.clientHeight * devicePixelRatio);
+  const an = A.an[$('#src').value], ink = css('--fwm-roll-ink'), note = css('--fwm-note'), glow = Number(css('--fwm-glow')) || 1;
+  g.strokeStyle = ink; g.globalAlpha = 0.15; g.lineWidth = 1;
+  for (let i = 1; i < 10; i++) { g.beginPath(); g.moveTo((W * i) / 10, 0); g.lineTo((W * i) / 10, H); g.stroke(); }
+  for (let i = 1; i < 6; i++) { g.beginPath(); g.moveTo(0, (H * i) / 6); g.lineTo(W, (H * i) / 6); g.stroke(); }
+  g.globalAlpha = 1; g.strokeStyle = note; g.lineWidth = 2 * devicePixelRatio; g.shadowColor = note; g.shadowBlur = 10 * glow * devicePixelRatio;
+  g.beginPath();
+  if (mode === 'wave') {
+    const n = an.fftSize; an.getFloatTimeDomainData(buf.subarray(0, n));
+    const span = Math.min(n / 2, Math.round((zoomMs / 1000) * A.ctx.sampleRate));
+    let t0 = 0; for (let i = 1; i < n - span; i++) if (buf[i - 1] < 0 && buf[i] >= 0) { t0 = i; break; } // rising edge: the wave stands still
+    for (let i = 0; i < span; i++) { const x = (i / span) * W, y = H / 2 - buf[t0 + i] * H * 0.45; i ? g.lineTo(x, y) : g.moveTo(x, y); }
+  } else {
+    const m = an.frequencyBinCount; an.getFloatFrequencyData(spec.subarray(0, m));
+    for (let x = 0; x < W; x += 2) { const f = 30 * Math.pow(16000 / 30, x / W), b = Math.min(m - 1, Math.round((f / (A.ctx.sampleRate / 2)) * m)), db = spec[b]; const y = H - ((db + 100) / 90) * H; x ? g.lineTo(x, y) : g.moveTo(x, y); }
+  }
+  g.stroke();
+}
+
+// ---- events ----
+document.addEventListener('click', (e) => {
+  const b = e.target.closest('button');
+  if (!b) return;
+  if (b.id === 'play') return play(b.getAttribute('aria-pressed') !== 'true');
+  if (b.id === 'expand') return expand(!$('#work').classList.contains('wide'));
+  if (b.id === 'freeze') { frozen = !frozen; b.setAttribute('aria-pressed', frozen); return; }
+  if (b.dataset.mode) { mode = b.dataset.mode; for (const x of document.querySelectorAll('[data-mode]')) x.setAttribute('aria-pressed', x === b); $('#zoom').hidden = mode !== 'wave'; return; }
+  if (b.dataset.zoom) { zoomMs = Number(b.dataset.zoom); for (const x of document.querySelectorAll('[data-zoom]')) x.setAttribute('aria-pressed', x === b); return; }
+  if (b.dataset.mute) { S.mute[b.dataset.mute] = !S.mute[b.dataset.mute]; b.setAttribute('aria-pressed', S.mute[b.dataset.mute]); CH.forEach((c) => level(c.id)); return; }
+  if (b.dataset.solo) { S.solo[b.dataset.solo] = !S.solo[b.dataset.solo]; b.setAttribute('aria-pressed', S.solo[b.dataset.solo]); CH.forEach((c) => level(c.id)); return; }
+  if (b.dataset.on) { const k = b.dataset.on; S.on[k] = !S.on[k]; b.setAttribute('aria-pressed', S.on[k]); b.textContent = S.on[k] ? 'On' : 'Off'; b.closest('.unit').classList.toggle('off', !S.on[k]); chain(); onOff(); return; }
+  if (b.dataset.div) { S.div = Number(b.dataset.div); for (const x of document.querySelectorAll('[data-div]')) x.setAttribute('aria-pressed', x === b); divTime(); pics(); return; }
+  if (b.hasAttribute('data-pp')) { S.pp = !S.pp; b.setAttribute('aria-pressed', S.pp); onOff(); pics(); }
+});
+document.addEventListener('input', (e) => { if (e.target.dataset.k) set(e.target.dataset.k, Number(e.target.value)); });
+let drag = null;
+document.addEventListener('pointerdown', (e) => { const k = e.target.closest('.knob'); if (!k) return; drag = { id: k.dataset.k, y: e.clientY, v: P[k.dataset.k].v }; k.setPointerCapture(e.pointerId); k.focus(); e.preventDefault(); });
+document.addEventListener('pointermove', (e) => { if (drag) set(drag.id, drag.v + (drag.y - e.clientY) / (e.shiftKey ? 600 : 150)); });
+document.addEventListener('pointerup', () => (drag = null));
+document.addEventListener('dblclick', (e) => { const k = e.target.closest('.knob'); if (k) set(k.dataset.k, P[k.dataset.k].d); });
+document.addEventListener('wheel', (e) => { const k = e.target.closest('.knob'); if (!k) return; e.preventDefault(); set(k.dataset.k, P[k.dataset.k].v - Math.sign(e.deltaY) * 0.02); }, { passive: false });
+document.addEventListener('keydown', (e) => {
+  const k = e.target.closest?.('.knob');
+  if (k && ['ArrowUp', 'ArrowRight', 'ArrowDown', 'ArrowLeft'].includes(e.key)) { e.preventDefault(); set(k.dataset.k, P[k.dataset.k].v + (e.key === 'ArrowUp' || e.key === 'ArrowRight' ? 0.02 : -0.02)); }
+  if (e.key === ' ' && !e.target.closest('input,select')) { e.preventDefault(); play($('#play').getAttribute('aria-pressed') !== 'true'); }
+});
+
+$('#src').innerHTML = `<option value="master">Master</option>` + CH.map((c) => `<option value="${c.id}">${c.name}</option>`).join('');
+$('#zoom').innerHTML = [5, 10, 20, 40].map((ms) => `<button data-zoom="${ms}" aria-pressed="${ms === zoomMs}">${ms} ms</button>`).join('');
+render();
+const expand = (on) => { $('#work').classList.toggle('wide', on); $('#expand').setAttribute('aria-pressed', on); $('#mixhint').textContent = on ? 'Effects: shared Reverb and Delay (fed by the sends), Lo-fi and Low-pass on the whole mix' : '⤢ shows the effects: Reverb, Delay, Lo-fi, Low-pass'; };
+if (location.hash === '#effects') expand(true); // a link straight to the expanded mixer
+addEventListener('hashchange', () => expand(location.hash === '#effects'));
+requestAnimationFrame(frame);
+}
+</script>
+</body>
+</html>
