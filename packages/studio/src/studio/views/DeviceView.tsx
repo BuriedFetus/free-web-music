@@ -33,6 +33,7 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
         if (step >= 0 && pat) st.project.setAutomation(t.id, pat, id, step, v);
       },
       subtitle: t.name,
+      songKey: st.project.key,
     };
   }, [t?.id, t?.name, peers, st, engine, slot]); // eslint-disable-line react-hooks/exhaustive-deps
 

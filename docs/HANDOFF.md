@@ -1,8 +1,20 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-25, evening): Mixer + effects + Scope all done; ask the user what's next
-All four slices are built (PLAN.md "Mixer and effects"). Next: the user's review, then Phase 5 instruments
-(Cobalt, Quartz, Opal), mock-up first. The Studio artifact (HEVoA3TExTjSF2bRmVUUei) is still an old build.
+## START HERE (2026-11-25, night): Garnet (string synth) built, all three slices; ask the user to play it
+Mixer, effects and Scope were approved. Phase 5 started with **Garnet** (user's choice; Cobalt parked, then Opal pads,
+then Quartz FM with two oscillator rows + filter block on the right). Mock-up `design/kit/garnet.html` approved
+("purfect, fun to play"). Built: engine (`src/devices/garnet.rs`, kind 3), studio panel (`devices/garnet/`), the neck
+(Chords from the song's Key with types, Notes with the scale lit), strums recorded as strums. See PLAN.md "Phase 5
+progress". Next: the user's review of Garnet in the studio, then the Opal mock-up (with sound).
+Things learnt: a strum recorded with Rec quantize on was split across two steps (each note snapped alone); for Garnet,
+notes within 75 ms of the previous one keep their distance from the first (which snaps). Garnet's sunburst can't live
+in `--dev-texture` (the template tiles textures at 7 px: chips and Library cards turned into a checkerboard); the
+texture is a fine grain and the panel CSS draws the glow. `.fwm-app button { color: inherit }` beats `.fwm-btn--hw`
+colours: on a light button the text vanished (scope the fix in the device CSS). Each rack slot keeps Garnet's string
+memory from the static pool (now 4 MiB) and reuses it, so add/remove never leaks.
+
+## Earlier (2026-11-25, evening): Mixer + effects + Scope all done
+All four slices are built (PLAN.md "Mixer and effects").
 
 ## Earlier (2026-11-25, later): Mixer slices 1–3 done
 The user said "just do Slice 2 - 3 in one go" and asked that Song arrangement cells preview their pattern: all done

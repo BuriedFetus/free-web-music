@@ -4,7 +4,7 @@ A collaborative, device-based music studio for the browser. This repo is the **c
 
 - Plan, phases, progress: `docs/PLAN.md`
 - Theming contract (tokens, skins, replaceable controls): `docs/THEMING.md`
-- Status: **Phases 1–3 built** (song arrangement, Flint drum machine), reviewed. **Phase 4** (playing together, mock-up `design/kit/together.html` approved): done and signed off. **Mixer + effects + Scope** approved (mock-up `design/kit/mixer.html`), all built (mixer, Reverb / Delay / sends / draggable chain, Lo-fi / Low-pass, Scope panel). Waiting for the user's review. See HANDOFF START HERE. Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
+- Status: **Phases 1–3 built** (song arrangement, Flint drum machine), reviewed. **Phase 4** (playing together, mock-up `design/kit/together.html` approved): done and signed off. **Mixer + effects + Scope** approved (mock-up `design/kit/mixer.html`), all built (mixer, Reverb / Delay / sends / draggable chain, Lo-fi / Low-pass, Scope panel). Approved. **Phase 5**: **Garnet** string synth (mock-up `design/kit/garnet.html` approved) built: engine, studio panel, strummable neck; waiting for the user's review. Next Opal, then Quartz. See HANDOFF START HERE. Progress checklists: `docs/PLAN.md`. Start with `docs/HANDOFF.md`.
 - Words: in code a **track** is an instrument lane; the song's rows (TRACK 1, TRACK 2… in the UI) are **rows**.
 - The arrangement panel is called **Song arrangement** in the UI (user, 2026-11-25: "Main sequencer" made people think of the Piano roll). In code it is still `seq` / `SeqView`.
 - Prototypes (no build step): `design/kit/index.html` (device kit, has a Sound button), `design/kit/workspace.html` (workspace), `design/kit/arrange.html` (song arrangement mock-up), `design/kit/flint.html` (Flint drum machine mock-up, with rough WebAudio preview sounds), `design/kit/together.html` (Phase 4: playing together over a pretend network), `design/kit/mixer.html` (mixer, effects and scope, with preview sound), `design/kit/garnet.html` (Garnet string synth: strummable neck, chord and notes modes, real string sound; `?selftest` checks tuning and levels). Serve with `python3 spikes/serve.py`.
@@ -18,7 +18,7 @@ Node comes from nvm: run `. ~/.nvm/nvm.sh` first in a fresh shell if `node` is m
 
 ## Browser checks (headless Firefox, no automation tools needed)
 Build (`npm run build -w apps/harness`), serve the repo root with COOP/COEP and a POST endpoint that appends the body to a log file, and use a fresh Firefox profile whose `user.js` sets `media.autoplay.default` to 0.
-- Two people: open `dist/index.html?e2e=a&room=R` and `dist/index.html?e2e=b&room=R` in ONE `firefox --headless` command (two tabs share BroadcastChannel). Each tab POSTs PASS/FAIL lines to `./log`. Playing together (shared Play, live keys, chips): `?e2e=ta` + `?e2e=tb`.
+- Two people: open `dist/index.html?e2e=a&room=R` and `dist/index.html?e2e=b&room=R` in ONE `firefox --headless` command (two tabs share BroadcastChannel). Each tab POSTs PASS/FAIL lines to `./log`. Playing together (shared Play, live keys, chips): `?e2e=ta` + `?e2e=tb`. Single-tab roles: multi, switch, roll, song, songs, flint, drums, mixer, fx, scope, garnet (add `&newuser`).
 - Basalt alone: `dist/index.html?basalt&selftest`.
 - Screenshots: `firefox --headless --screenshot out.png URL` (add `?seednow&room=<random>` for a populated studio).
 

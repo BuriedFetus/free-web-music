@@ -3,9 +3,8 @@
 :where(.garnet, [data-device="garnet"]) {
   --dev-case: #a8401f;
   --dev-case2: #3d100b;
-  --dev-texture:
-    radial-gradient(ellipse 70% 90% at 38% 30%, rgba(255, 196, 102, .5), rgba(255, 150, 60, .18) 45%, transparent 70%),
-    repeating-linear-gradient(97deg, rgba(0, 0, 0, .05) 0 2px, transparent 2px 7px, rgba(255, 255, 255, .03) 7px 9px, transparent 9px 15px);
+  /* fine wood grain: tiles cleanly at any size (the panel adds its own amber sunburst glow) */
+  --dev-texture: repeating-linear-gradient(97deg, rgba(0, 0, 0, .06) 0 1px, transparent 1px 3px, rgba(255, 255, 255, .03) 3px 4px, transparent 4px 7px);
   --dev-edge: #2a0907;
   --dev-silk: #fbead2;
   --dev-acc: #ffb547;

@@ -1,5 +1,6 @@
 // Basalt: mono bass synth, front panel. Layout and behaviour follow the approved design kit
 // (design/kit/index.html). It only uses primitives from the theme, so hosts can restyle it.
+import type { SongKey } from '../../model/scales';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
 import type { ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
@@ -39,6 +40,8 @@ export interface DeviceHost {
   paramChanged?(id: string, value: number): void;
   /** Subtitle under the nameplate, e.g. the track name. */
   subtitle?: string;
+  /** The song's key (Garnet builds its chords from it). */
+  songKey?: SongKey;
 }
 
 /** Props every device front panel takes (Basalt, Flint…). */

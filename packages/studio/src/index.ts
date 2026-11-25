@@ -3,6 +3,9 @@ import './styles/studio.css';
 
 export { Basalt, type BasaltProps, type DeviceProps } from './devices/basalt/Basalt';
 export { Flint } from './devices/flint/Flint';
+export { Garnet } from './devices/garnet/Garnet';
+export { GARNET_PRESETS } from './devices/garnet/presets';
+export { chordsOfKey, CHORD_TYPES, TUNING as GARNET_TUNING, type Chord, type ChordType } from './devices/garnet/music';
 export { FLINT_KITS, DRUM_TYPES, CHARACTERS } from './devices/flint/kits';
 export { BASALT_PRESETS, type Preset } from './devices/basalt/presets';
 export { Scope } from './devices/Scope';

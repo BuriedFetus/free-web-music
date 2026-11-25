@@ -10,6 +10,10 @@ export function toPhysical(spec: ParamSpec, v: number): number {
       return lo * Math.pow(hi / lo, v);
     case 'exp0':
       return v <= 0 ? 0 : lo * Math.pow(hi / lo, v);
+    case 'sq':
+      return lo + v * v * (hi - lo);
+    case 'sq0':
+      return v <= 0 ? 0 : lo + v * v * (hi - lo);
     default:
       return lo + v * (hi - lo);
   }
@@ -28,11 +32,15 @@ export function formatParam(spec: ParamSpec, v: number): string {
     case 'Hz':
       if (x < 10) return x.toFixed(2) + 'Hz';
       return x < 1000 ? Math.round(x) + 'Hz' : (x / 1000).toFixed(1) + 'k';
+    case 's':
+      return x.toFixed(1) + ' s';
+    case 'dB':
+      return (x > 0 ? '+' : '') + x.toFixed(0) + ' dB';
     case 'ms':
-      if (spec.map === 'exp0' && v <= 0) return 'Off';
+      if ((spec.map === 'exp0' || spec.map === 'sq0') && v <= 0) return 'Off';
       if (x < 10) return x.toFixed(1) + 'ms';
       return x < 1000 ? Math.round(x) + 'ms' : (x / 1000).toFixed(1) + 's';
     default:
-      return x.toFixed(2);
+      return spec.max === 100 ? Math.round(x) + '%' : x.toFixed(2);
   }
 }

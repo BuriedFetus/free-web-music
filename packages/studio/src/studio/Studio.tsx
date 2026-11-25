@@ -207,6 +207,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     return p == null ? null : p - latSteps();
   }, [live, latSteps]);
 
+  const strumRec = useRef<{ track: string; pat: string; free: number; s: number; t: number } | null>(null);
   const recordOn = useCallback(
     (track: TrackInfo, note: number, vel: number) => {
       const pos = recPos();
@@ -224,8 +225,17 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
       const n = Math.floor(raw);
       const idx = stepOf(n, len, track.seq.dir, (slots.current.get(track.id) ?? 0) + 1);
       const q = QUANT[ws.recQuant] ?? 0;
-      let s = idx + (raw - n);
-      if (q) s = Math.round(s / q) * q;
+      const free = idx + (raw - n);
+      let s = q ? Math.round(free / q) * q : free;
+      // A strum (Garnet: notes a few ms apart) stays a strum: the first note snaps to the grid, the rest
+      // keep their distance from it, so quantize never splits a chord across two steps.
+      const now = performance.now();
+      const g = strumRec.current;
+      const inStrum = !!q && track.device === 'garnet' && !!g && g.track === track.id && g.pat === pat && now - g.t < 75 && free >= g.free;
+      if (inStrum) {
+        s = g!.s + (free - g!.free);
+        g!.t = now;
+      } else strumRec.current = { track: track.id, pat, free, s, t: now };
       if (s >= len) s = 0;
       const id = project.addNote(track.id, pat, { s, l: q || 0.25, m: note, v: vel });
       if (id) recHeld.current.set(`${track.id}:${note}`, { id, track: track.id, pat, s, startPos: pos });

@@ -33,6 +33,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'mixer') return runMixer(p, engineRef, ok, out);
   if (role === 'fx') return runFx(p, engineRef, ok, out);
   if (role === 'scope') return runScope(p, engineRef, ok, out);
+  if (role === 'garnet') return runGarnet(p, engineRef, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
@@ -1010,6 +1011,99 @@ async function runScope(p: Project, engineRef: { current: Engine | null }, ok: (
     ok(!engineRef.current?.last?.probe, 'closing the Scope stops the probe (nothing extra sent)');
   } catch (e) {
     out.push(`FAIL scope: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: Garnet's panel and neck. Chords follow the song's key and the chord type; strumming plays the right
+ *  notes and is recorded; Notes mode lights the scale; keys 1–7 strum; drag across strings plucks each. */
+async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  const heads = () => [...document.querySelectorAll('.fwm-garnet__ch b')].map((b) => b.textContent).join(' ');
+  const ptr = (type: string, x: number, y: number) => {
+    const el = $('.fwm-garnet__neck')!;
+    el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', button: 0, buttons: type === 'pointerup' ? 0 : 1, isPrimary: true }));
+  };
+  const peak = async (ms: number) => {
+    let pk = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      pk = Math.max(pk, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+      await sleep(25);
+    }
+    return pk;
+  };
+  try {
+    await sleep(300);
+    ($('[aria-label="Add Garnet as a new track"]') as HTMLButtonElement).click();
+    await sleep(300);
+    const id = p.trackIds()[0];
+    ok(!!$('.fwm-garnet'), 'Garnet shows in the Device panel');
+    ok(heads() === 'C Dm Em F G Am B°', `no song key: the chords of C major (${heads()})`);
+    p.setKey({ root: 4, scale: 'minor' });
+    await sleep(150);
+    ok(heads() === 'Em F♯° G Am Bm C D', `song key E minor: its chords (${heads()})`);
+    btn('7th')!.click();
+    await sleep(100);
+    ok(heads() === 'Em7 F♯m7♭5 Gmaj7 Am7 Bm7 Cmaj7 D7', `7th: every chord stays in the key (${heads()})`);
+    btn('Triad')!.click();
+    p.setKey({ root: 0, scale: 'major' });
+    await sleep(150);
+    const cell = [...document.querySelectorAll('.fwm-garnet__col')][0];
+    const cs = [...cell.querySelectorAll('.fwm-garnet__cn')].map((c) => c.textContent).join(' ');
+    ok(cs === 'E C G E C ×', `the C strip shows the open C shape x32010, top string first (${cs})`);
+
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    await sleep(300);
+    ($('.fwm-garnet__ch') as HTMLButtonElement).click();
+    ok((await peak(700)) > 0.05, 'clicking a chord name strums it');
+    ok(document.querySelectorAll('.fwm-garnet__str.is-ringing').length >= 5, 'the strings it played are ringing');
+
+    // Rec + Play: a strum is recorded as the chord's notes, a few ms apart
+    const pat = p.cell(p.rows()[0].id, id)!;
+    const before = p.notes(id, pat).length;
+    btn('● Rec')!.click();
+    btn('▶ Play')!.click();
+    await sleep(500);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { code: 'Digit5', key: '5', bubbles: true })); // G
+    await sleep(600);
+    btn('■ Stop')!.click();
+    btn('● Rec')?.click();
+    await sleep(200);
+    const rec = p.notes(id, pat).slice(before).map(([, n]) => n);
+    const pitches = rec.map((n) => n.m).sort((a, b) => a - b).join(',');
+    ok(pitches === '43,47,50,55,59,67', `key 5 strums G (320003) and Rec writes its six notes (${pitches})`);
+    const starts = rec.map((n) => n.s).sort((a, b) => a - b);
+    ok(starts.length === 6 && starts[5] - starts[0] > 0 && starts[5] - starts[0] < 0.8 && starts[0] === Math.round(starts[0]), `strummed: the first note on the grid, the rest a few ms apart (5 gaps of 13 ms ≈ 0.53 steps at 120 BPM) (${starts.map((x) => x.toFixed(3)).join(' ')})`);
+
+    // drag down across the strings in the Am strip: each string plucks once
+    const r = $('.fwm-garnet__neck')!.getBoundingClientRect();
+    const x = r.left + (r.width * 5.5) / 7;
+    const ringing0 = document.querySelectorAll('.fwm-garnet__str.is-ringing').length;
+    document.querySelectorAll('.fwm-garnet__str').forEach((e) => e.classList.remove('is-ringing'));
+    ptr('pointerdown', x, r.top + 4);
+    for (let k = 1; k <= 12; k++) { ptr('pointermove', x, r.top + (r.height * k) / 12 - 2); await sleep(8); }
+    ptr('pointerup', x, r.bottom - 2);
+    await sleep(60);
+    const rung = document.querySelectorAll('.fwm-garnet__str.is-ringing').length;
+    ok(rung === 5 && ringing0 >= 0, `dragging across the Am strip plucks its five strings (x02210), the muted one stays still (${rung})`);
+
+    // Notes mode: the scale lit, the root brightest
+    btn('Notes')!.click();
+    await sleep(150);
+    const lit = document.querySelectorAll('.fwm-garnet__dot:not(.is-off)').length;
+    const roots = [...document.querySelectorAll('.fwm-garnet__dot.is-root')].map((d) => d.textContent);
+    ok(lit === 6 * 13 - document.querySelectorAll('.fwm-garnet__dot.is-off').length && roots.length > 0 && roots.every((t) => t === 'C'), `Notes: C major lit, roots are C (${lit} lit, ${roots.length} roots)`);
+    btn('Chords')!.click();
+
+    btn('Palm mute')!.click();
+    await sleep(100);
+    ok(btn('Palm mute')!.getAttribute('aria-pressed') === 'true', 'Palm mute is on (a shared setting of the instrument)');
+  } catch (e) {
+    out.push(`FAIL garnet: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
