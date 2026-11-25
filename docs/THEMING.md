@@ -7,6 +7,7 @@ The studio ships with its own look: hardware-style devices and a blue sequencer 
 | 1. Tokens | Colours, fonts, depth, roundness, glow, for the whole studio | CSS custom properties (`--fwm-*`) |
 | 2. Device skins | One device, or all devices (casing, accent, screen colours) | Device tokens (`--dev-*`) |
 | 3. Components | The controls themselves (knob, fader, button, screen, keys) | Pass your own React components |
+| 4. My look | Anything, for one person only | A stylesheet that person keeps (**My look** in the top bar) |
 
 You can try levels 1 and 2 live in the harness (`npm run dev`) or on the design sheet (`design/kit/index.html`), using the skin buttons **Default / Flat / Host brand**. All skin files live in `packages/studio/src/skins/`.
 
@@ -115,6 +116,13 @@ Primitive contracts (props every replacement receives):
 The exact TypeScript contracts are in `packages/studio/src/primitives/types.ts`; `packages/studio/test/basalt.test.tsx` shows a host Knob replacing the default one.
 
 Presence (who is touching what) and modulation are **data passed in**. A replacement component decides how to show them, and the studio never draws on top of it.
+
+## 4. Each person's own look
+
+On top of the host's theme, every person can keep their own **look**: one stylesheet, usually written by
+their own AI agent from a brief the studio gives them (top bar, **My look**). Only they see it; it is never
+in the shared song. It is nested under `.fwm-root` and can't load anything from the internet. The host can
+keep it with the person's account through `look` / `onLookChange`. Details: `docs/LOOKS.md`.
 
 ## Rules the studio follows so this keeps working
 

@@ -34,6 +34,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'fx') return runFx(p, engineRef, ok, out);
   if (role === 'scope') return runScope(p, engineRef, ok, out);
   if (role === 'garnet') return runGarnet(p, engineRef, ok, out);
+  if (role === 'look') return runLook(s.doc, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
@@ -1104,6 +1105,59 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     ok(btn('Palm mute')!.getAttribute('aria-pressed') === 'true', 'Palm mute is on (a shared setting of the instrument)');
   } catch (e) {
     out.push(`FAIL garnet: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: "My look". Copy the brief, paste a look, try it, keep it (only in this browser, never in the
+ *  shared song), see what was left out, go back to the default. */
+async function runLook(doc: Y.Doc, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  const root = () => $('.fwm-root')!;
+  const bg = () => getComputedStyle(root()).getPropertyValue('--fwm-bg').trim();
+  const type = (el: HTMLTextAreaElement, v: string) => {
+    Object.getOwnPropertyDescriptor(HTMLTextAreaElement.prototype, 'value')!.set!.call(el, v);
+    el.dispatchEvent(new Event('input', { bubbles: true }));
+  };
+  try {
+    await sleep(300);
+    const before = bg();
+    btn('My look')!.click();
+    await sleep(100);
+    ok(!!$('[role="dialog"][aria-labelledby="fwm-look-title"]'), 'My look opens');
+    btn('Copy the brief')!.click();
+    await sleep(300);
+    const shown = $<HTMLTextAreaElement>('[aria-label^="The brief for your AI agent"]');
+    ok(!!$('.fwm-look__ok') || (!!shown && shown.value.includes('--fwm-bg') && shown.value.includes('--dev-case')), 'the brief is copied (or shown to copy by hand) and names the tokens');
+    const box = $<HTMLTextAreaElement>('[aria-label="Your look (CSS)"]')!;
+    type(box, '& { --fwm-bg: #010203; }\n.fwm-tb { letter-spacing: 1px; }');
+    await sleep(50);
+    btn('Try it')!.click();
+    await sleep(100);
+    ok(bg() === '#010203', `Try it shows the look at once (--fwm-bg ${bg()})`);
+    btn('Keep this look')!.click();
+    await sleep(150);
+    ok(!$('.fwm-look') && bg() === '#010203', 'Keep: the dialog closes and the look stays');
+    const keys = Object.keys(localStorage).filter((k) => k.startsWith('fwm.look.'));
+    ok(keys.length === 1 && localStorage.getItem(keys[0])!.includes('#010203'), `kept in this browser under this person (${keys.join(', ')})`);
+    ok(!JSON.stringify(doc.toJSON()).includes('010203'), 'not in the shared song: nobody else gets it');
+    ok(!!$('style[data-fwm-look]')?.textContent?.startsWith('.fwm-root {'), 'scoped to the studio (nested under .fwm-root)');
+    btn('My look')!.click();
+    await sleep(100);
+    type($<HTMLTextAreaElement>('[aria-label="Your look (CSS)"]')!, '@import url("https://example.com/x.css");\n.fwm-dev { background: url(https://example.com/w.png); }');
+    await sleep(50);
+    ok(/Left out:.*import.*1 link/s.test($('.fwm-look')!.textContent ?? ''), 'remote files are left out, and it says so');
+    btn('Back to default')!.click();
+    await sleep(150);
+    ok(bg() === before && !$('style[data-fwm-look]'), `Back to default (--fwm-bg ${bg()})`);
+    ok(Object.keys(localStorage).every((k) => !k.startsWith('fwm.look.')), 'nothing kept any more');
+    document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
+    await sleep(100);
+    ok(!$('.fwm-look'), 'Escape closes it');
+  } catch (e) {
+    out.push(`FAIL look: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

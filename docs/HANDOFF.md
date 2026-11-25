@@ -1,6 +1,13 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-25, night): Garnet (string synth) built, all three slices; ask the user to play it
+## START HERE (2026-11-25, late night): Garnet approved ("amazing", with Distortion); My look built
+The user tested Garnet and its Distortion knob: approved. Then asked that friends can restyle the UI with their
+own AI agent without changing anyone else's: built as **My look** (docs/LOOKS.md, PLAN.md "My look"). Next: the
+user's review of My look, then the Opal mock-up (pads, with sound).
+Learnt: in Vitest (jsdom) `import.meta.url` is http and `?raw` CSS imports come back empty; read files with
+node:fs from `process.cwd()` and assert you really read something.
+
+## Earlier (2026-11-25, night): Garnet (string synth) built, all three slices
 Mixer, effects and Scope were approved. Phase 5 started with **Garnet** (user's choice; Cobalt parked, then Opal pads,
 then Quartz FM with two oscillator rows + filter block on the right). Mock-up `design/kit/garnet.html` approved
 ("purfect, fun to play"). Built: engine (`src/devices/garnet.rs`, kind 3), studio panel (`devices/garnet/`), the neck

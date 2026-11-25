@@ -1,5 +1,6 @@
 // <Studio>: the embeddable core. The host passes a Yjs doc, awareness, a live channel and the user;
 // the studio never opens a network connection itself.
+import { lookStorageKey, prepareLook } from '../model/look';
 import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore } from 'react';
 import type * as Y from 'yjs';
 import type { Awareness } from 'y-protocols/awareness';
@@ -31,6 +32,11 @@ export interface StudioProps {
   className?: string;
   /** Called when the audio engine has started (e.g. for a host-side recorder or tests). */
   onEngine?(engine: Engine): void;
+  /** This person's own look (a stylesheet only they see), if the host keeps it, e.g. in their profile.
+   *  Leave it undefined and the studio keeps it in this browser. See docs/LOOKS.md. */
+  look?: string | null;
+  /** Called when the person keeps a new look (null = back to the default). */
+  onLookChange?(css: string | null): void;
 }
 
 export function Studio(props: StudioProps) {
@@ -52,7 +58,7 @@ function loadWs(key: string): Workspace {
   }
 }
 
-function StudioInner({ doc, awareness = null, channel = null, songs = null, user }: StudioProps) {
+function StudioInner({ doc, awareness = null, channel = null, songs = null, user, look: hostLook, onLookChange }: StudioProps) {
   const project = useMemo(() => new Project(doc, { user: user.id }), [doc, user.id]);
   const presence = useMemo(() => new PresenceModel(awareness, user), [awareness, user]);
   useEffect(() => () => presence.destroy(), [presence]);
@@ -60,6 +66,37 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   const peers = useSyncExternalStore(presence.subscribe, presence.peers);
   const { engine, status, start } = useEngine();
   const live = status === 'on' ? engine : null;
+
+  // ---- my look: a stylesheet only this person sees (kept by the host, or in this browser) ----
+  const lookKey = lookStorageKey(user.id);
+  const [ownLook, setOwnLook] = useState<string | null>(() => {
+    try {
+      return localStorage.getItem(lookKey);
+    } catch {
+      return null;
+    }
+  });
+  const [lookPreview, setLookPreview] = useState<string | null>(null);
+  const lookOff = typeof location !== 'undefined' && /[?&]nolook(=|&|$)/.test(location.search);
+  const keptLook = hostLook !== undefined ? hostLook : ownLook;
+  const setLook = useCallback(
+    (css: string | null) => {
+      const v = css && css.trim() ? css : null;
+      onLookChange?.(v);
+      if (hostLook === undefined) {
+        setOwnLook(v);
+        try {
+          if (v) localStorage.setItem(lookKey, v);
+          else localStorage.removeItem(lookKey);
+        } catch {
+          /* no storage: kept for this visit only */
+        }
+      }
+    },
+    [hostLook, onLookChange, lookKey],
+  );
+  const shownLook = lookOff ? null : (lookPreview ?? keptLook);
+  const lookCss = useMemo(() => prepareLook(shownLook).css, [shownLook]);
 
   // ---- private workspace (per user, saved in this browser) ----
   const wsKey = `fwm.ws.${user.id}`;
@@ -417,6 +454,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     project, presence, user, channel, songs, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop,
     transport: sync, liveTiming: timing, rec, setRec, slotOf, cueRow,
     playNote, releaseNote, audition, peerHeld, toast,
+    look: { css: keptLook, set: setLook, preview: lookPreview, setPreview: setLookPreview, hostKeeps: hostLook !== undefined, off: lookOff },
   };
 
   return (
@@ -429,6 +467,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
       })}
       {live && <SongEngine project={project} slotOf={slotOf} loop={ws.loop} />}
       {live && <FxEngine project={project} />}
+      {lookCss && <style data-fwm-look="">{lookCss}</style>}
       <div className="fwm-app">
         <TopBar peers={peers} octave={octave} />
         <WorkspaceGrid userId={user.id} peers={peers} />

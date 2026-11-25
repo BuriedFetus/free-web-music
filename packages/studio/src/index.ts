@@ -24,3 +24,4 @@ export { PresenceModel, type Peer, type PresenceState, type Touch } from './coll
 export type { LiveChannel, LiveMessage, SongLibrary, SongSummary, StudioUser } from './collab/types';
 export type { DeviceHost } from './devices/basalt/Basalt';
 export { LIBRARY, deviceEntry, type DeviceEntry } from './devices/registry';
+export { lookBrief, prepareLook, LOOK_EXAMPLE, lookStorageKey } from './model/look';

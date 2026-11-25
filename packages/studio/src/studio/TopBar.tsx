@@ -4,6 +4,7 @@ import { useEngine } from '../engine/EngineProvider';
 import { NOTE_NAMES, SCALES } from '../model/scales';
 import { deviceEntry } from '../devices/registry';
 import { useStudio } from './context';
+import { LookPanel } from './LookPanel';
 import { SongMenu } from './SongMenu';
 
 /** Live position inside the playing TRACK: "row|bar.beat.step", from the engine. */
@@ -53,7 +54,8 @@ function useLinks() {
 }
 
 export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
-  const { project, ws, setWs, playing, setPlaying, alone, setAlone, setLoop, rec, setRec, user } = useStudio();
+  const { project, ws, setWs, playing, setPlaying, alone, setAlone, setLoop, rec, setRec, user, look } = useStudio();
+  const [lookOpen, setLookOpen] = useState(false);
   const link = useLinks();
   const { status, start, stop } = useEngine();
   const live = usePosition();
@@ -154,6 +156,11 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
           ? 'Pads A S D F G H J K · Space play'
           : `Keys A–; · Z/X octave ${octave >= 0 ? '+' : ''}${octave} · Space play`}
       </span>
+      <button type="button" className="fwm-btn-ui fwm-lookbtn" aria-haspopup="dialog" aria-expanded={lookOpen}
+        title="Restyle the studio for you only (others keep their own look)" onClick={() => setLookOpen(true)}>
+        My look{look.css && !look.off ? ' ●' : ''}
+      </button>
+      {lookOpen && <LookPanel onClose={() => setLookOpen(false)} />}
       <button type="button" className="fwm-btn-ui" aria-pressed={status === 'on'}
         onClick={() => (status === 'on' ? stop() : start())}>
         {status === 'on' ? 'Sound: on' : status === 'loading' ? 'Sound: loading…' : status === 'error' ? 'Sound: failed' : 'Sound: off'}

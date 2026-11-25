@@ -56,6 +56,22 @@ export interface StudioCtx {
   /** Keys others are holding, per track. */
   peerHeld: Record<string, { note: number; color: string }[]>;
   toast(msg: string, action?: { label: string; run(): void }): void;
+  /** This person's own look (a stylesheet only they see; never in the shared song). */
+  look: LookCtl;
+}
+
+export interface LookCtl {
+  /** The kept look, or null for the default. */
+  css: string | null;
+  /** Keep a look (null = back to the default). */
+  set(css: string | null): void;
+  /** Try a look without keeping it (null = stop trying). */
+  preview: string | null;
+  setPreview(css: string | null): void;
+  /** The host app keeps it (e.g. in the person's profile), so it follows them to other computers. */
+  hostKeeps: boolean;
+  /** Looks are switched off for this page (?nolook). */
+  off: boolean;
 }
 
 export const StudioContext = createContext<StudioCtx | null>(null);

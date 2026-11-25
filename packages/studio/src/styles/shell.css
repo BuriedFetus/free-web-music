@@ -345,3 +345,29 @@
 .fwm-scopev__screen { position: relative; flex: 1; min-height: 160px; margin: 0 10px 10px; border-radius: calc(8px * var(--fwm-round)); background: var(--fwm-roll-deep); overflow: hidden; color: var(--fwm-note); }
 .fwm-scopev__screen canvas { position: absolute; inset: 0; width: 100%; height: 100%; }
 .fwm-scopev__msg { position: absolute; inset: 0; display: grid; place-items: center; margin: 0; color: var(--fwm-roll-ink); opacity: .7; font-size: 14px; pointer-events: none; }
+
+/* ---------- My look (a stylesheet only this person sees) ---------- */
+.fwm-btn-ui--primary { background: var(--fwm-me); color: var(--fwm-on-me); border-color: var(--fwm-me); }
+.fwm-btn-ui--ghost { background: transparent; }
+.fwm-btn-ui:disabled { opacity: .45; cursor: default; }
+.fwm-look { position: fixed; inset: 0; z-index: 40; display: grid; place-items: center; padding: 16px; background: color-mix(in srgb, var(--fwm-bg) 55%, transparent); }
+.fwm-look__box { width: min(680px, 100%); max-height: calc(100vh - 32px); overflow: auto; padding: 18px 20px; border-radius: calc(14px * var(--fwm-round));
+  background: var(--fwm-panel); color: var(--fwm-ink); border: 1px solid var(--fwm-line); box-shadow: 0 18px 60px rgba(0,0,0,calc(.45 * var(--fwm-depth))); }
+.fwm-look__head { display: flex; align-items: center; justify-content: space-between; gap: 10px; }
+.fwm-look h2 { margin: 0; font: 800 22px/1.1 var(--fwm-font-ui); }
+.fwm-look h3 { margin: 16px 0 4px; font: 700 15px var(--fwm-font-ui); }
+.fwm-look p { margin: 4px 0 8px; font-size: 14px; color: var(--fwm-mute); max-width: 70ch; }
+.fwm-look p b { color: var(--fwm-ink); }
+.fwm-look__lead { font-size: 15px !important; }
+.fwm-look__row { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; margin: 6px 0; }
+.fwm-look__actions { margin-top: 14px; }
+.fwm-look__css { width: 100%; font: 13px/1.45 ui-monospace, "Courier New", monospace; color: var(--fwm-ink); background: var(--fwm-bg);
+  border: 1px solid var(--fwm-line); border-radius: calc(8px * var(--fwm-round)); padding: 10px; resize: vertical; }
+.fwm-look__file { display: inline-flex; align-items: center; position: relative; }
+.fwm-look__file input { position: absolute; inset: 0; opacity: 0; cursor: pointer; }
+.fwm-look__file:focus-within { outline: 2px solid var(--fwm-me); outline-offset: 2px; }
+.fwm-look__ok { font-weight: 700; color: var(--fwm-ink); }
+.fwm-look__size { font-size: 13px; color: var(--fwm-mute); }
+.fwm-look__warn { padding: 8px 10px; border-radius: 8px; background: color-mix(in srgb, var(--fwm-rec) 14%, transparent); color: var(--fwm-ink) !important; }
+.fwm-look__tip { font-size: 13px !important; margin-top: 12px !important; }
+.fwm-look code { font: 13px ui-monospace, monospace; color: var(--fwm-ink); }
