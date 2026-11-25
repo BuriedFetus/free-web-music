@@ -3,7 +3,7 @@
 // fader with a live meter. Maximised (the panel's ⤢), the effects chain shows under the strips.
 // Mute is the instrument's one Mute (the same as in the Song arrangement). Everything is in the shared
 // song, so others see the faders move and a ring on the control someone is touching.
-import { useEffect, useRef, type CSSProperties } from 'react';
+import { useEffect, useLayoutEffect, useRef, type CSSProperties } from 'react';
 import { MASTER_METER } from '@fwm/engine';
 import type { Peer } from '../../collab/presence';
 import { useEngine } from '../../engine/EngineProvider';
@@ -138,12 +138,58 @@ export function MixerView({ peers, expanded = false, onExpand }: { peers: Peer[]
   );
 }
 
-/** The effects chain on its own, as a panel (the same rack the maximised Mixer shows). */
+/** The effects chain on its own, as a panel (the same rack the maximised Mixer shows). It scales to
+ *  fit the panel, so every knob is in view without scrolling: the chain is laid out as if the panel were
+ *  1/s wider (it wraps where that width runs out) and drawn at scale s, with s as large as fits. */
 export function FxView({ peers }: { peers: Peer[] }) {
   const tokens = useDeviceTokens('mixer');
+  const outer = useRef<HTMLDivElement>(null);
+  const inner = useRef<HTMLDivElement>(null);
+  const sizer = useRef<HTMLDivElement>(null);
+  useLayoutEffect(() => {
+    const o = outer.current;
+    const el = inner.current;
+    const sz = sizer.current;
+    if (!o || !el || !sz) return;
+    const MIN = 0.45; // smaller than this is unreadable: scroll instead
+    const fits = (s: number, W: number, H: number) => {
+      el.style.width = W / s + 'px';
+      return el.scrollWidth <= el.clientWidth + 1 && el.offsetHeight * s <= H + 1;
+    };
+    const run = () => {
+      const W = o.clientWidth;
+      const H = o.clientHeight;
+      if (!W || !H) return;
+      let s = 1;
+      if (!fits(1, W, H)) {
+        let lo = MIN;
+        let hi = 1;
+        if (fits(lo, W, H)) {
+          for (let k = 0; k < 9; k++) {
+            const m = (lo + hi) / 2;
+            if (fits(m, W, H)) lo = m;
+            else hi = m;
+          }
+        }
+        s = lo;
+      }
+      el.style.width = W / s + 'px';
+      el.style.transform = s < 1 ? `scale(${s})` : '';
+      sz.style.height = el.offsetHeight * s + 'px';
+      o.dataset.scale = s.toFixed(2);
+    };
+    run();
+    const ro = new ResizeObserver(run);
+    ro.observe(o);
+    if (el.firstElementChild) ro.observe(el.firstElementChild); // the chain changed (an effect added, Vinyl…)
+    return () => ro.disconnect();
+  }, []);
   return (
-    <div className="fwm-mixer mixer fwm-fxview" data-device="mixer" style={tokens as CSSProperties}>
-      <FxRack peers={peers} />
+    <div ref={outer} className="fwm-mixer mixer fwm-fxview" data-device="mixer" style={tokens as CSSProperties}>
+      <div ref={sizer} className="fwm-fxview__sizer" />
+      <div ref={inner} className="fwm-fxview__fit">
+        <FxRack peers={peers} />
+      </div>
     </div>
   );
 }
