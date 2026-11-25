@@ -2,7 +2,9 @@
 // down the side; each cell picks the pattern that instrument plays in that row. A row lasts as long as
 // its longest pattern; shorter ones repeat inside it. Click a cell to edit its pattern in the Piano roll.
 // Drag a cell to another TRACK of the same instrument to play its pattern there too (hold Ctrl or Alt when
-// dropping for a separate copy); double-click a cell (or Delete) to empty it. Everything is undoable.
+// dropping for a separate copy), onto another instrument for a copy of it there (melodies to melodic
+// instruments, drum patterns to drum machines), or onto "+ Add TRACK" for a new TRACK that plays it.
+// Double-click a cell (or Delete) to empty it. Everything is undoable.
 import { createContext, useContext, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { Peer } from '../../collab/presence';
 import { deviceEntry, LIBRARY } from '../../devices/registry';
@@ -26,11 +28,15 @@ interface Drag {
   from: string;
   x: number;
   y: number;
-  over: { row: string; track: string } | null;
+  /** The cell under the pointer (row null = the "+ Add TRACK" button: a new TRACK). */
+  over: { row: string | null; track: string } | null;
   copy: boolean;
 }
+/** What dropping `d` where it is would do, in words, or why it can't. */
+type DropVerdict = { ok: true; copy: boolean; text: string } | { ok: false; text: string };
 interface DragApi {
   drag: Drag | null;
+  verdict(d: Drag): DropVerdict;
   start(e: RPointerEvent, row: string, track: string, pat: string, name: string): void;
   /** True right after a drag ends (the click that follows must not select the cell). */
   justDragged: React.MutableRefObject<boolean>;
@@ -43,6 +49,17 @@ export function SeqView({ peers }: { peers: Peer[] }) {
   const tracks = project.tracks();
   const rows = project.rows();
   const rowName = (id: string) => `TRACK ${rows.findIndex((r) => r.id === id) + 1}`;
+  const layoutOf = (t: string) => deviceEntry(project.track(t)?.device ?? '')?.layout ?? 'piano';
+  const verdict = (d: Drag): DropVerdict => {
+    const o = d.over;
+    if (!o || (o.row === d.from && o.track === d.track)) return { ok: false, text: 'drop it on another cell' };
+    const where = o.row ? rowName(o.row) : 'a new TRACK';
+    if (o.track === d.track) return { ok: true, copy: d.copy, text: `→ ${where} · ${d.copy ? 'separate copy' : 'same pattern (Ctrl: copy)'}` };
+    const to = project.track(o.track)?.name ?? '';
+    if (layoutOf(o.track) !== layoutOf(d.track))
+      return { ok: false, text: layoutOf(d.track) === 'pads' ? 'drum patterns only go to drum machines' : `${to} plays drum pads, not notes` };
+    return { ok: true, copy: true, text: `→ ${to}, ${where} · a copy` };
+  };
   const [drag, setDrag] = useState<Drag | null>(null);
   const justDragged = useRef(false);
   const start = (e: RPointerEvent, from: string, track: string, pat: string, name: string) => {
@@ -60,9 +77,9 @@ export function SeqView({ peers }: { peers: Peer[] }) {
         if (ev.clientY < r.top + 36) scroller.scrollTop -= 14;
         else if (ev.clientY > r.bottom - 36) scroller.scrollTop += 14;
       }
-      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-cell-row]');
+      const el = (document.elementFromPoint(ev.clientX, ev.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-cell-row], [data-drop-newrow]');
       cur = { track, pat, name, from, x: ev.clientX, y: ev.clientY, copy: ev.ctrlKey || ev.altKey || ev.metaKey,
-        over: el ? { row: el.dataset.cellRow!, track: el.dataset.cellTrack! } : null };
+        over: !el ? null : el.dataset.cellRow ? { row: el.dataset.cellRow, track: el.dataset.cellTrack! } : { row: null, track } };
       setDrag(cur);
     };
     const end = (drop: boolean, ev?: PointerEvent) => {
@@ -75,13 +92,21 @@ export function SeqView({ peers }: { peers: Peer[] }) {
       justDragged.current = true;
       setTimeout(() => (justDragged.current = false), 0);
       const o = cur.over;
-      if (!drop || !o || o.track !== track || o.row === from) return;
-      const copy = ev ? ev.ctrlKey || ev.altKey || ev.metaKey : cur.copy;
-      const id = project.placePattern(o.row, track, pat, copy);
-      if (!id) return;
-      setWs({ row: o.row, track });
-      toast(copy ? `${project.patternInfo(track, id)?.name}: a separate copy of ${name}, in ${rowName(o.row)}` : `${name} also plays in ${rowName(o.row)} (the same pattern: editing it changes both)`,
-        { label: 'Undo', run: () => project.undo() });
+      const v = verdict({ ...cur, copy: ev ? ev.ctrlKey || ev.altKey || ev.metaKey : cur.copy });
+      if (!drop || !o || !v.ok) return;
+      const done = project.placePattern(o.row, o.track, pat, v.copy, track);
+      if (!done) return;
+      setWs({ row: done.row, track: o.track });
+      const where = project.rows().findIndex((r) => r.id === done.row) + 1;
+      const pname = project.patternInfo(o.track, done.pat)?.name;
+      toast(
+        o.track !== track
+          ? `${pname}: a copy of ${name} for ${project.track(o.track)?.name}, in TRACK ${where}`
+          : v.copy
+            ? `${pname}: a separate copy of ${name}, in TRACK ${where}`
+            : `${name} also plays in TRACK ${where} (the same pattern: editing it changes both)`,
+        { label: 'Undo', run: () => project.undo() },
+      );
     };
     const up = (ev: PointerEvent) => end(true, ev);
     const cancel = () => end(false);
@@ -112,10 +137,10 @@ export function SeqView({ peers }: { peers: Peer[] }) {
             onChange={(e) => project.setSwing(Number(e.target.value) / 100)} />
         </label>
         <span>{Math.round(project.swing * 100)}%</span>
-        <span className="fwm-sqtip">Click a cell to edit its pattern in the Piano roll. Drag it to another TRACK to play it there too (hold Ctrl for a separate copy); double-click to empty it. A TRACK lasts as long as its longest pattern.</span>
+        <span className="fwm-sqtip">Click a cell to edit its pattern in the Piano roll. Drag it to another TRACK or instrument (hold Ctrl for a separate copy), or onto + Add TRACK; double-click to empty it. A TRACK lasts as long as its longest pattern.</span>
       </div>
       {tracks.length === 0 && <p className="fwm-empty">No instruments yet. Add Basalt from the Library, or with + Instrument.</p>}
-      <DragCtx.Provider value={{ drag, start, justDragged }}>
+      <DragCtx.Provider value={{ drag, verdict, start, justDragged }}>
       <div className={'fwm-arrw' + (drag ? ' is-dragging' : '')}>
         <div className="fwm-arr">
           <div className="fwm-arow" style={cols}>
@@ -132,22 +157,17 @@ export function SeqView({ peers }: { peers: Peer[] }) {
           {rows.map((r, i) => (
             <Row key={r.id} row={r} index={i} tracks={tracks} peers={peers.filter((p) => p.row === r.id)} canDelete={rows.length > 1} />
           ))}
-          <button type="button" className="fwm-tb fwm-tb--xs fwm-addt"
+          <button type="button" data-drop-newrow="" title="Add a TRACK (or drop a cell here: a new TRACK that plays it)"
+            className={'fwm-tb fwm-tb--xs fwm-addt' + (drag?.over && drag.over.row === null ? ' is-drop-ok' : '')}
             onClick={() => setWs({ row: project.addRow() })}>+ Add TRACK</button>
         </div>
       </div>
       </DragCtx.Provider>
       {drag && (
-        <div className={'fwm-dragghost' + (drag.over && drag.over.track === drag.track && drag.over.row !== drag.from ? ' is-ok' : '')}
+        <div className={'fwm-dragghost' + (verdict(drag).ok ? ' is-ok' : '')}
           style={{ left: drag.x + 14, top: drag.y + 10 }} aria-hidden="true">
           <b>{drag.name}</b>
-          <span>
-            {!drag.over || drag.over.row === drag.from
-              ? 'drop on another TRACK'
-              : drag.over.track !== drag.track
-                ? 'only in its own instrument'
-                : `→ ${rowName(drag.over.row)} · ${drag.copy ? 'separate copy' : 'same pattern (Ctrl: copy)'}`}
-          </span>
+          <span>{verdict(drag).text}</span>
         </div>
       )}
     </div>
@@ -236,7 +256,7 @@ function Cell({ row, rowName, rowLen, track: t, now }: { row: string; rowName: s
   const over = d?.over?.row === row && d.over.track === t.id;
   const dragCls =
     (d && d.from === row && d.track === t.id ? ' is-drag-src' : '') +
-    (over && d.from !== row ? (d.track === t.id ? ' is-drop-ok' : ' is-drop-no') : '');
+    (over && !(d.from === row && d.track === t.id) ? (dnd.verdict(d).ok ? ' is-drop-ok' : ' is-drop-no') : '');
   const cellAttrs = { 'data-cell-row': row, 'data-cell-track': t.id };
   const empty = () => {
     if (!info) return;
@@ -261,7 +281,7 @@ function Cell({ row, rowName, rowLen, track: t, now }: { row: string; rowName: s
           empty();
         }
       }}
-      title={`${info.name}: drag to another TRACK (Ctrl: a separate copy), double-click to empty`}
+      title={`${info.name}: drag to another TRACK or instrument (Ctrl: a separate copy), double-click to empty`}
       style={{ '--k': idx % 4, '--tw': `${(project.playLen(t.id, info.id) / rowLen) * 100}%` } as React.CSSProperties}
       aria-label={`${rowName}, ${t.name}: ${info.name}`}>
       <span className="fwm-cell__top">

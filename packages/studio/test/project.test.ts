@@ -72,13 +72,13 @@ describe('Project (shared)', () => {
     const r2 = you.addRow();
     const groove = you.cell(r1, t)!;
     // same pattern: both cells play it, edits change both
-    expect(you.placePattern(r2, t, groove)).toBe(groove);
+    expect(you.placePattern(r2, t, groove)?.pat).toBe(groove);
     expect(mira.cell(r2, t)).toBe(groove);
     you.undo();
     expect(you.cell(r2, t)).toBeNull();
     // a separate copy: a new pattern with the same notes and length, named after it
     you.addNote(t, groove, { s: 0, l: 1, m: 48, v: 0.8 });
-    const copy = you.placePattern(r2, t, groove, true)!;
+    const copy = you.placePattern(r2, t, groove, true)!.pat;
     expect(copy).not.toBe(groove);
     expect(you.notes(t, copy).map(([, n]) => n.m)).toEqual(you.notes(t, groove).map(([, n]) => n.m));
     expect(you.patternInfo(t, copy)!.name).toBe(`${you.patternInfo(t, groove)!.name} 2`);
@@ -92,9 +92,24 @@ describe('Project (shared)', () => {
     expect(you.patternList(t).map((p) => p.id)).toEqual([groove]);
     you.undo();
     expect(you.cell(r1, t)).toBe(groove);
-    // a pattern of another instrument can't be placed
+    // into another instrument: a copy there, with the same notes, one undo step
     const t2 = you.addTrack(m, undefined, 0);
-    expect(you.placePattern(r2, t2, groove)).toBeNull();
+    const before = you.patternList(t2).length;
+    const moved = you.placePattern(r2, t2, groove, false, t)!;
+    expect(moved.pat).not.toBe(groove);
+    expect(you.cell(r2, t2)).toBe(moved.pat);
+    expect(you.notes(t2, moved.pat).map(([, n]) => n.m)).toEqual(you.notes(t, groove).map(([, n]) => n.m));
+    expect(you.patternList(t2).length).toBe(before + 1);
+    you.undo();
+    expect(you.patternList(t2).length).toBe(before);
+    // onto "+ Add TRACK": a new TRACK at the end plays it
+    const rows = you.rows().length;
+    const nr = you.placePattern(null, t, groove)!;
+    expect(you.rows().length).toBe(rows + 1);
+    expect(you.rows()[rows].id).toBe(nr.row);
+    expect(you.cell(nr.row, t)).toBe(groove);
+    you.undo();
+    expect(you.rows().length).toBe(rows);
   });
 
   it('clear pattern is undoable', () => {

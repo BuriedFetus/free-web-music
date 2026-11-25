@@ -2,6 +2,7 @@
 //   tab A: ?e2e=a&room=R   plays, turns Cutoff, adds a note, plays a key
 //   tab B: ?e2e=b&room=R   checks it sees and hears all of that, and that its undo is its own
 import basaltManifest from '@fwm/engine/devices/basalt.json';
+import flintManifest from '@fwm/engine/devices/flint.json';
 import type { DeviceManifest, Engine } from '@fwm/engine';
 import { Project } from '@fwm/studio';
 import type * as Y from 'yjs';
@@ -1184,6 +1185,7 @@ async function runArrange(p: Project, ok: (c: boolean, l: string) => void, out: 
     await sleep(300);
     const t = p.addTrack(m, undefined, 0);
     const t2 = p.addTrack(m, undefined, 0);
+    const drums = p.addTrack(flintManifest as DeviceManifest, undefined, 0);
     const r1 = p.rows()[0].id;
     const r2 = p.addRow();
     const r3 = p.addRow();
@@ -1207,11 +1209,17 @@ async function runArrange(p: Project, ok: (c: boolean, l: string) => void, out: 
     await dragCell(cellEl(r1, t), cellEl(r3, t), { ctrlKey: true });
     const c = p.cell(r3, t);
     ok(!!c && c !== groove && p.patternInfo(t, c)!.name === `${p.patternInfo(t, groove)!.name} 2`, `hold Ctrl: a separate copy (${c && p.patternInfo(t, c)?.name})`);
-    const before = p.cell(r2, t2);
+    p.addNote(t, groove, { s: 0, l: 1, m: 50, v: 0.9 });
     await dragCell(cellEl(r1, t), cellEl(r2, t2));
-    ok(p.cell(r2, t2) === before, 'it can not go into another instrument');
-    await dragCell(cellEl(r1, t), cellEl(r3, t2), {}, false);
-    ok(!!$('.fwm-dragghost') && cellEl(r3, t2).classList.contains('is-drop-no'), 'while dragging: a label follows, the wrong column says no');
+    const into = p.cell(r2, t2);
+    ok(!!into && into !== groove && p.notes(t2, into).map(([, n]) => n.m).join() === p.notes(t, groove).map(([, n]) => n.m).join(),
+      `into another instrument: a copy there with the same notes (${into && p.patternInfo(t2, into)?.name})`);
+    const drumsBefore = p.cell(r2, drums);
+    await dragCell(cellEl(r1, t), cellEl(r2, drums));
+    ok(p.cell(r2, drums) === drumsBefore, 'a melody does not go into a drum machine');
+    await dragCell(cellEl(r1, t), cellEl(r3, drums), {}, false);
+    ok(!!$('.fwm-dragghost') && cellEl(r3, drums).classList.contains('is-drop-no') && /drum pads/.test($('.fwm-dragghost')!.textContent ?? ''),
+      `while dragging: a label follows and says why not (${$('.fwm-dragghost')?.textContent})`);
     document.dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape', bubbles: true }));
     await sleep(80);
     ok(!$('.fwm-dragghost'), 'Escape cancels the drag');
@@ -1226,6 +1234,9 @@ async function runArrange(p: Project, ok: (c: boolean, l: string) => void, out: 
     cellEl(r2, t).dispatchEvent(new KeyboardEvent('keydown', { key: 'Delete', bubbles: true }));
     await sleep(100);
     ok(p.cell(r2, t) === null, 'Delete on a cell empties it too');
+    const n = p.rows().length;
+    await dragCell(cellEl(r1, t), $('[data-drop-newrow]')!);
+    ok(p.rows().length === n + 1 && p.cell(p.rows()[n].id, t) === groove, 'dropped on + Add TRACK: a new TRACK plays it');
   } catch (e) {
     out.push(`FAIL arrange: ${String(e)}`);
   }

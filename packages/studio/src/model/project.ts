@@ -502,7 +502,7 @@ export class Project {
     return id;
   }
   /** A new empty pattern (inside a transaction). */
-  private makePattern(track: string, pats: Y.Array<string>, name: string, len: number, from?: Y.Map<unknown>): string {
+  private makePattern(track: string, pats: Y.Array<string>, name: string, len: number, from?: Y.Map<unknown>, withAuto = true): string {
     const id = uid('p');
     const p = new Y.Map<unknown>();
     p.set('name', name);
@@ -512,7 +512,7 @@ export class Project {
     const lens = new Y.Map<number>();
     if (from) {
       for (const v of (from.get('notes') as Y.Map<Note>).values()) notes.set(uid('n'), v);
-      for (const [k, v] of (from.get('auto') as Y.Map<number>).entries()) auto.set(k, v);
+      if (withAuto) for (const [k, v] of (from.get('auto') as Y.Map<number>).entries()) auto.set(k, v);
       for (const [k, v] of ((from.get('lens') as Y.Map<number> | undefined)?.entries() ?? [])) lens.set(k, v);
     }
     p.set('notes', notes);
@@ -776,17 +776,31 @@ export class Project {
     if (!c) return;
     this.action(() => (pat ? c.set(track, pat) : c.delete(track)));
   }
-  /** Put an instrument's pattern in a row (drag and drop in the song arrangement): the same pattern, or with
-   *  `copy` a separate copy of it ("Groove 2"). One undo step. Returns the pattern now in the cell. */
-  placePattern(row: string, track: string, pat: string, copy = false): string | null {
-    const c = this.rowMap(row)?.get('cells') as Y.Map<string> | undefined;
-    if (!c || !this.patMap(track, pat)) return null;
-    let id: string | null = pat;
+  /** Put a pattern in a row (drag and drop in the song arrangement). From the same instrument: the same
+   *  pattern, or with `copy` a separate copy ("Groove 2"). From another instrument (`from`): always a copy
+   *  on this one (same notes and length; automation stays behind, it belongs to the other instrument's
+   *  knobs). With `row` null, a new TRACK at the end plays it. One undo step. Returns the row and pattern. */
+  placePattern(row: string | null, track: string, pat: string, copy = false, from = track): { row: string; pat: string } | null {
+    const src = this.patMap(from, pat);
+    const pats = this.tracksMap.get(track)?.get('pats') as Y.Array<string> | undefined;
+    if (!src || !pats || (row && !this.rowMap(row))) return null;
+    let out: { row: string; pat: string } | null = null;
     this.action(() => {
-      if (copy) id = this.addPattern(track, pat);
-      if (id) c.set(track, id);
+      let id = pat;
+      if (from !== track) {
+        const name = (src.get('name') as string) || 'P';
+        const taken = new Set(this.patternList(track).map((p) => p.name));
+        let k = 2;
+        let n = name;
+        while (taken.has(n)) n = `${name} ${k++}`;
+        const same = this.track(from)?.device === this.track(track)?.device;
+        id = this.makePattern(track, pats, n, (src.get('len') as number) ?? BAR, src, same);
+      } else if (copy) id = this.addPattern(track, pat) ?? pat;
+      const r = row ?? this.addRow();
+      (this.rowMap(r)!.get('cells') as Y.Map<string>).set(track, id);
+      out = { row: r, pat: id };
     });
-    return id;
+    return out;
   }
   /** How long a pattern takes to play once in a track, in steps of the song clock (rate ½× = twice as long). */
   playLen(track: string, pat: string | null | undefined): number {
