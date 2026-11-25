@@ -66,15 +66,35 @@ main{padding:12px max(2vw,12px) 28px;display:grid;gap:12px}
 .ms button[aria-pressed=true].m{background:var(--fwm-rec);color:var(--fwm-on-rec)}
 .ms button[aria-pressed=true].s{background:var(--fwm-note);color:var(--fwm-on-note)}
 .chain{font-size:12px;color:var(--fwm-roll-ink);opacity:.8;text-align:center}
-.rack{display:none;padding:10px;gap:10px;grid-template-columns:repeat(auto-fit,minmax(230px,1fr));border-top:1px solid var(--fwm-line)}
-.work.wide .rack{display:grid}
+.rack{display:none;padding:10px;border-top:1px solid var(--fwm-line)}
+.work.wide .rack{display:block}
+.flow{display:flex;align-items:stretch;overflow-x:auto;padding:2px 2px 10px;scrollbar-width:thin}
+.flow .unit{flex:none;width:236px;align-content:start}
+.arrow{flex:none;display:grid;place-items:center;width:34px;font-size:30px;line-height:1;color:var(--fwm-note);text-shadow:0 0 calc(8px*var(--fwm-glow)) var(--fwm-note)}
+.endcap{flex:none;width:100px;display:grid;place-content:center;gap:4px;text-align:center;padding:8px;border-radius:calc(10px*var(--fwm-round));border:2px dashed color-mix(in srgb,var(--fwm-roll-ink) 35%,transparent);background:var(--fwm-roll-deep);color:var(--fwm-roll-ink)}
+.endcap b{font:900 14px/1 var(--fwm-font-display);letter-spacing:.04em}
+.endcap small{font-size:11px;opacity:.75}
+.endcap.drop{border-color:var(--fwm-note)}
+.unit.drop-before{box-shadow:-5px 0 0 var(--fwm-note)}
+.unit.drop-after{box-shadow:5px 0 0 var(--fwm-note)}
+.unit.dragging{opacity:.35}
+.uh[draggable=true]{cursor:grab}
+.grip{opacity:.6;font-size:16px;letter-spacing:-2px}
+.mv{display:flex;gap:3px;margin-left:auto}
+.mv button{width:28px;height:28px;border-radius:6px;border:0;background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);cursor:pointer;font-size:12px;font-weight:800}
+.mv button:disabled{opacity:.35;cursor:default}
+.shelf{display:flex;flex-wrap:wrap;align-items:center;gap:8px;margin-top:4px;padding:8px 12px;min-height:52px;border:2px dashed color-mix(in srgb,var(--fwm-mute) 45%,transparent);border-radius:calc(10px*var(--fwm-round));color:var(--fwm-mute);font-size:13px}
+.shelf.over{border-color:var(--fwm-note);color:var(--fwm-ink)}
+.chip2{min-height:36px;padding:0 14px;border-radius:99px;border:0;background:var(--fwm-roll2);color:var(--fwm-roll-ink);font:900 15px/1 var(--fwm-font-display);letter-spacing:.05em;text-transform:uppercase;cursor:grab}
 .unit{border-radius:calc(10px*var(--fwm-round));background:linear-gradient(160deg,var(--fwm-roll2),var(--fwm-roll));color:var(--fwm-roll-ink);padding:10px;display:grid;gap:8px;box-shadow:inset 0 1px 0 color-mix(in srgb,var(--fwm-roll-ink) 25%,transparent),0 calc(4px*var(--fwm-depth)) calc(10px*var(--fwm-depth)) color-mix(in srgb,var(--fwm-bg) 60%,transparent)}
 .unit.off{opacity:.6}
-.uh{display:flex;align-items:center;gap:8px}
+.uh{display:flex;align-items:center;gap:6px;min-height:30px}
+.us{display:flex;align-items:center;justify-content:space-between;gap:8px;min-height:32px}
+.us small{opacity:.75;font-size:12px}
 .uh b{font:900 18px/1 var(--fwm-font-display);letter-spacing:.06em;text-transform:uppercase}
 .uh small{opacity:.75;font-size:12px}
-.uh .btn{margin-left:auto;background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);border:0}
-.uh .btn[aria-pressed=true]{background:var(--fwm-note);color:var(--fwm-on-note)}
+.us .btn{background:var(--fwm-roll-btn);color:var(--fwm-roll-ink);border:0}
+.us .btn[aria-pressed=true]{background:var(--fwm-note);color:var(--fwm-on-note)}
 .pic{height:64px;border-radius:7px;background:var(--fwm-roll-deep);overflow:hidden}
 .pic svg{width:100%;height:100%;display:block}
 .pic .ln{fill:none;stroke:var(--fwm-note);stroke-width:2;filter:drop-shadow(0 0 calc(4px*var(--fwm-glow)) var(--fwm-note))}
@@ -123,9 +143,10 @@ h3{margin:4px 0 0;font-size:16px}
     <h3>What this proposes</h3>
     <ul class="notes">
       <li><b>One strip per instrument</b>, in the order of the Song arrangement: level fader with a meter, Pan, Mute, Solo, and two <b>sends</b>: how much of the instrument goes to the shared Reverb and Delay. The master strip sums everything.</li>
-      <li><b>⤢ expands the Mixer</b> and shows the effects rack: Reverb and Delay (shared, fed by the sends), then <b>Lo-fi</b> and the <b>main Low-pass</b> on the whole mix. Signal path: instruments + Reverb + Delay → Lo-fi → Low-pass → Master.</li>
+      <li><b>⤢ expands the Mixer</b> and shows the <b>effects chain</b>, laid out in the order the sound goes through it: Instruments ➜ Reverb ➜ Delay ➜ Lo-fi ➜ Low-pass ➜ Master. <b>Drag an effect by its title</b> to change the order (or use ◀ ▶), drag it to the shelf below to take it out (or ×), and drag it back in. The order matters: Reverb before Lo-fi gives worn, tape-like reverb tails; after it, the reverb stays clean.</li>
+      <li><b>Reverb and Delay are fed by each instrument's knobs</b>: where they sit in the chain is where their sound joins the mix.</li>
       <li><b>The Delay follows the tempo</b> (1/16 to dotted 1/4). Ping-pong bounces left and right.</li>
-      <li><b>Lo-fi is tape and vinyl</b>, not a bit-crusher: Wow and Flutter (slow and fast pitch wobble), Saturation (soft tape warmth), Age (the highs and lowest lows fade), Noise (tape hiss, or darker record surface) and Crackle. <b>Tape</b> and <b>Vinyl</b> set good starting points.</li>
+      <li><b>Lo-fi is tape and vinyl</b>, not a bit-crusher: Wow and Flutter (slow and fast pitch wobble), Saturation (soft tape warmth), Age (the highs and lowest lows fade), Noise (tape hiss, or darker record surface) and Crackle. <b>Tape</b> and <b>Vinyl</b> each keep their own settings; Noise and Crackle start at 0.</li>
       <li><b>Everything is shared</b> like the instruments: faders, sends and effect settings are in the song; others see your hand on a fader, and undo is per person.</li>
       <li><b>The Scope is its own panel</b> (pick it in any of the four panel slots): the master or one instrument, a steady trigger so waves stand still, time zoom, Freeze, and a Spectrum view.</li>
       <li>The sounds here are rough browser previews; the real ones run in the studio's audio engine like Basalt and Flint.</li>
@@ -170,16 +191,18 @@ def('lofi.wow', 0.35, 'Wow', pct, () => lofi());
 def('lofi.flutter', 0.3, 'Flutter', pct, () => lofi());
 def('lofi.sat', 0.5, 'Saturation', pct, () => lofi());
 def('lofi.age', 0.35, 'Age', (v) => fmtHz(18000 * Math.pow(3000 / 18000, v)), () => lofi());
-def('lofi.noise', 0.25, 'Noise', pct, () => lofi());
+def('lofi.noise', 0, 'Noise', pct, () => lofi());
 def('lofi.crackle', 0, 'Crackle', pct, () => lofi());
 def('lofi.mix', 1, 'Mix', pct, () => lofi());
 const STYLES = {
-  tape: { wow: 0.35, flutter: 0.3, sat: 0.5, age: 0.35, noise: 0.25, crackle: 0, mix: 1 },
-  vinyl: { wow: 0.15, flutter: 0.05, sat: 0.2, age: 0.55, noise: 0.3, crackle: 0.45, mix: 1 },
+  tape: { wow: 0.35, flutter: 0.3, sat: 0.5, age: 0.35, noise: 0, crackle: 0, mix: 1 },
+  vinyl: { wow: 0.15, flutter: 0.05, sat: 0.2, age: 0.55, noise: 0, crackle: 0, mix: 1 },
 };
 def('lp.cut', 0.75, 'Cutoff', (v) => fmtHz(hz(v, 60, 20000)), (v) => A && A.lp.frequency.setTargetAtTime(hz(v, 60, 20000), A.ctx.currentTime, 0.02));
 def('lp.res', 0.2, 'Resonance', (v) => (0.7 + v * 14).toFixed(1), (v) => A && (A.lp.Q.value = 0.7 + v * 14));
-const S = { mute: {}, solo: {}, div: 2, pp: true, style: 'tape', on: { rev: true, dly: true, lofi: false, lp: true } };
+const NAMES = { rev: 'Reverb', dly: 'Delay', lofi: 'Lo-fi', lp: 'Low-pass' };
+// chain: the effects the sound goes through, in order; shelf: effects taken out. Each Lo-fi style keeps its own settings.
+const S = { mute: {}, solo: {}, div: 2, pp: true, style: 'tape', styleVals: structuredClone(STYLES), chain: ['rev', 'dly', 'lofi', 'lp'], shelf: [], on: { rev: true, dly: true, lofi: false, lp: true } };
 
 // ---- knobs: drag up/down, wheel, arrow keys; double-click = default ----
 function knob(id, big) {
@@ -196,6 +219,7 @@ function knobSvg(v) {
 function set(id, v) {
   const p = P[id];
   p.v = Math.min(1, Math.max(0, v));
+  if (id.startsWith('lofi.')) S.styleVals[S.style][id.slice(5)] = p.v; // remembered for this style
   p.apply(p.v);
   for (const k of document.querySelectorAll(`[data-k="${id}"]`)) {
     if (k.classList.contains('knob')) { k.innerHTML = knobSvg(p.v); k.setAttribute('aria-valuenow', Math.round(p.v * 100)); k.setAttribute('aria-valuetext', p.show(p.v)); }
@@ -222,32 +246,57 @@ function render() {
     <div class="chain" id="chain"></div>
     <div class="fz"><div class="meter" data-meter="master"><i></i><b></b></div><input type="range" class="fader" min="0" max="1" step="0.005" value="${P['master.vol'].v}" data-k="master.vol" aria-label="Master level"></div>
     <span class="db" data-v="master.vol">${dB(P['master.vol'].v)}</span></div>`;
-  const unit = (id, name, sub, body) => `<div class="unit${S.on[id] ? '' : ' off'}" data-unit="${id}"><div class="uh"><b>${name}</b><small>${sub}</small><button class="btn sm" data-on="${id}" aria-pressed="${S.on[id]}">${S.on[id] ? 'On' : 'Off'}</button></div>${body}</div>`;
-  $('#rack').innerHTML =
-    unit('rev', 'Reverb', 'shared · fed by the sends', `<div class="pic" id="pic-rev"></div><div class="knobs">${knob('rev.size')}${knob('rev.pre')}${knob('rev.tone')}${knob('rev.ret')}</div>`)
-    + unit('dly', 'Delay', 'shared · follows the tempo', `<div class="pic" id="pic-dly"></div><div class="seg" role="group" aria-label="Delay time">${DIV.map(([l], i) => `<button data-div="${i}" aria-pressed="${S.div === i}">${l}</button>`).join('')}<button data-pp aria-pressed="${S.pp}">Ping-pong</button></div><div class="knobs">${knob('dly.fb')}${knob('dly.tone')}${knob('dly.ret')}</div>`)
-    + unit('lofi', 'Lo-fi', 'tape & vinyl · whole mix', `<div class="pic" id="pic-lofi"></div><div class="seg" role="group" aria-label="Style">${['tape', 'vinyl'].map((k) => `<button data-style="${k}" aria-pressed="${S.style === k}">${k === 'tape' ? 'Tape' : 'Vinyl'}</button>`).join('')}</div><div class="knobs">${['wow', 'flutter', 'sat', 'age', 'noise', 'crackle', 'mix'].map((k) => knob('lofi.' + k)).join('')}</div>`)
-    + unit('lp', 'Low-pass', 'whole mix', `<div class="pic" id="pic-lp"></div><div class="knobs" style="justify-content:space-around">${knob('lp.cut', true)}${knob('lp.res')}</div>`);
+  renderRack();
+}
+// The effects rack is the chain itself, in the order the sound flows: Instruments ➜ effect ➜ … ➜ Master.
+function renderRack() {
+  const n = S.chain.length;
+  const unit = (id, name, sub, body) => {
+    const i = S.chain.indexOf(id);
+    return `<div class="unit${S.on[id] ? '' : ' off'}" data-unit="${id}"><div class="uh" draggable="true" data-drag="${id}" title="Drag to move ${name} in the chain, or to the shelf to take it out"><span class="grip" aria-hidden="true">⠿</span><b>${name}</b>
+      <span class="mv"><button data-move="${id}" data-d="-1" ${i === 0 ? 'disabled' : ''} aria-label="Move ${name} earlier" title="Earlier in the chain">◀</button><button data-move="${id}" data-d="1" ${i === n - 1 ? 'disabled' : ''} aria-label="Move ${name} later" title="Later in the chain">▶</button><button data-remove="${id}" aria-label="Take ${name} out of the chain" title="Take out of the chain">×</button></span>
+      </div><div class="us"><small>${sub}</small><button class="btn sm" data-on="${id}" aria-pressed="${S.on[id]}">${S.on[id] ? 'On' : 'Off'}</button></div>${body}</div>`;
+  };
+  const units = {
+    rev: () => unit('rev', 'Reverb', 'fed by the Reverb knobs', `<div class="pic" id="pic-rev"></div><div class="knobs">${knob('rev.size')}${knob('rev.pre')}${knob('rev.tone')}${knob('rev.ret')}</div>`),
+    dly: () => unit('dly', 'Delay', 'fed by the Delay knobs · follows the tempo', `<div class="pic" id="pic-dly"></div><div class="seg" role="group" aria-label="Delay time">${DIV.map(([l], i) => `<button data-div="${i}" aria-pressed="${S.div === i}">${l}</button>`).join('')}<button data-pp aria-pressed="${S.pp}">Ping-pong</button></div><div class="knobs">${knob('dly.fb')}${knob('dly.tone')}${knob('dly.ret')}</div>`),
+    lofi: () => unit('lofi', 'Lo-fi', 'tape & vinyl', `<div class="pic" id="pic-lofi"></div><div class="seg" role="group" aria-label="Style">${['tape', 'vinyl'].map((k) => `<button data-style="${k}" aria-pressed="${S.style === k}">${k === 'tape' ? 'Tape' : 'Vinyl'}</button>`).join('')}</div><div class="knobs">${['wow', 'flutter', 'sat', 'age', 'noise', 'crackle', 'mix'].map((k) => knob('lofi.' + k)).join('')}</div>`),
+    lp: () => unit('lp', 'Low-pass', 'sweep the whole song', `<div class="pic" id="pic-lp"></div><div class="knobs" style="justify-content:space-around">${knob('lp.cut', true)}${knob('lp.res')}</div>`),
+  };
+  const arrow = '<span class="arrow" aria-hidden="true">➜</span>';
+  $('#rack').innerHTML = `<div class="flow" id="flow" aria-label="Effects chain, in the order the sound goes through">
+      <div class="endcap" data-cap="start"><b>INSTRUMENTS</b><small>their Reverb and Delay knobs feed those effects</small></div>${arrow}
+      ${S.chain.map((id) => units[id]() + arrow).join('')}
+      <div class="endcap" data-cap="end"><b>MASTER</b><small>to your speakers</small></div></div>
+    <div class="shelf" id="shelf"><span>${S.shelf.length ? 'Not in the chain (drag back in, or click):' : 'Drag an effect here to take it out of the chain'}</span>
+      ${S.shelf.map((id) => `<button class="chip2" draggable="true" data-drag="${id}" data-add="${id}" title="Add ${NAMES[id]} back at the end of the chain">${NAMES[id]}</button>`).join('')}</div>`;
   chain();
   pics();
+  route();
 }
 function chain() {
-  const on = ['rev', 'dly', 'lofi', 'lp'].filter((k) => S.on[k]).map((k) => ({ rev: 'Reverb', dly: 'Delay', lofi: 'Lo-fi', lp: 'Low-pass' })[k]);
-  $('#chain').textContent = on.length ? on.join(' · ') : 'No effects';
+  const on = S.chain.filter((k) => S.on[k]).map((k) => NAMES[k]);
+  $('#chain').textContent = on.length ? on.join(' ➜ ') : 'No effects';
+}
+function move(id, to) {
+  S.chain = S.chain.filter((x) => x !== id);
+  S.shelf = S.shelf.filter((x) => x !== id);
+  if (to == null) S.shelf.push(id);
+  else S.chain.splice(Math.max(0, Math.min(to, S.chain.length)), 0, id);
+  renderRack();
 }
 // small drawings that show what each effect does
 function pics() {
   const W = 240, H = 64, svg = (d) => `<svg viewBox="0 0 ${W} ${H}" preserveAspectRatio="none" aria-hidden="true">${d}</svg>`;
   const r = $('#pic-rev'), d = $('#pic-dly'), l = $('#pic-lofi'), f = $('#pic-lp');
-  if (!r) return;
   const sz = 0.4 + P['rev.size'].v * 5.6, pre = P['rev.pre'].v * 100;
   let path = `M0 ${H}`;
   for (let x = 0; x <= W; x += 3) { const t = (x / W) * 6000 - pre; path += ` L${x} ${t < 0 ? H : H - (H - 6) * Math.exp((-t / 1000) * (6.9 / sz)) * (0.6 + 0.4 * Math.random())}`; }
-  r.innerHTML = svg(`<path class="fl" d="${path} L${W} ${H}Z"/>`);
+  if (r) r.innerHTML = svg(`<path class="fl" d="${path} L${W} ${H}Z"/>`);
   const beat = DIV[S.div][1], fb = P['dly.fb'].v * 0.9;
   let bars = '';
   for (let k = 0, a = 1; k < 12 && a > 0.03; k++, a *= fb) { const x = 8 + k * beat * 40; if (x > W - 6) break; bars += `<rect class="fl" x="${x}" y="${H - 4 - a * (H - 10)}" width="6" height="${a * (H - 10)}" rx="2" transform="translate(0 ${S.pp ? (k % 2 ? 2 : -2) : 0})"/>`; }
-  d.innerHTML = svg(bars);
+  if (d) d.innerHTML = svg(bars);
   // a wave whose pitch wobbles (wow, flutter), flattened by saturation, roughened by noise; crackle as ticks
   const L = (k) => P['lofi.' + k].v, drive = 1 + L('sat') * 5, norm = Math.tanh(drive);
   let w = '', ph = 0, ticks = '';
@@ -257,11 +306,11 @@ function pics() {
     w += (x ? 'L' : 'M') + x + ' ' + (H / 2 - y * (H / 2 - 8) * (1 - L('age') * 0.3));
   }
   for (let k = 0; k < Math.round(L('crackle') * 14); k++) { const x = Math.random() * W, h = 4 + Math.random() * 14; ticks += `<rect class="fl" x="${x}" y="${H / 2 - h / 2}" width="2" height="${h}"/>`; }
-  l.innerHTML = svg(`${ticks}<path class="ln" d="${w}"/>`);
+  if (l) l.innerHTML = svg(`${ticks}<path class="ln" d="${w}"/>`);
   const fc = hz(P['lp.cut'].v, 60, 20000), Q = 0.7 + P['lp.res'].v * 14;
   let c = '';
   for (let x = 0; x <= W; x += 2) { const fr = hz(x / W, 20, 20000), rr = fr / fc, mag = 1 / Math.sqrt((1 - rr * rr) ** 2 + (rr / Q) ** 2), db = Math.max(-40, Math.min(18, 20 * Math.log10(mag))); c += (x ? 'L' : 'M') + x + ' ' + (H * 0.35 - db * (H * 0.6 / 40)); }
-  f.innerHTML = svg(`<path class="ln" d="${c}"/>`);
+  if (f) f.innerHTML = svg(`<path class="ln" d="${c}"/>`);
 }
 
 // ---- preview audio: three instruments → strips (fader, pan, sends) → returns → Lo-fi → Low-pass → master ----
@@ -274,16 +323,22 @@ function audio() {
   lpf.type = 'lowpass';
   scope.fftSize = 8192;
   const lofiIn = ctx.createGain(), lofiOut = ctx.createGain();
-  sum.connect(lofiIn); lofiOut.connect(lpf); lpf.connect(master); master.connect(scope); scope.connect(ctx.destination);
-  A = { ctx, sum, lp: lpf, master, scope, lofiIn, lofiOut, lofiNode: null, ch: {}, an: {} };
+  master.connect(scope); scope.connect(ctx.destination);
+  A = { ctx, sum, lp: lpf, master, scope, lofiIn, lofiOut, lofiNode: null, ch: {}, an: {}, stage: {} };
+  // Each effect is a stage (in ➜ out) so the chain can be wired in any order. Reverb and Delay stages
+  // pass the sound through and add their return (fed by the instruments' send knobs).
+  const stage = (inp = ctx.createGain(), out = ctx.createGain()) => ({ in: inp, out });
+  A.stage = { rev: stage(), dly: stage(), lofi: stage(lofiIn, lofiOut), lp: stage() };
+  A.stage.rev.in.connect(A.stage.rev.out); A.stage.dly.in.connect(A.stage.dly.out);
+  A.stage.lp.in.connect(lpf); lpf.connect(A.stage.lp.out);
   void loadLofi(ctx);
   // shared reverb (generated impulse) and ping-pong delay
   const rev = { pre: ctx.createDelay(0.2), conv: ctx.createConvolver(), tone: ctx.createBiquadFilter(), ret: ctx.createGain(), in: ctx.createGain() };
-  rev.tone.type = 'lowpass'; rev.in.connect(rev.pre); rev.pre.connect(rev.conv); rev.conv.connect(rev.tone); rev.tone.connect(rev.ret); rev.ret.connect(sum);
+  rev.tone.type = 'lowpass'; rev.in.connect(rev.pre); rev.pre.connect(rev.conv); rev.conv.connect(rev.tone); rev.tone.connect(rev.ret); rev.ret.connect(A.stage.rev.out);
   const dly = { in: ctx.createGain(), L: ctx.createDelay(2), R: ctx.createDelay(2), fbL: ctx.createGain(), fbR: ctx.createGain(), tone: ctx.createBiquadFilter(), ret: ctx.createGain(), mg: ctx.createChannelMerger(2), mono: ctx.createGain() };
   dly.tone.type = 'lowpass';
   dly.in.connect(dly.tone); dly.tone.connect(dly.L); dly.L.connect(dly.fbL); dly.fbL.connect(dly.R); dly.R.connect(dly.fbR); dly.fbR.connect(dly.L);
-  dly.L.connect(dly.mg, 0, 0); dly.R.connect(dly.mg, 0, 1); dly.mg.connect(dly.ret); dly.ret.connect(sum);
+  dly.L.connect(dly.mg, 0, 0); dly.R.connect(dly.mg, 0, 1); dly.mg.connect(dly.ret); dly.ret.connect(A.stage.dly.out);
   A.rev = rev; A.dly = dly;
   A.an.master = scope;
   for (const c of CH) {
@@ -295,7 +350,7 @@ function audio() {
   }
   for (const id in P) P[id].apply(P[id].v);
   for (const c of CH) level(c.id);
-  ir(); divTime(); lofi(); onOff();
+  ir(); divTime(); lofi(); onOff(); route();
 }
 // The tape / vinyl effect runs in an AudioWorklet; it slots in when loaded (bypassed until then, or if this page can't load it).
 async function loadLofi(ctx) {
@@ -332,7 +387,7 @@ async function loadLofi(ctx) {
     onOff();
   } catch (e) {
     console.warn('Lo-fi preview unavailable here:', e);
-    const h = $('[data-unit="lofi"] .uh small');
+    const h = $('[data-unit="lofi"] .us small');
     if (h) h.textContent = 'preview not available in this browser';
   }
 }
@@ -352,6 +407,15 @@ function lofi() {
   for (const k of ['wow', 'flutter', 'sat', 'age', 'noise', 'crackle']) n.parameters.get(k).setTargetAtTime(P['lofi.' + k].v, t, 0.02);
   n.parameters.get('vinyl').setValueAtTime(S.style === 'vinyl' ? 1 : 0, t);
   n.parameters.get('mix').setTargetAtTime(S.on.lofi ? P['lofi.mix'].v : 0, t, 0.02);
+}
+// Wire instruments ➜ the chain in order ➜ master. Effects on the shelf are left out (their returns go nowhere).
+function route() {
+  if (!A) return;
+  A.sum.disconnect();
+  for (const k in A.stage) A.stage[k].out.disconnect();
+  let prev = A.sum;
+  for (const id of S.chain) { prev.connect(A.stage[id].in); prev = A.stage[id].out; }
+  prev.connect(A.master);
 }
 function onOff() {
   if (!A) return;
@@ -449,10 +513,53 @@ document.addEventListener('click', (e) => {
   if (b.dataset.mute) { S.mute[b.dataset.mute] = !S.mute[b.dataset.mute]; b.setAttribute('aria-pressed', S.mute[b.dataset.mute]); CH.forEach((c) => level(c.id)); return; }
   if (b.dataset.solo) { S.solo[b.dataset.solo] = !S.solo[b.dataset.solo]; b.setAttribute('aria-pressed', S.solo[b.dataset.solo]); CH.forEach((c) => level(c.id)); return; }
   if (b.dataset.on) { const k = b.dataset.on; S.on[k] = !S.on[k]; b.setAttribute('aria-pressed', S.on[k]); b.textContent = S.on[k] ? 'On' : 'Off'; b.closest('.unit').classList.toggle('off', !S.on[k]); chain(); onOff(); return; }
-  if (b.dataset.style) { S.style = b.dataset.style; for (const x of document.querySelectorAll('[data-style]')) x.setAttribute('aria-pressed', x === b); for (const [k, v] of Object.entries(STYLES[S.style])) set('lofi.' + k, v); lofi(); return; }
+  if (b.dataset.style) { S.style = b.dataset.style; for (const x of document.querySelectorAll('[data-style]')) x.setAttribute('aria-pressed', x === b); for (const k of Object.keys(STYLES.tape)) set('lofi.' + k, S.styleVals[S.style][k]); lofi(); return; }
+  if (b.dataset.move) { const id = b.dataset.move; return move(id, S.chain.indexOf(id) + Number(b.dataset.d)); }
+  if (b.dataset.remove) return move(b.dataset.remove, null);
+  if (b.dataset.add) return move(b.dataset.add, S.chain.length);
   if (b.dataset.div) { S.div = Number(b.dataset.div); for (const x of document.querySelectorAll('[data-div]')) x.setAttribute('aria-pressed', x === b); divTime(); pics(); return; }
   if (b.hasAttribute('data-pp')) { S.pp = !S.pp; b.setAttribute('aria-pressed', S.pp); onOff(); pics(); }
 });
+// Drag an effect (by its header) along the chain, onto the shelf to take it out, or from the shelf back in.
+let dragId = null;
+const clearDrop = () => document.querySelectorAll('.drop-before,.drop-after,.drop,.over').forEach((x) => x.classList.remove('drop-before', 'drop-after', 'drop', 'over'));
+function dropIndex(x) {
+  const units = [...document.querySelectorAll('#flow .unit')].filter((u) => u.dataset.unit !== dragId);
+  let i = units.findIndex((u) => { const r = u.getBoundingClientRect(); return x < r.left + r.width / 2; });
+  if (i < 0) i = units.length;
+  return { i, units };
+}
+document.addEventListener('dragstart', (e) => {
+  const h = e.target.closest?.('[data-drag]');
+  if (!h) return;
+  dragId = h.dataset.drag;
+  e.dataTransfer.setData('text/plain', dragId);
+  e.dataTransfer.effectAllowed = 'move';
+  const u = h.closest('.unit');
+  if (u) { e.dataTransfer.setDragImage(u, 30, 20); requestAnimationFrame(() => u.classList.add('dragging')); }
+});
+document.addEventListener('dragover', (e) => {
+  if (!dragId) return;
+  const flow = e.target.closest('#flow'), shelf = e.target.closest('#shelf');
+  if (!flow && !shelf) return;
+  e.preventDefault();
+  clearDrop();
+  if (shelf) return shelf.classList.add('over');
+  const { i, units } = dropIndex(e.clientX);
+  if (!units.length) $('[data-cap="end"]').classList.add('drop');
+  else if (i < units.length) units[i].classList.add('drop-before');
+  else units[units.length - 1].classList.add('drop-after');
+});
+document.addEventListener('drop', (e) => {
+  if (!dragId) return;
+  e.preventDefault();
+  const id = dragId;
+  if (e.target.closest('#shelf')) move(id, null);
+  else if (e.target.closest('#flow')) move(id, dropIndex(e.clientX).i);
+  dragId = null;
+  clearDrop();
+});
+document.addEventListener('dragend', () => { dragId = null; clearDrop(); document.querySelectorAll('.dragging').forEach((x) => x.classList.remove('dragging')); });
 document.addEventListener('input', (e) => { if (e.target.dataset.k) set(e.target.dataset.k, Number(e.target.value)); });
 let drag = null;
 document.addEventListener('pointerdown', (e) => { const k = e.target.closest('.knob'); if (!k) return; drag = { id: k.dataset.k, y: e.clientY, v: P[k.dataset.k].v }; k.setPointerCapture(e.pointerId); k.focus(); e.preventDefault(); });
@@ -469,7 +576,7 @@ document.addEventListener('keydown', (e) => {
 $('#src').innerHTML = `<option value="master">Master</option>` + CH.map((c) => `<option value="${c.id}">${c.name}</option>`).join('');
 $('#zoom').innerHTML = [5, 10, 20, 40].map((ms) => `<button data-zoom="${ms}" aria-pressed="${ms === zoomMs}">${ms} ms</button>`).join('');
 render();
-const expand = (on) => { $('#work').classList.toggle('wide', on); $('#expand').setAttribute('aria-pressed', on); $('#mixhint').textContent = on ? 'Effects: shared Reverb and Delay (fed by the sends), Lo-fi and Low-pass on the whole mix' : '⤢ shows the effects: Reverb, Delay, Lo-fi, Low-pass'; };
+const expand = (on) => { $('#work').classList.toggle('wide', on); $('#expand').setAttribute('aria-pressed', on); $('#mixhint').textContent = on ? 'Effects chain: the sound flows left to right ➜ drag an effect by its title to change the order' : '⤢ shows the effects: Reverb, Delay, Lo-fi, Low-pass'; };
 if (location.hash === '#effects') expand(true); // a link straight to the expanded mixer
 addEventListener('hashchange', () => expand(location.hash === '#effects'));
 requestAnimationFrame(frame);

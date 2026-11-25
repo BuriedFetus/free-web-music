@@ -7,7 +7,11 @@ a **main mixer** (a Reverb and a Delay send knob per instrument; expanding the M
 main Low-pass settings) and an **Oscilloscope** as its own panel. Mock-up: `design/kit/mixer.html` (rough WebAudio
 preview sound; `#effects` opens it expanded). **Lo-fi is tape / vinyl** (the user rejected a bit-crusher): wow + flutter (modulated delay line),
 level-matched tanh saturation, Age (2-pole high cut + low cut), hiss or darker vinyl surface noise, crackle; Tape / Vinyl
-presets. Proposed chain: instruments (fader, pan, mute/solo, post-fader sends)
+presets (each style remembers its own settings; Noise and Crackle start at 0).
+**The effects rack is the chain** (user): Instruments ➜ Reverb ➜ Delay ➜ Lo-fi ➜ Low-pass ➜ Master, drawn left to right
+with ➜ arrows; drag an effect by its title to reorder, onto the shelf to take it out, back to add (◀ ▶ × too). Each
+effect is a stage (in ➜ out); Reverb / Delay stages pass the sound through and add their return (fed by the
+instruments' send knobs) at their place in the chain. Proposed chain: instruments (fader, pan, mute/solo, post-fader sends)
 + Reverb return + Delay return → Lo-fi → Low-pass → Master. Everything shared in the doc. Build only after sign-off;
 then plan slices (likely: 1 mixer strips + master in the engine, 2 Reverb + Delay, 3 Lo-fi + Low-pass, 4 Scope panel).
 
