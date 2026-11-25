@@ -14,6 +14,14 @@ export const KINDS = { basalt: 1, flint: 2 };
 export const MOD_SOURCES = { lfo: 0, amp: 1, filt: 2 };
 /** Mixer strip settings. level: 0..1 (0.8 = 0 dB), pan: -1..1, mute: 0/1, sendA / sendB: 0..1. */
 export const MIX = { level: 0, pan: 1, mute: 2, sendA: 3, sendB: 4 };
+/** Master effects: ids for the chain, and settings (values 0..1 unless noted). */
+export const FX_IDS = { reverb: 0, delay: 1, lofi: 2, lowpass: 3 };
+export const FX_PARAMS = {
+  'reverb.on': 0, 'reverb.size': 1, 'reverb.predelay': 2 /* seconds 0..0.1 */, 'reverb.tone': 3, 'reverb.return': 4,
+  'delay.on': 10, 'delay.time': 11 /* seconds 0.01..2 */, 'delay.feedback': 12, 'delay.tone': 13, 'delay.pingpong': 14, 'delay.return': 15,
+  'lofi.on': 20, 'lofi.wow': 21, 'lofi.flutter': 22, 'lofi.saturation': 23, 'lofi.age': 24, 'lofi.noise': 25, 'lofi.crackle': 26, 'lofi.mix': 27, 'lofi.vinyl': 28,
+  'lowpass.on': 30, 'lowpass.cutoff': 31, 'lowpass.resonance': 32,
+};
 /** Peak meter index of the master in `tick.meters` (L; R is the next one). */
 export const MASTER_METER = 32;
 
@@ -171,6 +179,14 @@ export async function createEngine({ base, context, manifests } = {}) {
     /** Master: setMaster({ level }). */
     setMaster(settings) {
       if (settings.level != null) send({ t: 'master', p: 0, v: settings.level });
+    },
+    /** Master effects settings, e.g. setFx({ 'reverb.size': 0.5, 'lofi.on': true }). Unknown keys are ignored. */
+    setFx(settings) {
+      for (const k in settings) if (k in FX_PARAMS) send({ t: 'fx', p: FX_PARAMS[k], v: Number(settings[k]) });
+    },
+    /** The effects chain, in order, e.g. setChain(['reverb', 'delay', 'lofi', 'lowpass']); left out = not in the chain. */
+    setChain(names) {
+      send({ t: 'chain', ids: names.map((n) => FX_IDS[n]).filter((i) => i != null) });
     },
     /** Song mode: one of a slot's patterns, {len, notes, auto: {paramId: (value|null)[]}}. */
     setPat(slot, id, { len, notes, auto = {}, lens }) {

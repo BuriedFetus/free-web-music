@@ -59,7 +59,7 @@ fn a_fader_jump_glides_instead_of_clicking() {
     let mut m = Mixer::new(48000.0);
     let run = |m: &mut Mixer| {
         let (mut l, mut r) = ([1f32; 128], [1f32; 128]);
-        m.strip(0, &mut l, &mut r);
+        m.strip(0, &mut l, &mut r, None);
         l
     };
     assert!(run(&mut m).iter().all(|&x| (x - 1.0).abs() < 1e-6), "unity by default");

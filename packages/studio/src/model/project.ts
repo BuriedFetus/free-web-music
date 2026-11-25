@@ -14,6 +14,7 @@
 //                                              pats: Y.Array<patternId> (this instrument's patterns, in order) }
 //   fwm.patterns   Y.Map    `${trackId}|${patternId}` → Y.Map { name, len, notes: Y.Map<noteId, Note>,
 //                                                               auto: Y.Map<`${param}@${step}`, number> }
+//   fwm.fx         Y.Map    master effects, flat keys (see model/fx.ts): chain, 'reverb.size', 'lofi.tape.wow'…
 //   fwm.song       Y.Array  rows: Y.Map { id, cells: Y.Map<trackId, patternId> } (no entry = silent)
 // Patterns belong to one instrument. A row plays, for each instrument, the pattern in its cell; it lasts as
 // long as its longest pattern and shorter ones repeat inside it.
@@ -24,6 +25,7 @@ import * as Y from 'yjs';
 import type { DeviceId, DeviceManifest, Direction, SeqNote } from '@fwm/engine';
 import { canRoute, defaults, MAX_ROUTES, type DeviceState, type DeviceStore, type Route } from './deviceStore';
 import { DEFAULT_KEY, SCALES, type SongKey } from './scales';
+import { clampFx, FX_ALL, FX_DEFAULTS, type FxId } from './fx';
 
 export const SCHEMA = 2;
 /** Steps (16th notes) in a bar. */
@@ -92,6 +94,8 @@ export interface SongFile {
   key: SongKey;
   /** Master fader (0..1, 0.8 = 0 dB). Missing in older files: 0 dB. */
   master?: { level: number };
+  /** Master effects (keys of model/fx.ts FX_DEFAULTS). Missing: defaults. */
+  fx?: Record<string, number | boolean | string>;
   tracks: {
     id: string;
     device: DeviceId;
@@ -133,6 +137,7 @@ export class Project {
   readonly tracksMap: Y.Map<Y.Map<unknown>>;
   readonly patterns: Y.Map<Y.Map<unknown>>;
   readonly song: Y.Array<Y.Map<unknown>>;
+  readonly fxMap: Y.Map<unknown>;
   readonly undoManager: Y.UndoManager;
   private version = 0;
   private listeners = new Set<() => void>();
@@ -156,7 +161,8 @@ export class Project {
     this.tracksMap = doc.getMap('fwm.tracks');
     this.patterns = doc.getMap('fwm.patterns');
     this.song = doc.getArray('fwm.song');
-    this.undoManager = new Y.UndoManager([this.meta, this.order, this.tracksMap, this.patterns, this.song], {
+    this.fxMap = doc.getMap('fwm.fx');
+    this.undoManager = new Y.UndoManager([this.meta, this.order, this.tracksMap, this.patterns, this.song, this.fxMap], {
       trackedOrigins: new Set([origin]),
       captureTimeout: 400, // a knob drag or a note drag is one undo step
     });
@@ -164,7 +170,7 @@ export class Project {
       this.version++;
       for (const fn of this.listeners) fn();
     };
-    for (const t of [this.meta, this.order, this.tracksMap, this.patterns, this.song]) t.observeDeep(bump);
+    for (const t of [this.meta, this.order, this.tracksMap, this.patterns, this.song, this.fxMap]) t.observeDeep(bump);
     this.undoManager.on('stack-item-added', bump);
     this.undoManager.on('stack-item-popped', bump);
   }
@@ -256,6 +262,33 @@ export class Project {
     this.transact(() => this.meta.set('masterLevel', Math.max(0, Math.min(1, v))));
   }
 
+  // ---- master effects ----
+  /** An effects setting (see model/fx.ts for the keys and their defaults). */
+  fx(key: string): number | boolean | string {
+    const v = this.fxMap.get(key);
+    return (v === undefined ? undefined : clampFx(key, v)) ?? FX_DEFAULTS[key];
+  }
+  /** Knob drags merge into one undo step; switches (on, style, chain, ping-pong, time) are their own steps. */
+  setFx(key: string, value: number | boolean | string) {
+    const v = clampFx(key, value);
+    if (v === undefined || v === this.fx(key)) return;
+    const write = () => this.fxMap.set(key, v);
+    if (typeof v === 'number' && key !== 'delay.div') this.transact(write);
+    else this.action(write);
+  }
+  /** The effects the mix goes through, in order. */
+  get fxChain(): FxId[] {
+    return String(this.fx('chain')).split(',').filter(Boolean) as FxId[];
+  }
+  setFxChain(ids: FxId[]) {
+    this.setFx('chain', ids.join(','));
+  }
+  /** Effects not in the chain (the shelf). */
+  get fxShelf(): FxId[] {
+    const c = this.fxChain;
+    return FX_ALL.filter((id) => !c.includes(id));
+  }
+
   // ---- the song as a whole: name, save state, file, INIT ----
   get songName(): string {
     return (this.meta.get('name') as string) || 'Untitled';
@@ -277,6 +310,7 @@ export class Project {
       swing: this.swing,
       key: this.key,
       master: { level: this.masterLevel },
+      fx: Object.fromEntries(Object.keys(FX_DEFAULTS).map((k) => [k, this.fx(k)])),
       tracks: this.tracks().map((t) => {
         const m = this.tracksMap.get(t.id)!;
         return {
@@ -330,6 +364,11 @@ export class Project {
   private replaceAll(file: SongFile, manifests: Partial<Record<string, DeviceManifest>>, id: string | null) {
     {
       for (const k of [...this.meta.keys()]) if (k !== 'schema') this.meta.delete(k);
+      for (const k of [...this.fxMap.keys()]) this.fxMap.delete(k);
+      for (const [k, v] of Object.entries(file.fx ?? {})) {
+        const c = clampFx(k, v);
+        if (c !== undefined) this.fxMap.set(k, c);
+      }
       this.order.delete(0, this.order.length);
       for (const k of [...this.tracksMap.keys()]) this.tracksMap.delete(k);
       for (const k of [...this.patterns.keys()]) this.patterns.delete(k);

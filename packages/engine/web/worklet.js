@@ -20,6 +20,8 @@
 //                                                  (corrects drift between people; the global clock keeps running)
 //   {t:'mix', slot, p, v}                          mixer strip: p 0 level (0.8 = 0 dB), 1 pan (-1..1), 2 mute, 3 send A, 4 send B
 //   {t:'master', p, v}                             master: p 0 level
+//   {t:'fx', p, v}                                 master effects setting (numbers: see FX_PARAMS in engine.js)
+//   {t:'chain', ids:[…]}                           effects chain order (0 reverb, 1 delay, 2 lo-fi, 3 low-pass)
 //   {t:'at', at, m}                                 do `m` ('on' | 'off' | 'param') at audio time `at`, to the sample
 //                                                  (other people's live keys and knob turns, played evenly)
 // Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport, meters}
@@ -369,6 +371,8 @@ export class FwmEngine extends Processor {
       case 'cue': this.seq.cue(m.row, m.wait); break;
       case 'mix': x.fwm_mix(m.slot, m.p, m.v); break;
       case 'master': x.fwm_master(m.p, m.v); break;
+      case 'fx': x.fwm_fx(m.p, m.v); break;
+      case 'chain': { const c = [255, 255, 255, 255]; (m.ids || []).slice(0, 4).forEach((id, i) => (c[i] = id)); x.fwm_fx_chain(c[0], c[1], c[2], c[3]); break; }
       case 'seek':
         if (this.seq.playing) this.seq.seek(m.row, this.target(m));
         else this.seq.start(m.row, this.target(m));

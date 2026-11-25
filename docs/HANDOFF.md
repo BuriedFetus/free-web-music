@@ -1,6 +1,16 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-25): building the Mixer (slice 1 of 4 done)
+## START HERE (2026-11-25, later): Mixer slices 1–3 done, Scope (slice 4) next
+The user said "just do Slice 2 - 3 in one go" and asked that Song arrangement cells preview their pattern: all done
+(PLAN.md "Mixer and effects"). Things learnt: the Dattorro tank applies its decay gain twice per half loop (formula
+uses 1.5 not 3); Lo-fi must not delay the mix when off (it made the whole studio 8 ms late, caught by
+`rack_events_are_sample_accurate`); Lo-fi saturation is level-matched at 0.25, not 0.5 (else +5 dB on normal
+instruments); Basalt has a sub-octave, so a closed low-pass barely quietens a bass note (test with C5). Two-tab sync
+got 6–8 ms gaps once Reverb / Delay ran all the time in two headless tabs; letting them sleep when unused fixed it
+(0–1.6 ms again). Next: slice 4, the Scope panel (mock-up `design/kit/mixer.html`), then ask the user what's next
+(Phase 5 instruments: Cobalt, Quartz, Opal).
+
+## Earlier (2026-11-25): building the Mixer (slice 1 of 4 done)
 The user approved the mock-up ("Alright you can push this!"). Slices and progress: PLAN.md "Mixer and effects".
 Slice 1 (mixer strips, master, meters, Mixer panel) is built. Next: slice 2, Reverb + Delay + sends + the draggable
 chain (shown when the Mixer panel is maximised: pass `L.max === i` from Workspace to MixerView). Engine plan: each

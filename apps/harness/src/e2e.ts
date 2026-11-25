@@ -31,6 +31,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'flint') return runFlint(p, engineRef, ok, out);
   if (role === 'drums') return runDrums(p, engineRef, ok, out);
   if (role === 'mixer') return runMixer(p, engineRef, ok, out);
+  if (role === 'fx') return runFx(p, engineRef, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
   try {
     await until('a peer', () => s.awareness.getStates().size >= 2, 10000);
@@ -811,6 +812,131 @@ async function runMixer(p: Project, engineRef: { current: Engine | null }, ok: (
     btn('■ Stop')!.click();
   } catch (e) {
     out.push(`FAIL mixer: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: the effects. Tails, cuts and levels are checked on the engine's master meter. */
+async function runFx(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  const master = async (ms: number) => {
+    let pk = 0;
+    let finite = true;
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      const m = engineRef.current?.last?.meters;
+      if (m) {
+        if (!Number.isFinite(m[32])) finite = false;
+        pk = Math.max(pk, m[32] || 0);
+      }
+      await sleep(20);
+    }
+    return finite ? pk : NaN;
+  };
+  const order = () => [...document.querySelectorAll<HTMLElement>('.fwm-fxflow .fwm-fxu')].map((u) => u.dataset.fx).join(',');
+  // Play a short phrase, stop, and measure what is still sounding 150–700 ms after Stop (the tails).
+  const tail = async () => {
+    btn('▶ Play')!.click();
+    await sleep(1200);
+    btn('■ Stop')!.click();
+    await sleep(150);
+    return master(550);
+  };
+  try {
+    await sleep(300);
+    const id = p.addTrack(m, undefined, 0);
+    // C5: well above the low-pass when it is closed (a bass note's sub oscillator would sit right on it)
+    for (const st of [0, 4, 8, 12]) p.addNote(id, p.patternList(id)[0].id, { s: st, l: 1, m: 72, v: 0.9 });
+    const sel = $<HTMLSelectElement>('[aria-label="Panel 2 view"]')!;
+    sel.value = 'mixer';
+    sel.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(150);
+    ($('.fwm-strip__chain') as HTMLButtonElement).click(); // the master's chain button maximises the Mixer
+    await sleep(150);
+    ok(order() === 'reverb,delay,lofi,lowpass', `maximised: the chain shows Reverb ➜ Delay ➜ Lo-fi ➜ Low-pass (${order()})`);
+    ok(document.querySelectorAll('.fwm-fxflow .fwm-arrow').length === 5, 'an arrow between every step');
+    btn('Sound')!.click();
+    await until('engine', () => !!engineRef.current?.last);
+    const shapes = document.querySelectorAll('.fwm-cell .fwm-cell__pv .fwm-cell__note').length;
+    ok(shapes === 4, `the arrangement cell previews the pattern: one shape per note (${shapes})`);
+    btn('▶ Play')!.click();
+    await sleep(500);
+    ok(!!$('.fwm-cell .fwm-cell__ph'), 'while playing, a playhead moves over the playing cell');
+    btn('■ Stop')!.click();
+    await sleep(300);
+    const dry = await tail();
+    p.setMix(id, { rev: 0.9 });
+    const wet = await tail();
+    ok(dry < 0.005 && wet > 0.02, `Reverb knob up: a tail after Stop (none ${dry.toFixed(4)}, with reverb ${wet.toFixed(3)})`);
+    p.setMix(id, { rev: 0 });
+    p.setFx('delay.feedback', 0.7);
+    p.setMix(id, { dly: 0.9 });
+    const echo = await tail();
+    ok(echo > 0.02, `Delay knob up: echoes after Stop (${echo.toFixed(3)})`);
+    p.setMix(id, { dly: 0 });
+    await sleep(2500); // let the echoes die
+    btn('▶ Play')!.click();
+    await sleep(600);
+    const open = await master(800);
+    p.setFx('lowpass.cutoff', 0); // 60 Hz
+    await sleep(200);
+    const closed = await master(800);
+    ok(20 * Math.log10(closed / open) < -20, `Low-pass closed: much quieter (${(20 * Math.log10(closed / open)).toFixed(1)} dB)`);
+    p.setFx('lowpass.cutoff', 1);
+    ($('[aria-label="Lo-fi off"]') as HTMLButtonElement).click();
+    await sleep(300);
+    const lofi = await master(1000);
+    ok(Number.isFinite(lofi) && Math.abs(20 * Math.log10(lofi / open)) < 4, `Lo-fi (tape) on: about the same level, never NaN (${(20 * Math.log10(lofi / open)).toFixed(1)} dB)`);
+    ($('.fwm-fxu[data-fx=lofi] .fwm-fxu__seg button:nth-child(2)') as HTMLButtonElement).click(); // Vinyl
+    p.setFx('lofi.vinyl.noise', 0.3);
+    await sleep(100);
+    ($('.fwm-fxu[data-fx=lofi] .fwm-fxu__seg button:nth-child(1)') as HTMLButtonElement).click(); // Tape
+    await sleep(100);
+    const noiseKnob = () => $('.fwm-fxu[data-fx=lofi] [role=slider][aria-label="Noise"]')?.getAttribute('aria-valuenow');
+    ok(noiseKnob() === '0', `Tape keeps its own Noise (0) (${noiseKnob()})`);
+    ($('.fwm-fxu[data-fx=lofi] .fwm-fxu__seg button:nth-child(2)') as HTMLButtonElement).click();
+    await sleep(100);
+    ok(noiseKnob() === '30', `Vinyl remembers its Noise (30) (${noiseKnob()})`);
+    btn('■ Stop')!.click();
+    // chain editing
+    ($('[aria-label="Move Reverb later"]') as HTMLButtonElement).click();
+    await sleep(50);
+    ok(order() === 'delay,reverb,lofi,lowpass' && p.fxChain.join(',') === 'delay,reverb,lofi,lowpass', `▶ moves Reverb after Delay (${order()})`);
+    ($('[aria-label="Take Lo-fi out of the chain"]') as HTMLButtonElement).click();
+    await sleep(50);
+    ok(order() === 'delay,reverb,lowpass' && !!btn('Lo-fi'), `× puts Lo-fi on the shelf (${order()})`);
+    btn('Lo-fi')!.click();
+    await sleep(50);
+    ok(order() === 'delay,reverb,lowpass,lofi', `clicking it on the shelf adds it at the end (${order()})`);
+    const dt = new DataTransfer();
+    const fire = (type: string, el: Element, x = 0) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: 10 }));
+    const first = $('.fwm-fxflow .fwm-fxu')!;
+    const lpHead = $('.fwm-fxu[data-fx=lowpass] .fwm-fxu__h')!;
+    fire('dragstart', lpHead);
+    await sleep(30);
+    fire('dragover', first, first.getBoundingClientRect().left + 5);
+    await sleep(30);
+    fire('drop', first, first.getBoundingClientRect().left + 5);
+    fire('dragend', lpHead);
+    await sleep(50);
+    ok(order() === 'lowpass,delay,reverb,lofi', `drag Low-pass to the start of the chain (${order()})`);
+    const revHead = $('.fwm-fxu[data-fx=reverb] .fwm-fxu__h')!;
+    fire('dragstart', revHead);
+    await sleep(30);
+    fire('dragover', $('.fwm-shelf')!);
+    fire('drop', $('.fwm-shelf')!);
+    fire('dragend', revHead);
+    await sleep(50);
+    ok(order() === 'lowpass,delay,lofi' && p.fxShelf.includes('reverb'), `drag Reverb onto the shelf takes it out (${order()})`);
+    // with Reverb out of the chain, its send does nothing (Lo-fi off: Vinyl's noise was left at 30%)
+    p.setFx('lofi.on', false);
+    p.setMix(id, { rev: 0.9 });
+    const none = await tail();
+    ok(none < 0.005, `Reverb out of the chain: no tail even with its knob up (${none.toFixed(4)})`);
+  } catch (e) {
+    out.push(`FAIL fx: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

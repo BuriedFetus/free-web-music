@@ -14,12 +14,14 @@ pub mod device;
 pub mod devices;
 pub mod dsp;
 pub mod events;
+pub mod fx;
 pub mod mixer;
 
 use device::{Device, ModSource, RouteError};
 use devices::basalt::Basalt;
 use devices::flint::Flint;
 use events::{Event, Kind, Queue};
+use fx::Fx;
 use mixer::Mixer;
 
 #[cfg(all(target_arch = "wasm32", not(test)))]
@@ -85,6 +87,8 @@ pub struct Rack {
     pub scope: [f32; SCOPE_LEN],
     pub scope_pos: usize,
     pub mixer: Mixer,
+    /// The master effects chain (Reverb, Delay, Lo-fi, Low-pass), after the strips, before the master fader.
+    pub fx: Fx,
     /// Meter snapshot for the host (see `Mixer::take_meters`).
     pub meters: [f32; (MAX_SLOTS + 1) * 2],
 }
@@ -103,6 +107,7 @@ impl Rack {
             scope: [0.0; SCOPE_LEN],
             scope_pos: 0,
             mixer: Mixer::new(sample_rate),
+            fx: Fx::new(sample_rate),
             meters: [0.0; (MAX_SLOTS + 1) * 2],
         }
     }
@@ -161,7 +166,7 @@ impl Rack {
             let (l, r) = (&mut self.tmp_l[from..to], &mut self.tmp_r[from..to]);
             if let Some(d) = self.slots[i].device() {
                 d.render(l, r);
-                self.mixer.strip(i, l, r);
+                self.mixer.strip(i, l, r, Some((&mut self.fx.sends, from)));
                 for (o, x) in self.out_l[from..to].iter_mut().zip(l.iter()) {
                     *o += *x;
                 }
@@ -200,6 +205,7 @@ impl Rack {
         }
         core::mem::swap(&mut self.queue, &mut self.carry);
 
+        self.fx.process(&mut self.out_l, &mut self.out_r, n);
         self.mixer.master(&mut self.out_l[..n], &mut self.out_r[..n]);
         for k in 0..n {
             self.scope[self.scope_pos] = 0.5 * (self.out_l[k] + self.out_r[k]);
@@ -220,6 +226,8 @@ fn rack() -> Option<&'static mut Rack> {
 #[no_mangle]
 pub extern "C" fn fwm_init(sample_rate: f32) {
     unsafe {
+        RACK = None;
+        fx::line::reset_pool();
         RACK = Some(Rack::new(sample_rate));
     }
 }
@@ -374,4 +382,22 @@ pub extern "C" fn fwm_meters() -> *const f32 {
 #[no_mangle]
 pub extern "C" fn fwm_meters_len() -> u32 {
     ((MAX_SLOTS + 1) * 2) as u32
+}
+
+// ---- master effects ----
+
+/// An effect setting (see `fx::param`: 0–4 Reverb, 10–15 Delay, 20–28 Lo-fi, 30–32 Low-pass).
+#[no_mangle]
+pub extern "C" fn fwm_fx(param: u32, value: f32) {
+    if let Some(r) = rack() {
+        r.fx.set(param, value);
+    }
+}
+
+/// The chain order: up to four effect ids (0 Reverb, 1 Delay, 2 Lo-fi, 3 Low-pass; 255 = none).
+#[no_mangle]
+pub extern "C" fn fwm_fx_chain(a: u32, b: u32, c: u32, d: u32) {
+    if let Some(r) = rack() {
+        r.fx.set_chain(&[a as u8, b as u8, c as u8, d as u8]);
+    }
 }

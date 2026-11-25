@@ -4,7 +4,7 @@
 import { useState } from 'react';
 import type { Peer } from '../../collab/presence';
 import { deviceEntry, LIBRARY } from '../../devices/registry';
-import { BAR, type SongRow, type TrackInfo } from '../../model/project';
+import { BAR, PAD_NOTE, PADS, type SongRow, type TrackInfo } from '../../model/project';
 import { useStudio } from '../context';
 import { usePlayNext, usePlayRow, usePlayStep } from './common';
 import { TrackNameInput } from './TrackName';
@@ -152,18 +152,66 @@ function Cell({ row, rowName, rowLen, track: t, now }: { row: string; rowName: s
     <button type="button" className={'fwm-cell has' + (on ? ' is-on' : '')} onClick={select}
       style={{ '--k': idx % 4, '--tw': `${(project.playLen(t.id, info.id) / rowLen) * 100}%` } as React.CSSProperties}
       aria-label={`${rowName}, ${t.name}: ${info.name}`}>
-      <b>{info.name}</b>
-      <small>{lenLabel(info.len)}</small>
-      {reps > 1 && <span className="fwm-cell__rep">×{Number.isInteger(reps) ? reps : reps.toFixed(1)}</span>}
+      <span className="fwm-cell__top">
+        <b>{info.name}</b>
+        <small>{lenLabel(info.len)}</small>
+        {reps > 1 && <span className="fwm-cell__rep">×{Number.isInteger(reps) ? reps : reps.toFixed(1)}</span>}
+      </span>
+      <PatternPreview track={t} pattern={info.id} len={info.len} />
       <span className="fwm-cell__ticks" />
       {now && <CellProgress slot={slotOf(t.id)} len={info.len} />}
     </button>
   );
 }
 
-/** How far the pattern has played in its current repeat (only the playing cells subscribe to the clock). */
+/**
+ * A small picture of the pattern: notes by position, length and pitch (a mini piano roll), or for a drum
+ * machine one row of hits per pad. Bars and beats are marked, so you can read the rhythm at a glance.
+ */
+function PatternPreview({ track, pattern, len }: { track: TrackInfo; pattern: string; len: number }) {
+  const { project } = useStudio();
+  const notes = project.notes(track.id, pattern).map(([, n]) => n);
+  const pads = deviceEntry(track.device)?.layout === 'pads';
+  const H = 24;
+  let rows: number;
+  let rowOf: (m: number) => number;
+  if (pads) {
+    rows = PADS;
+    rowOf = (m) => PADS - 1 - Math.max(0, Math.min(PADS - 1, m - PAD_NOTE)); // pad 1 at the bottom
+  } else {
+    const ms = notes.map((n) => n.m);
+    const lo = Math.min(...ms);
+    const hi = Math.max(...ms);
+    const span = Math.max(12, hi - lo + 1); // at least an octave tall, so a few notes don't fill it
+    const base = lo - Math.floor((span - (hi - lo + 1)) / 2);
+    rows = span;
+    rowOf = (m) => span - 1 - (m - base);
+  }
+  const rh = H / rows;
+  const grid = [];
+  for (let b = 4; b < len; b += 4) grid.push(<rect key={b} className={b % BAR ? 'fwm-cell__beat' : 'fwm-cell__bar'} x={(b / len) * 100} y={0} width={0.4} height={H} />);
+  return (
+    <svg className="fwm-cell__pv" viewBox={`0 0 100 ${H}`} preserveAspectRatio="none" aria-hidden="true">
+      {grid}
+      {notes.map((n, i) => {
+        if (n.s >= len) return null;
+        const x = (n.s / len) * 100;
+        const w = pads ? Math.max(0.9, 60 / len) : Math.max(0.8, (Math.min(n.l, len - n.s) / len) * 100 - 0.4);
+        return <rect key={i} className="fwm-cell__note" x={x} y={rowOf(n.m) * rh + rh * 0.1} width={w} height={Math.max(1.4, rh * 0.8)} rx={0.4} opacity={0.45 + 0.55 * n.v} />;
+      })}
+    </svg>
+  );
+}
+
+/** How far the pattern has played in its current repeat, and a playhead over its preview (only playing cells subscribe). */
 function CellProgress({ slot, len }: { slot: number | undefined; len: number }) {
   const step = usePlayStep(slot);
-  return <span className="fwm-cell__pr" style={{ width: step < 0 ? 0 : `${((step + 1) / len) * 100}%` }} />;
+  if (step < 0) return <span className="fwm-cell__pr" style={{ width: 0 }} />;
+  return (
+    <>
+      <span className="fwm-cell__pr" style={{ width: `${((step + 1) / len) * 100}%` }} />
+      <span className="fwm-cell__ph" style={{ left: `calc(9px + (100% - 18px) * ${(step + 0.5) / len})` }} />
+    </>
+  );
 }
 

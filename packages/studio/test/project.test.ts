@@ -323,3 +323,48 @@ describe('Project (mixer)', () => {
     expect(you.mix(you.trackIds()[0])).toEqual({ level: 0.8, pan: 0, solo: false, rev: 0, dly: 0 });
   });
 });
+
+describe('Project (master effects)', () => {
+  it('defaults, shared changes, the chain, per-style Lo-fi, files', async () => {
+    const { engineFx } = await import('../src/model/fx');
+    const [you, mira] = pair();
+    expect(you.fxChain).toEqual(['reverb', 'delay', 'lofi', 'lowpass']);
+    expect(you.fx('lowpass.cutoff')).toBe(1);
+    expect(you.fx('lofi.on')).toBe(false);
+    you.setFx('reverb.size', 0.8);
+    mira.setFxChain(['lowpass', 'reverb']);
+    expect(mira.fx('reverb.size')).toBe(0.8);
+    expect(you.fxChain).toEqual(['lowpass', 'reverb']);
+    expect(you.fxShelf).toEqual(['delay', 'lofi']);
+    you.setFxChain(['reverb', 'reverb', 'nope' as never, 'delay']);
+    expect(mira.fxChain).toEqual(['reverb', 'delay']);
+    // each Lo-fi style keeps its own settings; the engine gets the active style's
+    you.setFx('lofi.vinyl.noise', 0.2);
+    you.setFx('lofi.style', 'vinyl');
+    expect(engineFx((k) => you.fx(k), 120)['lofi.noise']).toBe(0.2);
+    you.setFx('lofi.style', 'tape');
+    expect(engineFx((k) => you.fx(k), 120)['lofi.noise']).toBe(0);
+    // delay follows the tempo: 1/8. at 120 BPM = 0.375 s
+    expect(engineFx((k) => you.fx(k), 120)['delay.time']).toBeCloseTo(0.375);
+    you.setFx('delay.div', 3);
+    expect(engineFx((k) => you.fx(k), 90)['delay.time']).toBeCloseTo(60 / 90);
+    you.setFx('reverb.size', 7);
+    expect(you.fx('reverb.size')).toBe(1);
+    const file = you.toFile();
+    mira.initSong(m);
+    expect(you.fxChain).toEqual(['reverb', 'delay', 'lofi', 'lowpass']);
+    you.loadFile(file, { basalt: m }, null);
+    expect(mira.fxChain).toEqual(['reverb', 'delay']);
+    expect(mira.fx('lofi.vinyl.noise')).toBe(0.2);
+    expect(mira.fx('delay.div')).toBe(3);
+  });
+
+  it('undo of an effect change is per person', () => {
+    const [you, mira] = pair();
+    mira.setFx('delay.feedback', 0.9);
+    you.setFx('reverb.tone', 0.1);
+    you.undo();
+    expect(you.fx('reverb.tone')).toBe(0.6);
+    expect(you.fx('delay.feedback')).toBe(0.9);
+  });
+});

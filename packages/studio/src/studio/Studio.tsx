@@ -13,6 +13,7 @@ import { deviceEntry } from '../devices/registry';
 import { EngineProvider, useEngine } from '../engine/EngineProvider';
 import { HeldParams, useDeviceSync } from '../engine/useDeviceSync';
 import { useComputerKeys } from '../hooks/useComputerKeys';
+import { engineFx } from '../model/fx';
 import { MAX_LEN, Project, type TrackInfo } from '../model/project';
 import { ThemeRoot, type StudioTheme } from '../theme/Theme';
 import { QUANT, StudioContext, type StudioCtx, type Workspace } from './context';
@@ -417,6 +418,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
         return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} held={held} audible={audible} />;
       })}
       {live && <SongEngine project={project} slotOf={slotOf} loop={ws.loop} />}
+      {live && <FxEngine project={project} />}
       <div className="fwm-app">
         <TopBar peers={peers} octave={octave} />
         <WorkspaceGrid userId={user.id} peers={peers} />
@@ -459,7 +461,7 @@ function TrackEngine({ project, track, slot, held, audible }: { project: Project
       engine.setTrack(slot, track.seq);
     }
     const mix = project.mix(track.id);
-    const strip = { level: mix.level, pan: mix.pan, mute: !audible };
+    const strip = { level: mix.level, pan: mix.pan, mute: !audible, sendA: mix.rev, sendB: mix.dly };
     const mk = JSON.stringify(strip);
     if (mk !== mixKey.current) {
       mixKey.current = mk;
@@ -484,6 +486,34 @@ function TrackEngine({ project, track, slot, held, audible }: { project: Project
       if (seen.has(id)) continue;
       sent.current.delete(id);
       engine.deletePat(slot, id);
+    }
+  });
+  return null;
+}
+
+/** Keeps the master effects (settings, chain order) mirrored in the engine; the delay time follows the tempo. */
+function FxEngine({ project }: { project: Project }) {
+  const { engine } = useEngine();
+  const sent = useRef(new Map<string, number>());
+  const chainSent = useRef('');
+  useEffect(() => {
+    sent.current = new Map();
+    chainSent.current = '';
+  }, [engine]);
+  useEffect(() => {
+    if (!engine) return;
+    const want = engineFx((k) => project.fx(k), project.bpm);
+    const changed: Record<string, number> = {};
+    for (const [k, v] of Object.entries(want)) {
+      if (sent.current.get(k) === v) continue;
+      sent.current.set(k, v);
+      changed[k] = v;
+    }
+    if (Object.keys(changed).length) engine.setFx(changed);
+    const chain = project.fxChain.join(',');
+    if (chain !== chainSent.current) {
+      chainSent.current = chain;
+      engine.setChain(project.fxChain);
     }
   });
   return null;

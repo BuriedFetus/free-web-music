@@ -99,15 +99,24 @@
 .fwm-tl .fwm-av { position: absolute; top: 4px; right: 4px; }
 .fwm-arow.is-sel .fwm-tl { box-shadow: inset 0 0 0 2px var(--fwm-roll-ink); }
 .fwm-arow.is-now .fwm-tl { background: var(--fwm-roll-ink); color: var(--fwm-roll-deep); }
-.fwm-cell { position: relative; height: 60px; border-radius: 8px; border: 0; cursor: pointer; background: var(--fwm-roll2); color: var(--fwm-roll-ink); text-align: left; padding: 7px 9px; overflow: hidden; }
+.fwm-cell { position: relative; height: 72px; border-radius: 8px; border: 0; cursor: pointer; background: var(--fwm-roll2); color: var(--fwm-roll-ink); text-align: left; padding: 7px 9px; overflow: hidden; }
 .fwm-cell:hover { filter: brightness(1.12); }
 .fwm-cell.is-on { outline: 3px solid var(--fwm-note); outline-offset: 1px; }
 .fwm-cell.has { background: color-mix(in srgb, var(--fwm-note) calc(18% + var(--k) * 9%), var(--fwm-roll2)); }
 .fwm-arow.is-now .fwm-cell { box-shadow: inset 0 0 0 2px var(--fwm-roll-ink); }
-.fwm-cell b { display: block; font: 900 20px/1.1 var(--fwm-font-display); letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; padding-right: 30px; }
-.fwm-cell small { display: block; font-size: 12px; opacity: .9; }
+.fwm-cell.has { display: flex; flex-direction: column; justify-content: flex-start; }
+.fwm-cell__top { display: flex; align-items: baseline; gap: 6px; min-width: 0; width: 100%; }
+.fwm-cell b { flex: 1; min-width: 0; font: 900 20px/1.1 var(--fwm-font-display); letter-spacing: .03em; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+.fwm-cell small { font-size: 12px; opacity: .9; white-space: nowrap; }
+/* pattern preview: a mini roll (or pad grid) under the name, with a playhead while it plays */
+.fwm-cell__pv { position: absolute; left: 9px; right: 9px; bottom: 9px; height: 26px; width: calc(100% - 18px); border-radius: 3px; background: color-mix(in srgb, var(--fwm-roll-deep) 45%, transparent); }
+.fwm-cell__note { fill: var(--fwm-roll-ink); }
+.fwm-cell.is-on .fwm-cell__note, .fwm-arow.is-now .fwm-cell__note { fill: var(--fwm-note); }
+.fwm-cell__beat { fill: color-mix(in srgb, var(--fwm-roll-ink) 12%, transparent); }
+.fwm-cell__bar { fill: color-mix(in srgb, var(--fwm-roll-ink) 35%, transparent); }
+.fwm-cell__ph { position: absolute; bottom: 9px; height: 26px; width: 2px; margin-left: -1px; background: var(--fwm-roll-ink); box-shadow: 0 0 calc(6px * var(--fwm-glow)) var(--fwm-roll-ink); }
 .fwm-cell__empty { opacity: .55; font-size: 20px; }
-.fwm-cell__rep { position: absolute; right: 8px; top: 7px; font-size: 12px; font-weight: 700; opacity: .9; }
+.fwm-cell__rep { font-size: 12px; font-weight: 700; opacity: .9; white-space: nowrap; }
 .fwm-cell__ticks { position: absolute; left: 0; right: 0; bottom: 0; height: 5px; background: repeating-linear-gradient(90deg, transparent 0 calc(var(--tw) - 2px), color-mix(in srgb, var(--fwm-roll-deep) 80%, transparent) calc(var(--tw) - 2px) var(--tw)); }
 .fwm-cell__pr { position: absolute; left: 0; bottom: 0; height: 5px; background: var(--fwm-note); box-shadow: 0 0 calc(8px * var(--fwm-glow)) var(--fwm-note); }
 .fwm-ra { display: flex; gap: 4px; align-items: center; }
@@ -247,7 +256,8 @@
 
 /* mixer: a desk of strips; meters are two bars fed by --lvl / --hold (set from the engine, no re-render) */
 .fwm-mixer { height: 100%; overflow: auto; }
-.fwm-mixer__desk { display: flex; gap: 8px; padding: 10px; min-height: 100%; align-items: stretch; }
+.fwm-mixer__desk { display: flex; gap: 8px; padding: 10px; align-items: stretch; }
+.fwm-mixer:not(.is-expanded) .fwm-mixer__desk { min-height: 100%; }
 .fwm-mixer__empty { color: var(--fwm-roll-ink); opacity: .75; margin: auto; font-size: 14px; }
 .fwm-strip { flex: none; width: 104px; display: flex; flex-direction: column; align-items: center; gap: 8px; padding: 8px 6px; border-radius: calc(10px * var(--fwm-round)); background: linear-gradient(160deg, var(--dev-case), var(--dev-case2)); color: var(--dev-silk); }
 .fwm-strip.is-sel { box-shadow: inset 0 0 0 2px var(--fwm-roll-ink); }
@@ -273,3 +283,53 @@
 .fwm-meter i::before { content: ''; position: absolute; left: 0; right: 0; bottom: 0; height: var(--lvl); background: linear-gradient(to top, var(--fwm-note) 0 75%, var(--fwm-rec) 100%); background-size: 100% 170px; background-position: bottom; }
 .fwm-meter i::after { content: ''; position: absolute; left: 0; right: 0; height: 2px; bottom: calc(var(--hold) - 2px); background: var(--fwm-roll-ink); opacity: .8; }
 .fwm-meter i.is-hot::after { background: var(--fwm-rec); opacity: 1; }
+
+/* strip sends (Reverb, Delay): two small knobs side by side; the master's chain button takes their row */
+.fwm-strip__sends { height: 74px; display: flex; justify-content: center; gap: 0; }
+.fwm-strip__sends .fwm-knob { width: 50px; }
+.fwm-strip__sends .fwm-knob svg { width: 34px; height: 34px; }
+.fwm-strip__sends .fwm-knob__val { font-size: 13px; height: 12px; }
+.fwm-strip__sends .fwm-knob .fwm-silk { font-size: 10px; }
+.fwm-app .fwm-strip__chain { height: 74px; width: 100%; border: 1px dashed color-mix(in srgb, var(--fwm-roll-ink) 35%, transparent); border-radius: calc(7px * var(--fwm-round)); background: none; color: var(--fwm-roll-ink); font: 600 11px/1.3 var(--fwm-font-ui); cursor: pointer; padding: 4px; }
+.fwm-app .fwm-strip__chain:disabled { cursor: default; border-style: solid; opacity: .85; }
+.fwm-strip__chainx { color: var(--fwm-note); font-weight: 800; }
+
+/* effects chain: the sound flows left to right, arrows between the steps */
+.fwm-fxrack { padding: 0 10px 12px; }
+.fwm-fxflow { display: flex; align-items: stretch; overflow-x: auto; padding: 2px 2px 10px; scrollbar-width: thin; }
+.fwm-fxstep { display: flex; align-items: stretch; flex: none; }
+.fwm-arrow { flex: none; display: grid; place-items: center; width: 34px; font-size: 28px; line-height: 1; color: var(--fwm-note); text-shadow: 0 0 calc(8px * var(--fwm-glow)) var(--fwm-note); }
+.fwm-endcap { flex: none; width: 100px; display: grid; place-content: center; gap: 4px; text-align: center; padding: 8px; border-radius: calc(10px * var(--fwm-round)); border: 2px dashed color-mix(in srgb, var(--fwm-roll-ink) 35%, transparent); background: var(--fwm-roll-deep); color: var(--fwm-roll-ink); }
+.fwm-endcap b { font: 900 14px/1 var(--fwm-font-display); letter-spacing: .04em; }
+.fwm-endcap small { font-size: 11px; opacity: .75; }
+.fwm-endcap.is-drop { border-color: var(--fwm-note); }
+.fwm-fxu { flex: none; width: 250px; display: grid; align-content: start; gap: 8px; padding: 10px; border-radius: calc(10px * var(--fwm-round)); background: linear-gradient(160deg, var(--fwm-roll2), var(--fwm-roll)); color: var(--fwm-roll-ink); box-shadow: inset 0 1px 0 color-mix(in srgb, var(--fwm-roll-ink) 25%, transparent), 0 calc(4px * var(--fwm-depth)) calc(10px * var(--fwm-depth)) color-mix(in srgb, var(--fwm-bg) 60%, transparent); }
+.fwm-fxu.is-off { opacity: .62; }
+.fwm-fxu.is-dragging { opacity: .35; }
+.fwm-fxu.is-drop-before { box-shadow: -5px 0 0 var(--fwm-note); }
+.fwm-fxu.is-drop-after { box-shadow: 5px 0 0 var(--fwm-note); }
+.fwm-fxu__h { display: flex; align-items: center; gap: 6px; min-height: 30px; cursor: grab; }
+.fwm-fxu__h b { font: 900 18px/1 var(--fwm-font-display); letter-spacing: .06em; text-transform: uppercase; }
+.fwm-fxu__grip { opacity: .6; font-size: 16px; letter-spacing: -2px; }
+.fwm-fxu__mv { display: flex; gap: 3px; margin-left: auto; }
+.fwm-fxu__mv button { width: 28px; height: 28px; border-radius: 6px; border: 0; background: var(--fwm-roll-btn); color: var(--fwm-roll-ink); cursor: pointer; font-size: 12px; font-weight: 800; }
+.fwm-fxu__mv button:disabled { opacity: .35; cursor: default; }
+.fwm-fxu__s { display: flex; align-items: center; justify-content: space-between; gap: 8px; min-height: 30px; }
+.fwm-fxu__s small { opacity: .75; font-size: 12px; }
+.fwm-fxu__on[aria-pressed=true] { background: var(--fwm-note); color: var(--fwm-on-note); }
+.fwm-fxu__seg { display: flex; flex-wrap: wrap; gap: 4px; }
+.fwm-fxu__knobs { display: flex; flex-wrap: wrap; justify-content: space-between; gap: 4px 0; }
+.fwm-fxu__knobs--lp { justify-content: space-around; align-items: center; }
+.fwm-fxu .fwm-knob { width: 58px; }
+.fwm-fxu .fwm-knob svg { width: 44px; height: 44px; }
+.fwm-fxu .fwm-knob--lg { width: 110px; }
+.fwm-fxu .fwm-knob--lg svg { width: 84px; height: 84px; }
+.fwm-fxu .fwm-knob__val { font-size: 14px; height: 13px; }
+.fwm-fxu .fwm-knob .fwm-silk { font-size: 11px; }
+.fwm-fxpic { height: 64px; border-radius: calc(7px * var(--fwm-round)); background: var(--fwm-roll-deep); overflow: hidden; }
+.fwm-fxpic svg { width: 100%; height: 100%; display: block; }
+.fwm-fxpic__line { fill: none; stroke: var(--fwm-note); stroke-width: 2; filter: drop-shadow(0 0 calc(4px * var(--fwm-glow)) var(--fwm-note)); }
+.fwm-fxpic__fill { fill: color-mix(in srgb, var(--fwm-note) 25%, transparent); }
+.fwm-shelf { display: flex; flex-wrap: wrap; align-items: center; gap: 8px; padding: 8px 12px; min-height: 52px; border: 2px dashed color-mix(in srgb, var(--fwm-roll-ink) 35%, transparent); border-radius: calc(10px * var(--fwm-round)); color: var(--fwm-roll-ink); opacity: .9; font-size: 13px; }
+.fwm-shelf.is-over { border-color: var(--fwm-note); opacity: 1; }
+.fwm-app .fwm-fxchip { min-height: 36px; padding: 0 14px; border-radius: 99px; border: 0; background: var(--fwm-roll2); color: var(--fwm-roll-ink); font: 900 15px/1 var(--fwm-font-display); letter-spacing: .05em; text-transform: uppercase; cursor: grab; }

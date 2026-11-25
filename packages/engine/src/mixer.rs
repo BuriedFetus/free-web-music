@@ -5,7 +5,7 @@
 //! Solo is decided by the host (it knows every track): a strip that is soloed out is simply muted here.
 
 use crate::dsp::smooth::{smoothing_coef, Smoother};
-use crate::MAX_SLOTS;
+use crate::{BLOCK, MAX_SLOTS};
 
 /// Strip parameters, as numbered in the C interface (`fwm_mix`).
 pub const MIX_LEVEL: u32 = 0;
@@ -45,6 +45,8 @@ pub struct Strip {
     mute: bool,
     gl: Smoother,
     gr: Smoother,
+    sa: Smoother,
+    sb: Smoother,
     /// Post-fader send amounts (0..1) to the shared effects A (reverb) and B (delay).
     pub send: [f32; 2],
     /// Peak |sample| per side since the meters were last read.
@@ -54,13 +56,15 @@ pub struct Strip {
 impl Strip {
     const fn new() -> Strip {
         // fader_gain(UNITY) = 1
-        Strip { level: UNITY, pan: 0.0, mute: false, gl: Smoother::new(1.0), gr: Smoother::new(1.0), send: [0.0; 2], peak: [0.0; 2] }
+        Strip { level: UNITY, pan: 0.0, mute: false, gl: Smoother::new(1.0), gr: Smoother::new(1.0), sa: Smoother::new(0.0), sb: Smoother::new(0.0), send: [0.0; 2], peak: [0.0; 2] }
     }
     fn update(&mut self) {
         let g = if self.mute { 0.0 } else { fader_gain(self.level) };
         let (l, r) = balance(self.pan);
         self.gl.target = g * l;
         self.gr.target = g * r;
+        self.sa.target = self.send[0];
+        self.sb.target = self.send[1];
     }
 }
 
@@ -105,16 +109,35 @@ impl Mixer {
         }
     }
 
-    /// Apply a strip (gain, balance) to one device's output, in place, and meter it.
-    pub fn strip(&mut self, slot: usize, left: &mut [f32], right: &mut [f32]) {
+    /// Apply a strip (gain, balance) to one device's output, in place, and meter it. With `sends`
+    /// (the effect send buses and where this span starts in the block), the post-fader sound is
+    /// added to send A (reverb) and B (delay) by the strip's send amounts.
+    pub fn strip(&mut self, slot: usize, left: &mut [f32], right: &mut [f32], sends: Option<(&mut [[f32; BLOCK]; 4], usize)>) {
         let c = self.coef;
         let s = &mut self.strips[slot];
         let (mut pl, mut pr) = (s.peak[0], s.peak[1]);
-        for (l, r) in left.iter_mut().zip(right.iter_mut()) {
-            *l *= s.gl.next(c);
-            *r *= s.gr.next(c);
-            pl = pl.max(l.abs());
-            pr = pr.max(r.abs());
+        match sends {
+            Some((bus, from)) => {
+                for (k, (l, r)) in left.iter_mut().zip(right.iter_mut()).enumerate() {
+                    *l *= s.gl.next(c);
+                    *r *= s.gr.next(c);
+                    let (a, b) = (s.sa.next(c), s.sb.next(c));
+                    bus[0][from + k] += *l * a;
+                    bus[1][from + k] += *r * a;
+                    bus[2][from + k] += *l * b;
+                    bus[3][from + k] += *r * b;
+                    pl = pl.max(l.abs());
+                    pr = pr.max(r.abs());
+                }
+            }
+            None => {
+                for (l, r) in left.iter_mut().zip(right.iter_mut()) {
+                    *l *= s.gl.next(c);
+                    *r *= s.gr.next(c);
+                    pl = pl.max(l.abs());
+                    pr = pr.max(r.abs());
+                }
+            }
         }
         s.peak = [pl, pr];
     }

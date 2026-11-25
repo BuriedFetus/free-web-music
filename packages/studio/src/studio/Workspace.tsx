@@ -91,7 +91,7 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
             {v === 'seq' && <SeqView peers={peers} />}
             {v === 'roll' && <RollView peers={peers} />}
             {v === 'device' && <DeviceView peers={peers} />}
-            {v === 'mixer' && <MixerView peers={peers} />}
+            {v === 'mixer' && <MixerView peers={peers} expanded={L.max === i} onExpand={() => save({ ...L, max: i })} />}
             {v === 'library' && <LibraryView />}
           </div>
         </section>

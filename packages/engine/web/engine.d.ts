@@ -92,6 +92,10 @@ export interface Engine {
   /** Mixer strip: level 0..1 (0.8 = 0 dB), pan -1..1, mute, sendA / sendB 0..1. Gains glide. */
   setMix(slot: number, settings: Partial<{ level: number; pan: number; mute: boolean | number; sendA: number; sendB: number }>): void;
   setMaster(settings: { level?: number }): void;
+  /** Master effects settings ('reverb.size', 'delay.time' in seconds, 'lofi.on'…, see FX_PARAMS). */
+  setFx(settings: Partial<Record<FxParam, number | boolean>>): void;
+  /** Chain order; effects left out are not in the chain. */
+  setChain(names: FxId[]): void;
   setParam(slot: number, id: string, value: number): void;
   paramIndex(slot: number, id: string): number;
   setRoute(slot: number, route: number, src: ModSourceId, target: string, depth: number): void;
@@ -121,6 +125,14 @@ export interface Engine {
 
 export const KINDS: Record<DeviceId, number>;
 export const MOD_SOURCES: Record<ModSourceId, number>;
+export type FxId = 'reverb' | 'delay' | 'lofi' | 'lowpass';
+export type FxParam =
+  | 'reverb.on' | 'reverb.size' | 'reverb.predelay' | 'reverb.tone' | 'reverb.return'
+  | 'delay.on' | 'delay.time' | 'delay.feedback' | 'delay.tone' | 'delay.pingpong' | 'delay.return'
+  | 'lofi.on' | 'lofi.wow' | 'lofi.flutter' | 'lofi.saturation' | 'lofi.age' | 'lofi.noise' | 'lofi.crackle' | 'lofi.mix' | 'lofi.vinyl'
+  | 'lowpass.on' | 'lowpass.cutoff' | 'lowpass.resonance';
+export const FX_IDS: Record<FxId, number>;
+export const FX_PARAMS: Record<FxParam, number>;
 export const MIX: Record<'level' | 'pan' | 'mute' | 'sendA' | 'sendB', number>;
 export const MASTER_METER: number;
 
