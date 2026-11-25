@@ -1,0 +1,25 @@
+/* Garnet: string synth. Sunburst wood casing (amber centre, deep garnet edge), cream knobs,
+   rosewood neck (--dev-lcd), nickel and bronze strings (--dev-key, --dev-keyb), amber accent. */
+:where(.garnet, [data-device="garnet"]) {
+  --dev-case: #a8401f;
+  --dev-case2: #3d100b;
+  --dev-texture:
+    radial-gradient(ellipse 70% 90% at 38% 30%, rgba(255, 196, 102, .5), rgba(255, 150, 60, .18) 45%, transparent 70%),
+    repeating-linear-gradient(97deg, rgba(0, 0, 0, .05) 0 2px, transparent 2px 7px, rgba(255, 255, 255, .03) 7px 9px, transparent 9px 15px);
+  --dev-edge: #2a0907;
+  --dev-silk: #fbead2;
+  --dev-acc: #ffb547;
+  --dev-lcd: #1d0f0b;
+  --dev-lcdink: #ffc874;
+  --dev-cap: #f6ead2;
+  --dev-capd: #b39769;
+  --dev-btn: #f6ead2;
+  --dev-btn2: #cfb48a;
+  --dev-btnink: #3a160e;
+  --dev-btnedge: #7b5934;
+  --dev-sec: rgba(0, 0, 0, .2);
+  --dev-track: #1d0f0b;
+  --dev-key: #e4e1dc;
+  --dev-keyb: #c99a5b;
+  --dev-keylabel: #a08a6c;
+}

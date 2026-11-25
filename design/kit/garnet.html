@@ -1,0 +1,806 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Garnet String Synth</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Figtree:wght@400;600;800&family=VT323&family=Big+Shoulders+Display:wght@800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="skins/app.css">
+<link rel="stylesheet" href="skins/device-base.css">
+<link rel="stylesheet" href="skins/garnet.css">
+<style>
+/* VOICE an instrument you want to touch: warm wood, cream knobs, strings that move when you play them
+   IDEA a string synth with a playable neck: strum chords of the song's key, or pick notes with the scale lit up
+   PICTURE the neck itself: six strings you drag across, chord strips named for the key
+   COLOUR theme tokens only: Garnet's casing tokens (--dev-*): wood case, rosewood neck (--dev-lcd), strings (--dev-key / --dev-keyb)
+   TYPE tokens: display for the nameplate, screen for readouts, label for silkscreen, ui for chrome
+   LAYOUT top bar; device: STRING + BODY rows with the AMP block on the right, PLAY row, the neck; phone: stacks */
+*{box-sizing:border-box;min-width:0}
+html,body{margin:0}
+body{background:var(--fwm-bg);color:var(--fwm-ink);font:15px/1.45 var(--fwm-font-ui);overflow-x:clip}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fwm-me);outline-offset:2px}
+.bar{display:flex;flex-wrap:wrap;align-items:center;gap:8px 12px;padding:10px max(2vw,12px);background:var(--fwm-panel);border-bottom:1px solid var(--fwm-line)}
+.btn{min-height:40px;padding:0 14px;border-radius:calc(9px*var(--fwm-round));border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;font-weight:600;white-space:nowrap}
+.btn[aria-pressed=true]{background:var(--fwm-me);color:var(--fwm-on-me);border-color:var(--fwm-me)}
+.bar select{min-height:40px;border-radius:calc(9px*var(--fwm-round));border:1px solid var(--fwm-line);background:var(--fwm-bg);padding:0 8px;font-weight:600}
+.bar label{display:flex;align-items:center;gap:6px;font-weight:600}
+.muted{color:var(--fwm-mute);font-size:14px}
+main{padding:14px max(2vw,12px) 28px;display:grid;gap:14px;max-width:1240px;margin:0 auto}
+
+/* the device */
+.dev{border-radius:calc(18px*var(--fwm-round));padding:16px 18px 18px;background:var(--dev-texture),linear-gradient(160deg,var(--dev-case),var(--dev-case2));box-shadow:inset 0 1px 0 color-mix(in srgb,var(--dev-silk) 35%,transparent),inset 0 -3px 0 var(--dev-edge),0 calc(10px*var(--fwm-depth,1)) calc(24px*var(--fwm-depth,1)) color-mix(in srgb,var(--fwm-bg) 60%,transparent);color:var(--dev-silk);display:grid;gap:14px}
+.dhead{display:flex;flex-wrap:wrap;align-items:center;gap:10px 16px}
+.plate b{display:block;font:900 46px/.9 var(--fwm-font-display);letter-spacing:.05em}
+.plate b i{font-style:normal;color:var(--dev-acc)}
+.plate span{font:600 11px var(--fwm-font-label,var(--fwm-font-ui));letter-spacing:.1em;text-transform:uppercase;opacity:.9}
+.prog{display:flex;align-items:center;gap:6px;margin-left:auto}
+.screen{font:26px/1 var(--fwm-font-screen);background:var(--dev-lcd);color:var(--dev-lcdink);padding:8px 12px;border-radius:8px;min-width:210px;white-space:nowrap;box-shadow:inset 0 2px 6px color-mix(in srgb,var(--dev-lcd) 50%,black)}
+.screen small{font-size:18px;opacity:.7}
+.pic{width:200px;height:52px;border-radius:8px;background:var(--dev-lcd);box-shadow:inset 0 2px 6px color-mix(in srgb,var(--dev-lcd) 50%,black);display:block}
+.hw{min-height:40px;min-width:40px;padding:0 10px;border:0;border-radius:8px;cursor:pointer;background:linear-gradient(var(--dev-btn),var(--dev-btn2));color:var(--dev-btnink);box-shadow:inset 0 -3px 0 var(--dev-btnedge);font-weight:700}
+.hw[aria-pressed=true]{background:var(--dev-acc);color:var(--dev-btnink);box-shadow:inset 0 -3px 0 color-mix(in srgb,var(--dev-acc) 55%,black)}
+
+/* bracketed sections: a thin line with the name in the middle, ends turned down */
+.brk{display:flex;align-items:center;gap:12px;font:600 12px var(--fwm-font-label,var(--fwm-font-ui));letter-spacing:.14em;text-transform:uppercase;margin-bottom:6px}
+.brk::before,.brk::after{content:"";flex:1;height:9px;margin-top:9px;border-top:1.5px solid color-mix(in srgb,var(--dev-silk) 75%,transparent)}
+.brk::before{border-left:1.5px solid color-mix(in srgb,var(--dev-silk) 75%,transparent)}
+.brk::after{border-right:1.5px solid color-mix(in srgb,var(--dev-silk) 75%,transparent)}
+.face{display:grid;grid-template-columns:minmax(0,2.3fr) minmax(0,1fr);gap:22px}
+.rowk{display:grid;grid-template-columns:64px repeat(4,minmax(0,1fr));align-items:center;gap:6px;padding:6px 0}
+.rowk+.rowk{border-top:1px dashed color-mix(in srgb,var(--dev-silk) 25%,transparent)}
+.rn{font:900 22px/1 var(--fwm-font-display);letter-spacing:.06em;writing-mode:vertical-rl;transform:rotate(180deg);justify-self:center;opacity:.9}
+.ampg{display:grid;grid-template-columns:repeat(2,minmax(0,1fr));gap:6px 4px;align-items:center;padding-top:6px}
+
+/* knobs: cream caps with a darker skirt and a pointer bar; the arc shows the value */
+.kn{text-align:center;display:grid;justify-items:center;gap:2px}
+.knob{--s:62px;width:var(--s);height:var(--s);border-radius:50%;cursor:ns-resize;touch-action:none;position:relative;background:conic-gradient(from 225deg,var(--dev-acc) calc(var(--v)*270deg),color-mix(in srgb,var(--dev-silk) 22%,transparent) 0 270deg,transparent 0)}
+.kn.lg .knob{--s:84px}
+.kn.sm .knob{--s:52px}
+.knob::before{content:"";position:absolute;inset:6px;border-radius:50%;background:radial-gradient(circle at 36% 28%,var(--dev-cap) 0 45%,var(--dev-capd) 100%);box-shadow:0 0 0 3px color-mix(in srgb,var(--dev-capd) 70%,var(--dev-edge)),0 calc(5px*var(--fwm-depth,1)) calc(8px*var(--fwm-depth,1)) color-mix(in srgb,var(--dev-edge) 70%,transparent)}
+.knob::after{content:"";position:absolute;left:50%;top:9px;width:4px;height:calc(var(--s)*.3);margin-left:-2px;border-radius:2px;background:var(--dev-btnink);transform-origin:50% calc(var(--s)/2 - 9px);transform:rotate(calc(-135deg + var(--v)*270deg))}
+.kv{font:18px/1 var(--fwm-font-screen);color:var(--dev-lcdink);background:var(--dev-lcd);border-radius:4px;padding:2px 5px;min-width:6ch;margin-top:5px}
+.kl{font:600 10.5px var(--fwm-font-label,var(--fwm-font-ui));letter-spacing:.08em;text-transform:uppercase}
+/* stepped dial: the choices are printed around it */
+.step{position:relative;width:132px;height:104px;display:grid;place-items:center}
+.step .knob{--s:58px;cursor:pointer}
+.step .knob::before{background:radial-gradient(circle at 36% 28%,var(--dev-cap) 0 40%,var(--dev-capd) 100%)}
+.step .lbl{position:absolute;left:50%;top:50%;font:600 10px var(--fwm-font-label,var(--fwm-font-ui));letter-spacing:.04em;text-transform:uppercase;white-space:nowrap;transform:translate(-50%,-50%);opacity:.65;cursor:pointer;background:none;border:0;padding:2px;color:inherit}
+.step .lbl.on{opacity:1;color:var(--dev-acc)}
+
+.playrow{display:flex;flex-wrap:wrap;align-items:center;gap:10px 18px}
+.playrow .kn .knob{--s:52px}
+.mode{display:flex;gap:4px;padding:4px;border-radius:10px;background:var(--dev-sec)}
+.chips{display:flex;flex-wrap:wrap;gap:4px}
+.chip{min-height:34px;padding:0 12px;border:0;border-radius:99px;cursor:pointer;background:color-mix(in srgb,var(--dev-btn) 22%,transparent);color:var(--dev-silk);font-weight:700}
+.chip[aria-pressed=true]{background:var(--dev-acc);color:var(--dev-btnink)}
+.hint{font-size:13px;opacity:.85;margin:0}
+
+/* the neck */
+.heads{display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));gap:4px;margin-bottom:6px}
+.ch{min-height:56px;border:0;border-radius:10px 10px 4px 4px;cursor:pointer;background:linear-gradient(var(--dev-btn),var(--dev-btn2));color:var(--dev-btnink);box-shadow:inset 0 -3px 0 var(--dev-btnedge);display:grid;place-content:center;line-height:1.05;padding:4px}
+.ch b{font:800 21px/1 var(--fwm-font-ui)}
+.ch small{font:600 11px var(--fwm-font-label,var(--fwm-font-ui));opacity:.7;margin-top:3px}
+.ch.hit,.ch:active{background:var(--dev-acc)}
+.fretn{text-align:center;font:18px/1 var(--fwm-font-screen);opacity:.85;position:relative;padding-bottom:10px}
+.fretn i{position:absolute;left:50%;bottom:0;width:7px;height:7px;margin-left:-3.5px;border-radius:50%;background:var(--dev-cap);opacity:.8}
+.fretn i+i{margin-left:5px}.fretn i.l{margin-left:-12px}
+.neck{position:relative;height:300px;border-radius:8px;background:repeating-linear-gradient(90deg,color-mix(in srgb,var(--dev-lcd) 88%,var(--dev-case)) 0 3px,var(--dev-lcd) 3px 11px);box-shadow:inset 0 4px 12px color-mix(in srgb,var(--dev-lcd) 50%,black),0 0 0 3px var(--dev-edge);display:grid;grid-template-columns:repeat(var(--cols),minmax(0,1fr));touch-action:none;cursor:pointer;user-select:none;overflow:hidden}
+.col{display:grid;grid-template-rows:repeat(6,1fr);border-right:3px solid color-mix(in srgb,var(--dev-keylabel) 70%,var(--dev-lcd));position:relative}
+.col:last-child{border-right:0}
+.neck.chords .col{border-right:4px solid var(--dev-lcd);background:color-mix(in srgb,var(--dev-btn) 9%,transparent)}
+.neck.chords .col:nth-child(even){background:color-mix(in srgb,var(--dev-btn) 4%,transparent)}
+.neck.notes .col.open{border-right:7px solid var(--dev-cap);background:color-mix(in srgb,var(--dev-lcd) 60%,black)}
+.col.hit{background:color-mix(in srgb,var(--dev-acc) 22%,transparent)}
+.cell{display:grid;place-items:center;position:relative;z-index:2;pointer-events:none}
+.dot{min-width:30px;height:30px;padding:0 6px;border-radius:99px;display:grid;place-items:center;font:800 13px/1 var(--fwm-font-ui);background:color-mix(in srgb,var(--dev-acc) 70%,var(--dev-lcd));color:var(--dev-btnink);box-shadow:0 2px 5px color-mix(in srgb,var(--dev-lcd) 70%,black)}
+.dot.root{background:var(--dev-acc);box-shadow:0 0 0 2px var(--dev-cap),0 0 calc(10px*var(--fwm-glow)) var(--dev-acc)}
+.dot.off{min-width:8px;width:8px;height:8px;padding:0;background:color-mix(in srgb,var(--dev-silk) 22%,transparent);box-shadow:none;font-size:0}
+.lock .dot.off{opacity:.25}
+.cn{font:700 12px var(--fwm-font-ui);color:var(--dev-silk);background:color-mix(in srgb,var(--dev-lcd) 80%,transparent);padding:1px 6px;border-radius:6px}
+.cn.root{color:var(--dev-btnink);background:var(--dev-acc)}
+.cn.x{background:none;color:color-mix(in srgb,var(--dev-silk) 55%,transparent);font-size:15px}
+.dot.pop,.cn.pop{animation:pop .35s ease-out}
+@keyframes pop{0%{transform:scale(1.45)}100%{transform:scale(1)}}
+.strings{position:absolute;inset:0;pointer-events:none;z-index:1}
+.str{position:absolute;left:0;right:0;height:var(--th);margin-top:calc(var(--th)/-2);background:linear-gradient(color-mix(in srgb,var(--dev-key) 100%,white),color-mix(in srgb,var(--dev-key) 60%,black));box-shadow:0 2px 3px color-mix(in srgb,var(--dev-lcd) 80%,black)}
+.str.wound{background:repeating-linear-gradient(90deg,var(--dev-keyb) 0 2px,color-mix(in srgb,var(--dev-keyb) 55%,black) 2px 3px)}
+.str.ring{animation:vib .9s linear,glow 1.3s ease-out}
+@keyframes vib{0%{transform:translateY(0)}4%{transform:translateY(-2.4px)}8%{transform:translateY(2.4px)}12%{transform:translateY(-2px)}16%{transform:translateY(2px)}22%{transform:translateY(-1.6px)}28%{transform:translateY(1.6px)}36%{transform:translateY(-1.1px)}44%{transform:translateY(1.1px)}56%{transform:translateY(-.7px)}70%{transform:translateY(.6px)}85%{transform:translateY(-.3px)}100%{transform:translateY(0)}}
+@keyframes glow{0%{box-shadow:0 0 calc(12px*var(--fwm-glow)) var(--dev-acc),0 0 0 1px var(--dev-acc)}100%{box-shadow:0 2px 3px color-mix(in srgb,var(--dev-lcd) 80%,black)}}
+.sname{position:absolute;left:4px;z-index:3;font:700 11px var(--fwm-font-ui);color:var(--dev-silk);opacity:.7;transform:translateY(-130%);pointer-events:none}
+
+.fit{display:grid;grid-template-columns:minmax(0,1fr);gap:8px;background:var(--fwm-panel);border:1px solid var(--fwm-line);border-radius:12px;padding:14px 16px}
+.fit h2{margin:0;font-size:16px}
+[hidden]{display:none!important}
+.fitnotes{font-size:14px;color:var(--fwm-mute);max-width:95ch;margin:0;padding-left:18px}
+.fitnotes li{margin:4px 0}.fitnotes b{color:var(--fwm-ink)}
+@media (max-width:900px){.face{grid-template-columns:minmax(0,1fr)}.prog{margin-left:0}}
+@media (max-width:620px){.rowk{grid-template-columns:40px repeat(2,minmax(0,1fr))}.neck{height:250px}.ch b{font-size:16px}.plate b{font-size:38px}.pic{width:140px}.neck.notes,.heads.notes{min-width:640px}.neckwrap{overflow-x:auto}}
+@media (prefers-reduced-motion:reduce){.str.ring{animation:glow 1.3s ease-out}.dot.pop,.cn.pop{animation:none}}
+</style>
+</head>
+<body>
+<div class="bar">
+  <label>Song key <select id="key" aria-label="Song key"></select></label>
+  <select id="scale" aria-label="Scale"></select>
+  <button class="btn" id="room" aria-pressed="true" title="A little room sound (in the studio: the Reverb send)">Room</button>
+  <span class="muted">Mock-up with real string sound. Click or drag across the strings. Keys 1–7 strum the chords (Shift: up-strum).</span>
+</div>
+<main>
+  <section class="dev" data-device="garnet" aria-label="Garnet string synth">
+    <div class="dhead">
+      <div class="plate"><b>GARNE<i>T</i></b><span>String synth · strum &amp; pick</span></div>
+      <div class="prog">
+        <button class="hw" id="pprev" aria-label="Previous sound">‹</button>
+        <div class="screen" id="pname" aria-live="polite"></div>
+        <button class="hw" id="pnext" aria-label="Next sound">›</button>
+        <canvas class="pic" id="pic" aria-label="The string, drawn live"></canvas>
+      </div>
+    </div>
+
+    <div class="face">
+      <div>
+        <div class="brk">Strings</div>
+        <div class="rowk" id="rowPick"><span class="rn">PICK</span></div>
+        <div class="rowk" id="rowBody"><span class="rn">BODY</span></div>
+      </div>
+      <div>
+        <div class="brk">Amp</div>
+        <div class="ampg" id="amp"></div>
+      </div>
+    </div>
+
+    <div>
+      <div class="brk">Play</div>
+      <div class="playrow" id="playrow">
+        <div class="mode" role="group" aria-label="What the neck plays">
+          <button class="hw" data-mode="chords">Chords</button>
+          <button class="hw" data-mode="notes">Notes</button>
+        </div>
+        <div class="chips" id="variants" role="group" aria-label="Chord type"></div>
+        <button class="hw" id="lock" aria-pressed="false" hidden title="Notes outside the scale don't play">Only scale notes</button>
+        <button class="hw" id="mute" aria-pressed="false" title="Rest your palm on the strings: short, thumpy notes">Palm mute</button>
+      </div>
+    </div>
+
+    <div class="neckwrap">
+      <div class="heads" id="heads"></div>
+      <div class="neck" id="neck" role="group" aria-label="Guitar neck: click or drag across the strings"></div>
+      <p class="hint" id="hint" style="margin-top:8px"></p>
+    </div>
+  </section>
+
+  <section class="fit" aria-label="How Garnet fits in the studio">
+    <h2>How it fits in the studio</h2>
+    <ul class="fitnotes">
+      <li><b>Chords follow the song's Key.</b> Each strip is a chord of the key (in C major: C, Dm, Em, F, G, Am, B°). The chord type (Triad, 7th, sus2, sus4, add9, Power) changes all of them and stays in the scale, so in C major a 7th on E gives Em7 and on G gives G7.</li>
+      <li><b>Inside a strip, each string plays its note of that chord</b>, as a guitarist would finger it (× = that string is not in the chord: it plays a muted thud if you drag over it). Drag down or up across the strings to strum; the faster you drag, the harder it plays. Click a chord name to strum it.</li>
+      <li><b>Notes mode</b> is the neck itself, frets 0–12: the scale's notes are lit, the key's root is the brightest. Drag along a string to slide. "Only scale notes" stops wrong notes.</li>
+      <li><b>The sound</b> is a modelled string, not a recording: a pluck runs round a tuned loop that loses its brightness as it rings. Pick sets where and how hard you pluck; Body is the guitar it's on (nylon, steel, hollow jazz box, or electric pickup), then the amp: Drive, Cab, Presence.</li>
+      <li><b>In the studio</b> Garnet is an instrument like Basalt: its patterns sit in the song arrangement and the Piano roll edits them. What you strum here is recorded as notes, each string a few milliseconds after the last, so the strum plays back the way you played it. Knobs are shared and show who is turning them; the mode and chord type are yours.</li>
+      <li><b>Six strings means six notes at once.</b> That polyphony is new in the engine, and Opal (pads) and Quartz (keys) will use it too.</li>
+      <li>With the song Key set to "No key", chords use C major until a key is picked.</li>
+    </ul>
+  </section>
+</main>
+
+<script>
+{
+const $ = (s, r = document) => r.querySelector(s);
+const clamp = (v, a = 0, b = 1) => Math.max(a, Math.min(b, v));
+
+// ---------- music: keys, scales, chords of the key, guitar voicings ----------
+const KEYS = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'F♯', 'G', 'A♭', 'A', 'B♭', 'B'];
+const NS = ['C', 'C♯', 'D', 'D♯', 'E', 'F', 'F♯', 'G', 'G♯', 'A', 'A♯', 'B'];
+const NF = ['C', 'D♭', 'D', 'E♭', 'E', 'F', 'G♭', 'G', 'A♭', 'A', 'B♭', 'B'];
+const SCALES = {
+  major: { n: 'Major', s: [0, 2, 4, 5, 7, 9, 11] },
+  minor: { n: 'Minor', s: [0, 2, 3, 5, 7, 8, 10] },
+  dorian: { n: 'Dorian', s: [0, 2, 3, 5, 7, 9, 10] },
+  mixo: { n: 'Mixolydian', s: [0, 2, 4, 5, 7, 9, 10] },
+  pmaj: { n: 'Major pentatonic', s: [0, 2, 4, 7, 9], parent: 'major' },
+  pmin: { n: 'Minor pentatonic', s: [0, 3, 5, 7, 10], parent: 'minor' },
+  blues: { n: 'Blues', s: [0, 3, 5, 6, 7, 10], parent: 'minor' },
+};
+const PARENT = { major: 0, minor: 3, dorian: 10, mixo: 5 }; // semitones up to the major key with the same notes
+const TUNING = [40, 45, 50, 55, 59, 64]; // low E … high E (MIDI)
+const VARIANTS = [['triad', 'Triad'], ['7', '7th'], ['sus2', 'sus2'], ['sus4', 'sus4'], ['add9', 'add9'], ['5', 'Power']];
+let key = 0, scale = 'major', variant = 'triad', mode = 'chords', lock = false;
+const chordScale = () => SCALES[SCALES[scale].parent || scale].s;
+const flats = () => [5, 10, 3, 8, 1].includes((key + PARENT[SCALES[scale].parent || scale]) % 12);
+const nn = (pc) => (flats() ? NF : NS)[((pc % 12) + 12) % 12];
+const inScale = (pc) => SCALES[scale].s.includes(((pc - key) % 12 + 12) % 12);
+
+function chordsOfKey() {
+  const S = chordScale();
+  const t = (d, k) => S[(d + k) % 7] + 12 * Math.floor((d + k) / 7) - S[d];
+  return S.map((r, d) => {
+    const third = t(d, 2), fifth = t(d, 4), sev = t(d, 6), sec = t(d, 1), four = t(d, 3);
+    const root = (key + r) % 12, R = nn(root);
+    const q = third === 4 && fifth === 7 ? '' : third === 3 && fifth === 7 ? 'm' : third === 3 && fifth === 6 ? '°' : third === 4 && fifth === 8 ? '+' : '';
+    let iv, name, opt = null;
+    if (variant === 'triad') { iv = [0, third, fifth]; name = R + q; }
+    else if (variant === '7') {
+      iv = [0, third, fifth, sev]; opt = fifth;
+      name = R + ({ '4,7,11': 'maj7', '4,7,10': '7', '3,7,10': 'm7', '3,6,10': 'm7♭5', '3,7,11': 'm(maj7)', '4,8,11': '+maj7' }[[third, fifth, sev].join()] || '7');
+    } else if (variant === 'sus2') { iv = [0, sec, fifth]; name = R + (sec === 1 ? 'sus♭2' : 'sus2') + (fifth === 6 ? '♭5' : ''); }
+    else if (variant === 'sus4') { iv = [0, four, fifth]; name = R + (four === 6 ? 'sus♯4' : 'sus4') + (fifth === 6 ? '♭5' : ''); }
+    else if (variant === 'add9') { iv = [0, third, fifth, sec]; opt = fifth; const a9 = sec === 1 ? 'add♭9' : 'add9'; name = R + (q === 'm' ? `m(${a9})` : q === '' ? a9 : `${q}(${a9})`); }
+    else { iv = [0, 7]; name = R + '5'; }
+    const rom = ['I', 'II', 'III', 'IV', 'V', 'VI', 'VII'][d];
+    const rn = (third === 3 ? rom.toLowerCase() : rom) + (q === '°' ? '°' : q === '+' ? '+' : '');
+    const ch = { root, pcs: [...new Set(iv.map((i) => (root + i + 120) % 12))], third: (root + third) % 12, opt: opt == null ? null : (root + opt) % 12, power: variant === '5', name, rn };
+    ch.frets = voicing(ch);
+    return ch;
+  });
+}
+
+// A playable guitar shape: the root in the bass, every chord note present, within four frets
+// (or using open strings), as few muted strings as possible, as low on the neck as possible.
+function voicing(ch) {
+  const win = (p) => [...(p <= 1 ? [0] : []), ...[0, 1, 2, 3].map((k) => Math.max(1, p) + k)].filter((v, i, a) => a.indexOf(v) === i);
+  let best = null, bestScore = Infinity;
+  for (let p = 0; p <= 9; p++) {
+    const W = win(p);
+    for (const bs of [0, 1, 2]) {
+      for (const bf of W.filter((f) => (TUNING[bs] + f) % 12 === ch.root)) {
+        const top = ch.power ? bs + 2 : 5;
+        if (top > 5) continue;
+        const opts = [];
+        for (let s = bs + 1; s <= top; s++) {
+          const o = W.filter((f) => ch.pcs.includes((TUNING[s] + f) % 12));
+          if (!ch.power && s >= 4) o.push(-1); // the top strings may be left out
+          if (!o.length) o.push(-1);
+          opts.push(o);
+        }
+        const fr = new Array(6).fill(-1);
+        fr[bs] = bf;
+        const rec = (i) => {
+          if (i === opts.length) {
+            const sc = score(fr, bs, top, p, ch);
+            if (sc < bestScore) { bestScore = sc; best = fr.slice(); }
+            return;
+          }
+          for (const f of opts[i]) { fr[bs + 1 + i] = f; rec(i + 1); }
+        };
+        rec(0);
+      }
+    }
+  }
+  return best;
+}
+function score(fr, bs, top, p, ch) {
+  let sc = 0;
+  const pcs = new Set(), played = [];
+  for (let s = 0; s < 6; s++) if (fr[s] >= 0) { pcs.add((TUNING[s] + fr[s]) % 12); played.push(s); }
+  for (const pc of ch.pcs) if (!pcs.has(pc)) sc += pc === ch.opt ? 2 : 100;
+  // a muted string between played ones can't be strummed cleanly
+  for (let s = bs + 1; s < played[played.length - 1]; s++) if (fr[s] < 0) sc += 20;
+  for (let s = played[played.length - 1] + 1; s <= top; s++) sc += 2.5;
+  const fretted = played.map((s) => fr[s]).filter((f) => f > 0);
+  if (fretted.length) {
+    const lo = Math.min(...fretted), hi = Math.max(...fretted);
+    const atLo = fretted.filter((f) => f === lo).length;
+    const fingers = fretted.length - (atLo > 1 ? atLo - 1 : 0);
+    if (fingers > 4) sc += 50;
+    // a barre (one finger across the lowest fret) can't leave an open string under it
+    const bar = played.filter((s) => fr[s] === lo);
+    if (bar.length > 1) for (const s of played) if (fr[s] === 0 && s > bar[0] && s < bar[bar.length - 1]) sc += 6;
+    sc += (hi - lo) * 0.6 + lo * 0.45;
+  }
+  sc -= played.length * 0.7;
+  sc += bs * 0.2;
+  const thirds = played.filter((s) => (TUNING[s] + fr[s]) % 12 === ch.third).length;
+  if (thirds > 2) sc += 1;
+  // open strings ring and are easy, unless the hand is far up the neck at the same time
+  const opens = played.filter((s) => fr[s] === 0).length, far = fretted.some((f) => f >= 4);
+  sc += opens * (far ? 1.5 : -0.4);
+  if (ch.power && played.length !== 3) sc += 30;
+  return sc;
+}
+const hz = (m) => 440 * Math.pow(2, (m - 69) / 12);
+
+// ---------- sound: six modelled strings in an AudioWorklet, then body, amp, room ----------
+const WORKLET = `
+const N = 8192, M = N - 1;
+class Garnet extends AudioWorkletProcessor {
+  constructor(o) {
+    super();
+    this.st = [];
+    for (let i = 0; i < 6; i++) this.st.push({ b: new Float32Array(N), w: 0, per: 200, tper: 200, lp: 0, exc: null, ei: 0, k: 1, kn: 0, dead: false, mute: false, live: false, quiet: 0 });
+    this.p = { sustain: .5, bright: .6, hard: .5, pick: .25, vib: 0, slide: .3, mute: 0 };
+    this.q = [];
+    this.t = 0;
+    this.dc = [0, 0, 0, 0];
+    const po = (o && o.processorOptions) || {};
+    if (po.p) this.p = po.p;
+    if (po.q) this.q = po.q.slice();
+    this.port.onmessage = (e) => { const m = e.data; if (m.t === 'p') this.p = m.p; else this.q.push(m); };
+  }
+  pluck(m) {
+    const s = this.st[m.s], p = this.p, per = sampleRate / m.f;
+    s.per = per; s.tper = per;
+    s.dead = !!m.dead; s.mute = !!p.mute && !m.dead;
+    const L = Math.max(2, Math.round(per));
+    // a burst of noise, darker for a soft thumb, brighter for a hard pick ...
+    const h = 0.05 + p.hard * 0.9, e = new Float32Array(L);
+    let lp = 0;
+    for (let i = 0; i < L; i++) { lp += h * ((Math.random() * 2 - 1) - lp); e[i] = lp; }
+    // ... minus itself a little later: plucking at a point silences the harmonics with a node there
+    const d = Math.max(1, Math.round((0.04 + p.pick * 0.42) * L)), o = new Float32Array(L);
+    let mx = 1e-6;
+    for (let i = 0; i < L; i++) { o[i] = e[i] - (i >= d ? e[i - d] : 0); mx = Math.max(mx, Math.abs(o[i])); }
+    const g = (m.v || 0.8) * (s.dead ? 0.45 : 1) * 0.5 / mx;
+    for (let i = 0; i < L; i++) o[i] *= g;
+    s.exc = o; s.ei = 0;
+    s.kn = s.live ? L : 0; s.k = 1; // re-plucking a ringing string first damps what's there
+    s.live = true; s.quiet = 0;
+  }
+  process(_i, outs) {
+    const out = outs[0], L = out[0], R = out[1] || out[0], n = L.length, sr = sampleRate, p = this.p;
+    const now = currentFrame, due = [];
+    for (let j = this.q.length - 1; j >= 0; j--) {
+      const m = this.q[j], off = Math.round((m.at || 0) * sr) - now;
+      if (off < n) { due.push([Math.max(0, off), m]); this.q.splice(j, 1); }
+    }
+    due.sort((a, b) => a[0] - b[0]);
+    const T0 = 0.35 + p.sustain * p.sustain * 7.5;
+    const gl = 1 - Math.exp(-1 / (sr * (0.004 + p.slide * p.slide * 0.3)));
+    const set = this.st.map((s, i) => {
+      if (!s.live) return null;
+      const f = sr / s.per;
+      const T = s.dead ? 0.03 : s.mute ? 0.14 : T0 * Math.pow(110 / f, 0.35);
+      const c = s.dead || s.mute ? 0.22 + p.bright * 0.2 : 0.2 + p.bright * 0.78;
+      const pan = (i - 2.5) * 0.12;
+      return { g: Math.pow(10, -3 * s.per / (sr * T)), c, comp: (1 - c) / c, gl: Math.cos((pan + 1) * Math.PI / 4), gr: Math.sin((pan + 1) * Math.PI / 4) };
+    });
+    let di = 0;
+    for (let i = 0; i < n; i++) {
+      while (di < due.length && due[di][0] <= i) {
+        const m = due[di++][1];
+        if (m.t === 'pluck') {
+          this.pluck(m);
+          const s = this.st[m.s], f = m.f, T = s.dead ? 0.03 : s.mute ? 0.14 : T0 * Math.pow(110 / f, 0.35);
+          const c = s.dead || s.mute ? 0.22 + p.bright * 0.2 : 0.2 + p.bright * 0.78, pan = (m.s - 2.5) * 0.12;
+          set[m.s] = { g: Math.pow(10, -3 * s.per / (sr * T)), c, comp: (1 - c) / c, gl: Math.cos((pan + 1) * Math.PI / 4), gr: Math.sin((pan + 1) * Math.PI / 4) };
+        } else if (m.t === 'slide') { const s = this.st[m.s]; if (s.live) s.tper = sr / m.f; }
+      }
+      this.t += 1 / sr;
+      if (this.t > 1000) this.t -= 1000;
+      const vib = 1 + p.vib * 0.006 * Math.sin(2 * Math.PI * 5.2 * this.t);
+      let l = 0, r = 0;
+      for (let k = 0; k < 6; k++) {
+        const s = this.st[k], x = set[k];
+        if (!s.live || !x) continue;
+        s.per += (s.tper - s.per) * gl;
+        const eff = s.per * vib - x.comp;
+        const pos = s.w - eff, i0 = Math.floor(pos), fr = pos - i0;
+        const a = s.b[i0 & M], b2 = s.b[(i0 + 1) & M];
+        let y = a + (b2 - a) * fr;
+        if (s.kn > 0) { s.k += (0.12 - s.k) * 0.06; y *= s.k; if (--s.kn === 0) s.k = 1; }
+        s.lp += x.c * (y - s.lp);
+        let v = s.lp * x.g;
+        if (s.exc) { v += s.exc[s.ei++]; if (s.ei >= s.exc.length) s.exc = null; }
+        if (!(v === v) || Math.abs(v) > 50) { v = 0; s.b.fill(0); s.lp = 0; s.live = false; }
+        if (Math.abs(v) < 1e-20) v = 0;
+        s.b[s.w] = v; s.w = (s.w + 1) & M;
+        l += v * x.gl; r += v * x.gr;
+        if (Math.abs(v) < 2e-5) { if (++s.quiet > sr * 0.2 && !s.exc) { s.live = false; s.b.fill(0); s.lp = 0; } } else s.quiet = 0;
+      }
+      // DC blockers
+      const yl = l - this.dc[0] + 0.995 * this.dc[1]; this.dc[0] = l; this.dc[1] = yl;
+      const yr = r - this.dc[2] + 0.995 * this.dc[3]; this.dc[2] = r; this.dc[3] = yr;
+      L[i] = yl; if (R !== L) R[i] = yr;
+    }
+    return true;
+  }
+}
+registerProcessor('garnet', Garnet);`;
+const WORKLET_URL = URL.createObjectURL(new Blob([WORKLET], { type: 'text/javascript' }));
+
+// knobs and their ranges
+const BODIES = ['Nylon', 'Steel', 'Hollow', 'Electric'];
+const CABS = ['Direct', 'Combo', 'Stack'];
+const pct = (v) => Math.round(v * 100) + '%';
+const K = {
+  pick: { l: 'Position', f: (v) => (v < 0.34 ? 'Bridge' : v < 0.67 ? 'Middle' : 'Neck') },
+  hard: { l: 'Pick', f: (v) => (v < 0.34 ? 'Thumb' : v < 0.67 ? 'Soft' : 'Hard') },
+  sustain: { l: 'Sustain', f: (v) => (0.35 + v * v * 7.5).toFixed(1) + ' s' },
+  bright: { l: 'Bright', f: pct },
+  body: { l: 'Body', steps: BODIES },
+  reso: { l: 'Resonance', f: pct },
+  tone: { l: 'Tone', f: pct },
+  drive: { l: 'Drive', f: pct, size: 'lg' },
+  cab: { l: 'Cab', steps: CABS },
+  pres: { l: 'Presence', f: (v) => ((v - 0.5) * 16 >= 0 ? '+' : '') + ((v - 0.5) * 16).toFixed(0) + ' dB' },
+  level: { l: 'Level', f: pct },
+  strum: { l: 'Strum', f: (v) => Math.round(6 + v * v * 60) + ' ms' },
+  vib: { l: 'Vibrato', f: pct },
+  slide: { l: 'Slide', f: (v) => Math.round((0.004 + v * v * 0.3) * 1000) + ' ms' },
+};
+const DEF = { pick: 0.2, hard: 0.6, sustain: 0.55, bright: 0.6, body: 3, reso: 0.6, tone: 0.55, drive: 0.12, cab: 1, pres: 0.55, level: 0.75, strum: 0.35, vib: 0, slide: 0.3, mute: 0 };
+const PRESETS = [
+  ['Clean Electric', {}],
+  ['Warm Jazz', { pick: 0.6, hard: 0.22, sustain: 0.45, bright: 0.32, body: 2, reso: 0.6, tone: 0.4, drive: 0.1, cab: 1, pres: 0.4 }],
+  ['Nylon', { pick: 0.42, hard: 0.18, sustain: 0.45, bright: 0.45, body: 0, reso: 0.7, tone: 0.5, drive: 0, cab: 0, pres: 0.5 }],
+  ['Steel Acoustic', { pick: 0.15, hard: 0.75, sustain: 0.65, bright: 0.75, body: 1, reso: 0.65, tone: 0.6, drive: 0, cab: 0, pres: 0.6 }],
+  ['Crunch', { pick: 0.12, hard: 0.8, sustain: 0.75, bright: 0.7, body: 3, reso: 0.5, tone: 0.6, drive: 0.6, cab: 2, pres: 0.55 }],
+  ['Funk Mute', { pick: 0.1, hard: 0.85, sustain: 0.5, bright: 0.75, body: 3, reso: 0.5, tone: 0.65, drive: 0.08, cab: 1, pres: 0.65, mute: 1, strum: 0.2 }],
+  ['Lead Drive', { pick: 0.15, hard: 0.7, sustain: 0.95, bright: 0.6, body: 3, reso: 0.4, tone: 0.55, drive: 0.85, cab: 2, pres: 0.5, vib: 0.35 }],
+];
+let P = { ...DEF }, preset = 0, edited = false;
+
+// Body: three resonances and a tone filter per guitar; electric = a pickup resonance instead of a box.
+const BODY = [
+  { hp: 75, b: [[105, 7, 1.4], [210, 4, 1.6], [2800, -4, 0.8]], lp: 4500, q: 0.7 },
+  { hp: 80, b: [[100, 5, 1.4], [220, 3, 1.8], [3200, 4, 0.9]], lp: 10000, q: 0.7 },
+  { hp: 70, b: [[140, 6, 1.2], [360, 3, 1.4], [1800, -3, 1]], lp: 2600, q: 1.1 },
+  { hp: 60, b: [[120, 0, 1], [400, -1, 1], [3000, 5, 2.2]], lp: 5000, q: 1.6 },
+];
+const CAB = [{ hp: 40, pk: [1000, 0, 0.7], lp: 16000, q: 0.7 }, { hp: 90, pk: [1500, 2, 0.8], lp: 5500, q: 0.9 }, { hp: 110, pk: [850, 3.5, 0.9], lp: 3800, q: 1.3 }];
+
+function graph(ctx, node) {
+  const biq = (type) => { const b = ctx.createBiquadFilter(); b.type = type; return b; };
+  const G = { ctx, node, hp: biq('highpass'), b: [biq('peaking'), biq('peaking'), biq('peaking')], tone: biq('lowpass'), sh: ctx.createWaveShaper(), post: ctx.createGain(),
+    chp: biq('highpass'), cpk: biq('peaking'), clp: biq('lowpass'), pres: biq('highshelf'), level: ctx.createGain(), room: ctx.createConvolver(), roomG: ctx.createGain(),
+    comp: ctx.createDynamicsCompressor(), an: ctx.createAnalyser(), drive: -1 };
+  G.sh.oversample = '4x';
+  G.pres.frequency.value = 3000;
+  G.an.fftSize = 2048;
+  G.comp.threshold.value = -10; G.comp.ratio.value = 4; G.comp.attack.value = 0.005; G.comp.release.value = 0.2;
+  const chain = [node, G.hp, ...G.b, G.tone, G.sh, G.post, G.chp, G.cpk, G.clp, G.pres, G.level, G.comp, G.an, ctx.destination];
+  for (let i = 0; i < chain.length - 1; i++) chain[i].connect(chain[i + 1]);
+  G.level.connect(G.roomG); G.roomG.connect(G.room); G.room.connect(G.comp);
+  const len = Math.floor(ctx.sampleRate * 1.4), ir = ctx.createBuffer(2, len, ctx.sampleRate);
+  for (let c = 0; c < 2; c++) { const d = ir.getChannelData(c); for (let i = 0; i < len; i++) d[i] = (Math.random() * 2 - 1) * Math.pow(1 - i / len, 4) * (i < ctx.sampleRate * 0.012 ? 0 : 1); }
+  G.room.buffer = ir;
+  return G;
+}
+function applyGraph(G, P, room) {
+  const B = BODY[P.body], C = CAB[P.cab], set = (a, v) => a.setTargetAtTime(v, G.ctx.currentTime, 0.02);
+  G.hp.frequency.value = B.hp;
+  B.b.forEach(([f, g, q], i) => { G.b[i].frequency.value = f; G.b[i].Q.value = q; set(G.b[i].gain, g * P.reso * 1.6); });
+  set(G.tone.frequency, Math.min(18000, B.lp * Math.pow(2, (P.tone - 0.5) * 2.5))); G.tone.Q.value = B.q;
+  if (G.drive !== P.drive) {
+    // the drive curve, level-matched: a typical pluck (0.4) comes out at about the same level clean or driven
+    const k = 0.5 + P.drive * 12, curve = new Float32Array(2048), tk = Math.tanh(k);
+    for (let i = 0; i < 2048; i++) { const x = (i / 2047) * 2 - 1; curve[i] = Math.tanh(k * x) / tk; }
+    G.sh.curve = curve; G.post.gain.value = 0.45 / (Math.tanh(0.4 * k) / tk); G.drive = P.drive;
+  }
+  G.chp.frequency.value = C.hp; G.cpk.frequency.value = C.pk[0]; G.cpk.gain.value = C.pk[1]; G.cpk.Q.value = C.pk[2]; G.clp.frequency.value = C.lp; G.clp.Q.value = C.q;
+  set(G.pres.gain, (P.pres - 0.5) * 16);
+  set(G.level.gain, P.level * P.level * 1.6);
+  set(G.roomG.gain, room ? 0.13 : 0);
+}
+const workletP = (P) => ({ sustain: P.sustain, bright: P.bright, hard: P.hard, pick: P.pick, vib: P.vib, slide: P.slide, mute: P.mute });
+
+let A = null, pending = [], room = true;
+// Built inside the first click: browsers only allow sound that starts from a click.
+function ensureAudio() {
+  if (A) { A.ctx.resume().catch(() => {}); return; }
+  const ctx = new AudioContext();
+  ctx.resume().catch(() => {});
+  A = { ctx, G: null };
+  ctx.audioWorklet.addModule(WORKLET_URL).then(() => {
+    const node = new AudioWorkletNode(ctx, 'garnet', { numberOfInputs: 0, outputChannelCount: [2], processorOptions: { p: workletP(P) } });
+    A.G = graph(ctx, node);
+    applyGraph(A.G, P, room);
+    const t0 = ctx.currentTime + 0.02;
+    for (const m of pending) node.port.postMessage({ ...m, at: t0 + m.rel });
+    pending = [];
+  }).catch((e) => { $('#hint').textContent = 'Sound is not available in this browser: ' + e.message; });
+}
+function send(m, rel = 0) {
+  if (!A || !A.G) { pending.push({ ...m, rel }); return; }
+  A.G.node.port.postMessage({ ...m, at: A.ctx.currentTime + 0.01 + rel });
+}
+function params() { if (A && A.G) { A.G.node.port.postMessage({ t: 'p', p: workletP(P) }); applyGraph(A.G, P, room); } }
+
+// ---------- the device face ----------
+function knobHTML(id, size) {
+  const k = K[id];
+  if (k.steps) {
+    const n = k.steps.length, labels = k.steps.map((s, i) => {
+      const a = (-135 + (i * 270) / (n - 1)) * Math.PI / 180;
+      return `<button type="button" class="lbl" data-step="${id}" data-i="${i}" style="left:${50 + Math.sin(a) * 46}%;top:${50 - Math.cos(a) * 44}%">${s}</button>`;
+    }).join('');
+    return `<div class="kn"><div class="step">${labels}<div class="knob" role="slider" tabindex="0" aria-label="${k.l}" data-k="${id}"></div></div><div class="kl">${k.l}</div></div>`;
+  }
+  return `<div class="kn ${size || k.size || ''}"><div class="knob" role="slider" tabindex="0" aria-label="${k.l}" data-k="${id}"></div><div class="kv" data-kv="${id}"></div><div class="kl">${k.l}</div></div>`;
+}
+$('#rowPick').insertAdjacentHTML('beforeend', ['pick', 'hard', 'sustain', 'bright'].map((id) => knobHTML(id)).join(''));
+$('#rowBody').insertAdjacentHTML('beforeend', knobHTML('body') + ['reso', 'tone'].map((id) => knobHTML(id)).join(''));
+$('#amp').innerHTML = knobHTML('cab') + knobHTML('drive') + knobHTML('pres', 'sm') + knobHTML('level', 'sm');
+$('#playrow').insertAdjacentHTML('afterbegin', ['strum', 'vib', 'slide'].map((id) => knobHTML(id)).join(''));
+
+function show(id) {
+  const k = K[id], el = $(`[data-k="${id}"]`);
+  if (!el) return;
+  const v = k.steps ? P[id] / (k.steps.length - 1) : P[id];
+  el.style.setProperty('--v', v);
+  const txt = k.steps ? k.steps[P[id]] : k.f(P[id]);
+  el.setAttribute('aria-valuetext', txt);
+  if (k.steps) document.querySelectorAll(`[data-step="${id}"]`).forEach((b) => b.classList.toggle('on', +b.dataset.i === P[id]));
+  else $(`[data-kv="${id}"]`).textContent = txt;
+}
+function setP(id, v, user = true) {
+  const k = K[id];
+  P[id] = k.steps ? Math.round(clamp(v, 0, k.steps.length - 1)) : clamp(v);
+  show(id);
+  if (user) { edited = true; showPreset(); }
+  params();
+}
+document.querySelectorAll('.knob').forEach((el) => {
+  const id = el.dataset.k, k = K[id];
+  let y0 = 0, v0 = 0, drag = false;
+  el.addEventListener('pointerdown', (e) => { el.setPointerCapture(e.pointerId); y0 = e.clientY; v0 = P[id]; drag = false; });
+  el.addEventListener('pointermove', (e) => {
+    if (!el.hasPointerCapture(e.pointerId)) return;
+    const d = (y0 - e.clientY) / 170;
+    if (Math.abs(y0 - e.clientY) > 3) drag = true;
+    setP(id, k.steps ? v0 + Math.round(d * 4) : v0 + d);
+  });
+  el.addEventListener('pointerup', () => { if (k.steps && !drag) setP(id, (P[id] + 1) % k.steps.length); });
+  el.addEventListener('wheel', (e) => { e.preventDefault(); setP(id, P[id] + (k.steps ? -Math.sign(e.deltaY) : -e.deltaY / 1500)); }, { passive: false });
+  el.addEventListener('keydown', (e) => {
+    const d = { ArrowUp: 1, ArrowRight: 1, ArrowDown: -1, ArrowLeft: -1 }[e.key];
+    if (d) { e.preventDefault(); setP(id, P[id] + (k.steps ? d : d * 0.02)); }
+  });
+  el.addEventListener('dblclick', () => setP(id, PRESETS[preset][1][id] ?? DEF[id]));
+});
+document.querySelectorAll('[data-step]').forEach((b) => b.addEventListener('click', () => setP(b.dataset.step, +b.dataset.i)));
+
+function showPreset() { $('#pname').innerHTML = `${String(preset + 1).padStart(2, '0')} ${PRESETS[preset][0]}${edited ? ' <small>edited</small>' : ''}`; }
+function loadPreset(i) {
+  preset = (i + PRESETS.length) % PRESETS.length; edited = false;
+  P = { ...DEF, ...PRESETS[preset][1] };
+  for (const id in K) show(id);
+  $('#mute').setAttribute('aria-pressed', !!P.mute);
+  showPreset(); params();
+}
+$('#pprev').onclick = () => loadPreset(preset - 1);
+$('#pnext').onclick = () => loadPreset(preset + 1);
+$('#mute').onclick = () => { P.mute = P.mute ? 0 : 1; $('#mute').setAttribute('aria-pressed', !!P.mute); edited = true; showPreset(); params(); };
+$('#room').onclick = () => { room = !room; $('#room').setAttribute('aria-pressed', room); params(); };
+
+// ---------- the neck ----------
+let CH = [];
+const neck = $('#neck'), heads = $('#heads');
+function build() {
+  CH = chordsOfKey();
+  const cols = mode === 'chords' ? CH.length : 13;
+  for (const el of [neck, heads]) { el.style.setProperty('--cols', cols); el.classList.toggle('notes', mode === 'notes'); }
+  neck.className = 'neck ' + mode + (lock ? ' lock' : '');
+  let h = '', body = '';
+  if (mode === 'chords') {
+    CH.forEach((c, i) => {
+      h += `<button type="button" class="ch" data-c="${i}" title="Strum ${c.name} (key ${i + 1})"><b>${c.name}</b><small>${c.rn}</small></button>`;
+      let cells = '';
+      for (let s = 5; s >= 0; s--) {
+        const f = c.frets[s];
+        cells += f < 0 ? `<div class="cell" data-s="${s}"><span class="cn x">×</span></div>`
+          : `<div class="cell" data-s="${s}"><span class="cn${(TUNING[s] + f) % 12 === c.root ? ' root' : ''}">${nn(TUNING[s] + f)}</span></div>`;
+      }
+      body += `<div class="col" data-c="${i}">${cells}</div>`;
+    });
+  } else {
+    for (let f = 0; f <= 12; f++) {
+      const inl = [3, 5, 7, 9].includes(f) ? '<i></i>' : f === 12 ? '<i class="l"></i><i></i>' : '';
+      h += `<div class="fretn">${f === 0 ? 'open' : f}${inl}</div>`;
+      let cells = '';
+      for (let s = 5; s >= 0; s--) {
+        const m = TUNING[s] + f, pc = m % 12, ins = inScale(pc);
+        cells += `<div class="cell" data-s="${s}"><span class="dot${ins ? (pc === key ? ' root' : '') : ' off'}">${ins ? nn(pc) : ''}</span></div>`;
+      }
+      body += `<div class="col${f === 0 ? ' open' : ''}" data-c="${f}">${cells}</div>`;
+    }
+  }
+  heads.innerHTML = h;
+  let strs = '';
+  for (let s = 0; s < 6; s++) {
+    const top = ((5 - s) + 0.5) / 6 * 100;
+    strs += `<div class="str${s <= 2 ? ' wound' : ''}" data-str="${s}" style="top:${top}%;--th:${(3.8 - s * 0.5).toFixed(1)}px"></div>`;
+  }
+  neck.innerHTML = body + `<div class="strings">${strs}</div>`;
+  heads.querySelectorAll('.ch').forEach((b) => b.addEventListener('click', (e) => strum(+b.dataset.c, e.shiftKey ? 'up' : 'down')));
+  document.querySelectorAll('[data-mode]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.mode === mode));
+  $('#variants').hidden = mode !== 'chords';
+  $('#lock').hidden = mode !== 'notes';
+  $('#hint').textContent = mode === 'chords'
+    ? `Chords of ${KEYS[key]} ${SCALES[scale].n.toLowerCase()}${SCALES[scale].parent ? ` (chords from ${KEYS[key]} ${SCALES[SCALES[scale].parent].n.toLowerCase()})` : ''}. Drag across the strings inside a strip to strum, click a string to pick one note.`
+    : `${KEYS[key]} ${SCALES[scale].n.toLowerCase()}: lit notes are in the scale, the brightest is ${KEYS[key]}. Drag along a string to slide.`;
+}
+$('#variants').innerHTML = VARIANTS.map(([id, l]) => `<button type="button" class="chip" data-v="${id}">${l}</button>`).join('');
+$('#variants').addEventListener('click', (e) => { const b = e.target.closest('[data-v]'); if (!b) return; variant = b.dataset.v; markVariant(); build(); });
+const markVariant = () => document.querySelectorAll('[data-v]').forEach((b) => b.setAttribute('aria-pressed', b.dataset.v === variant));
+document.querySelectorAll('[data-mode]').forEach((b) => b.addEventListener('click', () => { mode = b.dataset.mode; build(); }));
+$('#lock').onclick = () => { lock = !lock; $('#lock').setAttribute('aria-pressed', lock); build(); };
+
+// what a string plays at a column: { midi } or { dead } (a muted string in a chord strip), or null
+function noteAt(s, c) {
+  if (mode === 'chords') {
+    const f = CH[c].frets[s];
+    return f < 0 ? { midi: TUNING[s], dead: true } : { midi: TUNING[s] + f };
+  }
+  const m = TUNING[s] + c;
+  if (lock && !inScale(m % 12)) return null;
+  return { midi: m };
+}
+function flash(s, c, delayMs = 0) {
+  setTimeout(() => {
+    const str = neck.querySelector(`[data-str="${s}"]`);
+    if (str) { str.classList.remove('ring'); void str.offsetWidth; str.classList.add('ring'); }
+    const dot = neck.querySelector(`.col[data-c="${c}"] .cell[data-s="${s}"] span`);
+    if (dot) { dot.classList.remove('pop'); void dot.offsetWidth; dot.classList.add('pop'); }
+  }, delayMs);
+}
+function pluck(s, c, v, rel = 0) {
+  const n = noteAt(s, c);
+  if (!n) return;
+  send({ t: 'pluck', s, f: hz(n.midi), v, dead: !!n.dead }, rel);
+  flash(s, c, rel * 1000);
+}
+function strum(c, dir) {
+  ensureAudio();
+  const ch = CH[c], gap = (6 + P.strum * P.strum * 60) / 1000;
+  const order = [0, 1, 2, 3, 4, 5].filter((s) => ch.frets[s] >= 0);
+  if (dir === 'up') order.reverse();
+  order.forEach((s, i) => pluck(s, c, 0.85 - i * 0.03, i * gap));
+  const head = heads.querySelector(`[data-c="${c}"]`), col = neck.querySelector(`.col[data-c="${c}"]`);
+  for (const el of [head, col]) { if (!el) continue; el.classList.add('hit'); setTimeout(() => el.classList.remove('hit'), 220); }
+}
+
+let drag = null;
+function hit(e) {
+  const r = neck.getBoundingClientRect(), cols = mode === 'chords' ? CH.length : 13;
+  return { s: 5 - clamp(Math.floor(((e.clientY - r.top) / r.height) * 6), 0, 5), c: clamp(Math.floor(((e.clientX - r.left) / r.width) * cols), 0, cols - 1) };
+}
+neck.addEventListener('pointerdown', (e) => {
+  ensureAudio();
+  neck.setPointerCapture(e.pointerId);
+  const h = hit(e);
+  drag = { ...h, y: e.clientY, t: performance.now() };
+  pluck(h.s, h.c, 0.8);
+});
+neck.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const h = hit(e);
+  if (h.s !== drag.s) {
+    // crossed one or more strings: pluck each in order, harder for a faster drag
+    const now = performance.now(), speed = Math.abs(e.clientY - drag.y) / Math.max(1, now - drag.t);
+    const v = clamp(0.5 + speed * 0.35, 0.4, 1), dir = Math.sign(h.s - drag.s);
+    for (let s = drag.s + dir; s !== h.s + dir; s += dir) pluck(s, h.c, v);
+    Object.assign(drag, h, { y: e.clientY, t: now });
+  } else if (mode === 'notes' && h.c !== drag.c) {
+    const n = noteAt(h.s, h.c);
+    if (n) { send({ t: 'slide', s: h.s, f: hz(n.midi) }); flash(h.s, h.c); }
+    drag.c = h.c;
+  } else drag.c = h.c;
+});
+const up = () => { drag = null; };
+neck.addEventListener('pointerup', up);
+neck.addEventListener('pointercancel', up);
+document.addEventListener('keydown', (e) => {
+  if (e.target.closest('select,input') || e.metaKey || e.ctrlKey || e.altKey) return;
+  const d = /^Digit([1-9])$/.exec(e.code);
+  if (d && mode === 'chords' && +d[1] <= CH.length) { e.preventDefault(); strum(+d[1] - 1, e.shiftKey ? 'up' : 'down'); }
+});
+
+// key and scale (in the studio: the song's Key)
+$('#key').innerHTML = KEYS.map((k, i) => `<option value="${i}">${k}</option>`).join('');
+$('#scale').innerHTML = Object.entries(SCALES).map(([id, s]) => `<option value="${id}">${s.n}</option>`).join('');
+$('#key').onchange = (e) => { key = +e.target.value; build(); };
+$('#scale').onchange = (e) => { scale = e.target.value; build(); };
+
+// the live string picture
+const pic = $('#pic'), pg = pic.getContext('2d'), buf = new Float32Array(2048);
+function frame() {
+  requestAnimationFrame(frame);
+  const d = devicePixelRatio || 1, w = pic.clientWidth, h = pic.clientHeight;
+  if (!w) return;
+  if (pic.width !== Math.round(w * d)) { pic.width = Math.round(w * d); pic.height = Math.round(h * d); }
+  pg.setTransform(d, 0, 0, d, 0, 0);
+  pg.clearRect(0, 0, w, h);
+  const css = getComputedStyle(pic), ink = css.getPropertyValue('--dev-lcdink').trim();
+  pg.strokeStyle = ink; pg.lineWidth = 2;
+  pg.shadowColor = ink; pg.shadowBlur = 6 * (parseFloat(css.getPropertyValue('--fwm-glow')) || 0);
+  pg.beginPath();
+  if (A && A.G) {
+    A.G.an.getFloatTimeDomainData(buf);
+    let st = 0;
+    for (let i = 1; i < 900; i++) if (buf[i - 1] <= 0 && buf[i] > 0) { st = i; break; }
+    let pk = 0.05;
+    for (let i = st; i < st + 1000; i++) pk = Math.max(pk, Math.abs(buf[i]));
+    for (let x = 0; x <= w; x++) { const y = h / 2 - (buf[st + Math.floor((x / w) * 1000)] / pk) * (h / 2 - 6); x ? pg.lineTo(x, y) : pg.moveTo(x, y); }
+  } else { pg.moveTo(0, h / 2); pg.lineTo(w, h / 2); }
+  pg.stroke();
+}
+
+if (location.hash === '#notes') mode = 'notes';
+markVariant();
+loadPreset(0);
+build();
+requestAnimationFrame(frame);
+
+// ---------- live check (?livetest): strum G through the page's own audio and listen ----------
+if (location.search.includes('livetest')) setTimeout(() => {
+  ensureAudio();
+  strum(4, 'down');
+  let peak = 0;
+  const t = setInterval(() => {
+    if (!A || !A.G) return;
+    A.G.an.getFloatTimeDomainData(buf);
+    for (const v of buf) peak = Math.max(peak, Math.abs(v));
+  }, 30);
+  setTimeout(() => {
+    clearInterval(t);
+    fetch('./log', { method: 'POST', body: `${peak > 0.02 && peak < 1 ? 'PASS' : 'FAIL'} live strum @${A.ctx.sampleRate}: peak ${peak.toFixed(3)} (${A.ctx.state})` });
+  }, 1500);
+}, 500);
+
+// ---------- self-test (?selftest): tuning and levels, rendered offline at 44.1 and 48 kHz ----------
+if (location.search.includes('selftest')) (async () => {
+  const lines = [];
+  const log = (s) => { lines.push(s); fetch('./log', { method: 'POST', body: s }).catch(() => {}); };
+  const pitch = (x, sr) => {
+    let best = 0, bl = 0;
+    const r = (l) => { let a = 0, b = 0, c = 0; for (let i = 0; i < x.length - l; i++) { a += x[i] * x[i + l]; b += x[i] * x[i]; c += x[i + l] * x[i + l]; } return a / Math.sqrt(b * c + 1e-12); };
+    const lo = Math.floor(sr / 1000), hi = Math.floor(sr / 60), rs = [];
+    for (let l = lo; l <= hi; l++) { rs[l] = r(l); }
+    // first peak above 0.9 of the max (avoids octave errors)
+    const mx = Math.max(...rs.slice(lo));
+    for (let l = lo + 1; l < hi; l++) if (rs[l] > 0.9 * mx && rs[l] >= rs[l - 1] && rs[l] >= rs[l + 1]) { bl = l; break; }
+    const a = rs[bl - 1], b = rs[bl], c = rs[bl + 1], off = (a - c) / (2 * (a - 2 * b + c));
+    best = sr / (bl + off);
+    return best;
+  };
+  try {
+    for (const sr of [44100, 48000]) {
+      for (const [m, label] of [[45, 'A2'], [64, 'E4'], [76, 'E5'], [40, 'E2']]) {
+        for (const pr of [0, 2, 3]) {
+          const PP = { ...DEF, ...PRESETS[pr][1] };
+          const ctx = new OfflineAudioContext(2, sr * 1.5, sr);
+          await ctx.audioWorklet.addModule(WORKLET_URL);
+          const node = new AudioWorkletNode(ctx, 'garnet', { numberOfInputs: 0, outputChannelCount: [2], processorOptions: { p: workletP(PP), q: [{ t: 'pluck', s: 1, f: hz(m), v: 0.8, at: 0.05 }] } });
+          node.connect(ctx.destination);
+          const b = await ctx.startRendering(), x = b.getChannelData(0).slice(Math.floor(sr * 0.25), Math.floor(sr * 0.25) + 8192);
+          const f = pitch(x, sr), cents = 1200 * Math.log2(f / hz(m));
+          log(`${Math.abs(cents) < 8 ? 'PASS' : 'FAIL'} tuning ${label} ${PRESETS[pr][0]} @${sr}: ${f.toFixed(2)} Hz, ${cents.toFixed(1)} cents`);
+        }
+      }
+      // a full strum through body + amp + room, every preset: no NaN, no clipping, audible
+      for (let pr = 0; pr < PRESETS.length; pr++) {
+        const PP = { ...DEF, ...PRESETS[pr][1] };
+        const ctx = new OfflineAudioContext(2, sr * 2, sr);
+        await ctx.audioWorklet.addModule(WORKLET_URL);
+        const ch = (key = 0, scale = 'major', variant = 'triad', chordsOfKey())[4]; // G
+        const q = [0, 1, 2, 3, 4, 5].filter((s) => ch.frets[s] >= 0).map((s, i) => ({ t: 'pluck', s, f: hz(TUNING[s] + ch.frets[s]), v: 0.9, at: 0.05 + i * 0.015 }));
+        const node = new AudioWorkletNode(ctx, 'garnet', { numberOfInputs: 0, outputChannelCount: [2], processorOptions: { p: workletP(PP), q } });
+        const G = graph(ctx, node);
+        applyGraph(G, PP, true);
+        const b = await ctx.startRendering(), d = b.getChannelData(0);
+        let pk = 0, ss = 0, nan = false;
+        for (let i = 0; i < d.length; i++) { if (!(d[i] === d[i])) nan = true; pk = Math.max(pk, Math.abs(d[i])); ss += d[i] * d[i]; }
+        const rms = Math.sqrt(ss / d.length);
+        log(`${!nan && pk < 1 && rms > 0.01 ? 'PASS' : 'FAIL'} strum G ${PRESETS[pr][0]} @${sr}: peak ${pk.toFixed(2)}, rms ${rms.toFixed(3)}${nan ? ' NaN!' : ''}`);
+      }
+    }
+    // voicings: the open chords a guitarist expects
+    key = 0; scale = 'major'; variant = 'triad';
+    const v = chordsOfKey().map((c) => c.name + ':' + c.frets.map((f) => (f < 0 ? 'x' : f)).join(''));
+    log('INFO C major voicings ' + v.join(' '));
+    const want = { 'C': 'x32010', 'G': '320003', 'Am': 'x02210', 'Em': '022000', 'Dm': 'xx0231', 'F': '133211' };
+    for (const s of v) { const [n, f] = s.split(':'); if (want[n]) log(`${want[n] === f ? 'PASS' : 'INFO'} voicing ${n} ${f} (usual ${want[n]})`); }
+    for (const vt of ['7', 'sus2', 'sus4', 'add9', '5']) { variant = vt; log('INFO ' + vt + ' ' + chordsOfKey().map((c) => c.name + ':' + c.frets.map((f) => (f < 0 ? 'x' : f)).join('')).join(' ')); }
+    key = 4; scale = 'minor'; variant = 'triad';
+    log('INFO E minor ' + chordsOfKey().map((c) => c.name + ':' + c.frets.map((f) => (f < 0 ? 'x' : f)).join('')).join(' '));
+    key = 0; scale = 'major'; variant = 'triad';
+  } catch (e) { log('FAIL selftest error ' + e.message); }
+  log('DONE');
+})();
+}
+</script>
+</body>
+</html>
