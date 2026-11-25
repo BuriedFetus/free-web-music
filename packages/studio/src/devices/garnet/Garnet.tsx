@@ -10,6 +10,7 @@ import { DEFAULT_KEY, SCALES, NOTE_NAMES, type SongKey } from '../../model/scale
 import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
 import type { DeviceHost, DeviceProps } from '../basalt/Basalt';
 import { Scope } from '../Scope';
+import { Sends } from '../Sends';
 import { CHORD_TYPES, FRETS, TUNING, chordsOfKey, inScale, neckKey, noteName, type ChordType } from './music';
 import { GARNET_FORMAT, GARNET_PRESETS } from './presets';
 
@@ -177,6 +178,7 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
             </div>
           ))}
         </div>
+        <Sends host={host} />
         <div className="fwm-preset">
           <P.Button variant="hw" label="Previous sound" onPress={() => loadPreset(presetIx - 1)}>‹</P.Button>
           <P.Screen variant="preset">

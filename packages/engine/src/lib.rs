@@ -22,6 +22,7 @@ use devices::basalt::Basalt;
 use devices::flint::Flint;
 use devices::garnet::Garnet;
 use devices::opal::Opal;
+use devices::quartz::Quartz;
 use events::{Event, Kind, Queue};
 use fx::Fx;
 use mixer::Mixer;
@@ -48,6 +49,7 @@ pub enum DeviceKind {
     Flint = 2,
     Garnet = 3,
     Opal = 4,
+    Quartz = 5,
 }
 
 impl DeviceKind {
@@ -57,6 +59,7 @@ impl DeviceKind {
             2 => Some(DeviceKind::Flint),
             3 => Some(DeviceKind::Garnet),
             4 => Some(DeviceKind::Opal),
+            5 => Some(DeviceKind::Quartz),
             _ => None,
         }
     }
@@ -68,6 +71,7 @@ pub enum Slot {
     Flint(Flint),
     Garnet(Garnet),
     Opal(Opal),
+    Quartz(Quartz),
 }
 
 impl Slot {
@@ -78,6 +82,7 @@ impl Slot {
             Slot::Flint(d) => Some(d),
             Slot::Garnet(d) => Some(d),
             Slot::Opal(d) => Some(d),
+            Slot::Quartz(d) => Some(d),
         }
     }
 
@@ -88,6 +93,7 @@ impl Slot {
             Slot::Flint(d) => Some(d),
             Slot::Garnet(d) => Some(d),
             Slot::Opal(d) => Some(d),
+            Slot::Quartz(d) => Some(d),
         }
     }
 }
@@ -146,6 +152,7 @@ impl Rack {
             DeviceKind::Basalt => Slot::Basalt(Basalt::new()),
             DeviceKind::Flint => Slot::Flint(Flint::new()),
             DeviceKind::Opal => Slot::Opal(Opal::new()),
+            DeviceKind::Quartz => Slot::Quartz(Quartz::new()),
             DeviceKind::Garnet => {
                 // the old device in this slot (if any) goes first: its memory is about to be reused
                 self.slots[slot] = Slot::Empty;

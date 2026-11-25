@@ -1,4 +1,4 @@
-export type DeviceId = 'basalt' | 'flint' | 'garnet' | 'opal';
+export type DeviceId = 'basalt' | 'flint' | 'garnet' | 'opal' | 'quartz';
 export type ModSourceId = 'lfo' | 'amp' | 'filt';
 
 export interface ParamSpec {
@@ -141,7 +141,7 @@ export const MIX: Record<'level' | 'pan' | 'mute' | 'sendA' | 'sendB', number>;
 export const MASTER_METER: number;
 
 export function createEngine(options?: {
-  /** Folder holding fwm_engine.wasm, worklet.js, basalt.json, flint.json, garnet.json, opal.json. Default: next to this module. */
+  /** Folder holding fwm_engine.wasm, worklet.js, basalt.json, flint.json, garnet.json, opal.json, quartz.json. Default: next to this module. */
   base?: string;
   context?: BaseAudioContext;
   /** Manifests as objects or URLs. */

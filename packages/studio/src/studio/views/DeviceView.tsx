@@ -37,6 +37,10 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
     };
   }, [t?.id, t?.name, peers, st, engine, slot]); // eslint-disable-line react-hooks/exhaustive-deps
 
+  if (host && t) {
+    const mix = st.project.mix(t.id);
+    host.sends = { rev: mix.rev, dly: mix.dly, set: (k, v) => st.project.setMix(t.id, { [k]: v }) };
+  }
   if (!t || !entry?.Component || !store || !host)
     return <p className="fwm-empty">No track selected. Bring a device in from the Library to make one.</p>;
   const C = entry.Component;

@@ -36,6 +36,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'scope') return runScope(p, engineRef, ok, out);
   if (role === 'garnet') return runGarnet(p, engineRef, ok, out);
   if (role === 'opal') return runOpal(p, engineRef, ok, out);
+  if (role === 'quartz') return runQuartz(p, engineRef, ok, out);
   if (role === 'look') return runLook(s.doc, ok, out);
   if (role === 'arrange') return runArrange(p, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
@@ -1278,8 +1279,54 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
     ($('.fwm-opal [aria-label="Stack: 1"]') as HTMLButtonElement).click();
     await until('stack in engine', () => engineRef.current!.last!.devices[slot].eff[2] === 0, 2000);
     ok(true, 'Stack 1 reaches the engine');
+    // SEND knobs = the Mixer strip's sends, both ways
+    const tid = p.trackIds()[0];
+    const rev = $('.fwm-opal .fwm-sends [role=slider][aria-label="Reverb"]')!;
+    rev.focus();
+    for (let i = 0; i < 5; i++) rev.dispatchEvent(new KeyboardEvent('keydown', { key: 'ArrowUp', bubbles: true }));
+    await sleep(100);
+    ok(p.mix(tid).rev > 0, `turning Reverb on Opal sets the Mixer send (${p.mix(tid).rev.toFixed(2)})`);
+    p.setMix(tid, { dly: 0.5 });
+    await sleep(150);
+    const dl = $('.fwm-opal .fwm-sends [role=slider][aria-label="Delay"]')!;
+    ok(dl.getAttribute('aria-valuenow') === '0.5' || (dl.getAttribute('aria-valuetext') ?? '').includes('50'), `the Mixer's Delay send shows on Opal (${dl.getAttribute('aria-valuenow')} ${dl.getAttribute('aria-valuetext')})`);
   } catch (e) {
     out.push(`FAIL opal: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: Quartz's panel shows, a chord makes sound, presets step, Harmonics reaches the engine. */
+async function runQuartz(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  try {
+    await sleep(300);
+    ($('[aria-label="Add Quartz as a new track"]') as HTMLButtonElement).click();
+    await sleep(400);
+    ok(!!$('.fwm-quartz') && p.trackIds().length === 1, 'Quartz shows in the Device panel');
+    btn('Sound')?.click();
+    await until('engine', () => !!engineRef.current?.last, 4000);
+    for (const k of ['a', 'd', 'g']) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+    let pk = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 1200) {
+      pk = Math.max(pk, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+      await sleep(25);
+    }
+    for (const k of ['a', 'd', 'g']) document.body.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
+    ok(pk > 0.02 && pk <= 1, `a chord rings (peak ${pk.toFixed(3)})`);
+    ($('.fwm-quartz [aria-label="Next sound"]') as HTMLButtonElement).click();
+    await sleep(100);
+    ok(($('.fwm-quartz .fwm-preset')!.textContent ?? '').includes('Soft Rhodes'), 'next sound: Soft Rhodes');
+    const slot = Number(Object.keys(engineRef.current!.last!.devices)[0]);
+    ($('.fwm-quartz [aria-label="Harmonics: 3"]') as HTMLButtonElement).click();
+    await until('harmonics in engine', () => engineRef.current!.last!.devices[slot].eff[2] === 3, 2000);
+    ok(true, 'Harmonics reaches the engine');
+    ok(!!$('.fwm-quartz .fwm-sends'), 'SEND knobs on Quartz');
+  } catch (e) {
+    out.push(`FAIL quartz: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

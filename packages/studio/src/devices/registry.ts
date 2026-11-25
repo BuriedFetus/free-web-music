@@ -13,6 +13,9 @@ import { GARNET_PRESETS } from './garnet/presets';
 import opalManifest from '@fwm/engine/devices/opal.json';
 import { Opal } from './opal/Opal';
 import { OPAL_PRESETS } from './opal/presets';
+import quartzManifest from '@fwm/engine/devices/quartz.json';
+import { Quartz } from './quartz/Quartz';
+import { QUARTZ_PRESETS } from './quartz/presets';
 
 export interface DeviceEntry {
   id: string;
@@ -43,7 +46,10 @@ export const LIBRARY: DeviceEntry[] = [
     available: true, manifest: garnetManifest as DeviceManifest, Component: Garnet, presets: GARNET_PRESETS,
   },
   { id: 'cobalt', name: 'Cobalt', kind: 'Chip lead + arpeggiator', category: 'Synths', roll: { low: 60, high: 96 }, rootNote: 72, available: false, soon: 'Phase 5' },
-  { id: 'quartz', name: 'Quartz', kind: 'FM keys', category: 'Keys & pads', roll: { low: 42, high: 78 }, rootNote: 60, available: false, soon: 'Phase 5' },
+  {
+    id: 'quartz', name: 'Quartz', kind: 'FM keys: tines, bells, organs', category: 'Keys & pads', roll: { low: 36, high: 96 }, rootNote: 60,
+    available: true, manifest: quartzManifest as DeviceManifest, Component: Quartz, presets: QUARTZ_PRESETS,
+  },
   {
     id: 'opal', name: 'Opal', kind: 'Pad synth: 8 voices, stack & chorus', category: 'Keys & pads', roll: { low: 36, high: 84 }, rootNote: 60,
     available: true, manifest: opalManifest as DeviceManifest, Component: Opal, presets: OPAL_PRESETS,

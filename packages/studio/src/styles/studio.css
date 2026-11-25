@@ -267,3 +267,11 @@
 .fwm-opal__chorus { display: grid; gap: 4px; justify-items: center; font-size: 12px; }
 .fwm-opal__chorus .fwm-seg { margin: 0; }
 @container (max-width: 760px) { .fwm-opal__face, .fwm-opal__low { grid-template-columns: minmax(0, 1fr); } }
+
+/* SEND knobs on an instrument (the Mixer strip's Reverb / Delay sends) */
+.fwm-sends { display: flex; align-items: center; gap: 2px; padding: 2px 8px; border-radius: calc(10px * var(--fwm-round)); background: var(--dev-sec); margin-left: auto; }
+.fwm-sends__t { font: 11px var(--fwm-font-label); letter-spacing: .14em; color: var(--dev-silk); writing-mode: vertical-rl; transform: rotate(180deg); }
+.fwm-sends .fwm-knob { width: 64px; }
+.fwm-sends .fwm-knob svg { width: 40px; height: 40px; }
+.fwm-quartz { background: var(--dev-texture, none), linear-gradient(160deg, var(--dev-case), color-mix(in srgb, var(--dev-case2) calc(var(--fwm-depth) * 100%), var(--dev-case))); }
+.fwm-quartz .fwm-gstep { width: 120px; }

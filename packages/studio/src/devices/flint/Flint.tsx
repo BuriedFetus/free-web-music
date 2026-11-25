@@ -1,5 +1,6 @@
 // Flint: drum machine, front panel. Layout follows the approved mock-up (design/kit/flint.html):
 // kit screen, 8 pads, and the sound editor for the selected pad. Only theme primitives and --dev-* tokens.
+import { Sends } from '../Sends';
 import { useCallback, useEffect, useRef, useState, type CSSProperties } from 'react';
 import { useEngine } from '../../engine/EngineProvider';
 import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
@@ -76,6 +77,7 @@ export function Flint({ store, host, slot, computerKeys = true, user = { name: '
             </div>
           ))}
         </div>
+        <Sends host={host} />
         <div className="fwm-preset">
           <P.Button variant="hw" label="Previous kit" onPress={() => loadKit(kitIx - 1)}>‹</P.Button>
           <P.Screen variant="preset">

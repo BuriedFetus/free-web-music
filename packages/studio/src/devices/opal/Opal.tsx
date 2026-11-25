@@ -8,6 +8,7 @@ import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
 import type { DeviceProps } from '../basalt/Basalt';
 import { GKnob, StepDial, defaultsOf } from '../garnet/Garnet';
 import { Scope } from '../Scope';
+import { Sends } from '../Sends';
 import { OPAL_FORMAT, OPAL_PRESETS } from './presets';
 
 const CHORUS = ['Off', 'I', 'II', 'I+II'];
@@ -50,6 +51,7 @@ export function Opal({ store, host, slot, user = { name: 'You', color: 'var(--fw
             </div>
           ))}
         </div>
+        <Sends host={host} />
         <div className="fwm-preset">
           <P.Button variant="hw" label="Previous sound" onPress={() => loadPreset(presetIx - 1)}>‹</P.Button>
           <P.Screen variant="preset">

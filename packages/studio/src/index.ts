@@ -7,6 +7,8 @@ export { Garnet } from './devices/garnet/Garnet';
 export { GARNET_PRESETS } from './devices/garnet/presets';
 export { Opal } from './devices/opal/Opal';
 export { OPAL_PRESETS } from './devices/opal/presets';
+export { Quartz } from './devices/quartz/Quartz';
+export { QUARTZ_PRESETS } from './devices/quartz/presets';
 export { chordsOfKey, CHORD_TYPES, TUNING as GARNET_TUNING, type Chord, type ChordType } from './devices/garnet/music';
 export { FLINT_KITS, DRUM_TYPES, CHARACTERS } from './devices/flint/kits';
 export { BASALT_PRESETS, type Preset } from './devices/basalt/presets';

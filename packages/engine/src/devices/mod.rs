@@ -4,3 +4,4 @@ pub mod basalt;
 pub mod flint;
 pub mod garnet;
 pub mod opal;
+pub mod quartz;

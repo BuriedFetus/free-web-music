@@ -11,6 +11,7 @@ import { formatParam } from '../../model/params';
 import type { Presence } from '../../primitives/types';
 import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
 import { Scope } from '../Scope';
+import { Sends } from '../Sends';
 import { LFO_ICONS, OSC_ICONS, WaveIcon } from './icons';
 import { BASALT_PRESETS } from './presets';
 
@@ -42,6 +43,8 @@ export interface DeviceHost {
   subtitle?: string;
   /** The song's key (Garnet builds its chords from it). */
   songKey?: SongKey;
+  /** This track's Reverb / Delay sends (the Mixer's): shown as SEND knobs on the panel. */
+  sends?: { rev: number; dly: number; set(which: 'rev' | 'dly', v: number): void };
 }
 
 /** Props every device front panel takes (Basalt, Flint…). */
@@ -157,6 +160,7 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
           ))}
         </div>
         <Scope engine={status === 'on' ? engine : null} note={top} />
+        <Sends host={host} />
         <div className="fwm-preset">
           <P.Button variant="hw" label="Previous preset" onPress={() => loadPreset(presetIx - 1)}>‹</P.Button>
           <P.Screen variant="preset">
