@@ -125,6 +125,7 @@ h3{margin:4px 0 0;font-size:16px}
       <li><b>One strip per instrument</b>, in the order of the Song arrangement: level fader with a meter, Pan, Mute, Solo, and two <b>sends</b>: how much of the instrument goes to the shared Reverb and Delay. The master strip sums everything.</li>
       <li><b>⤢ expands the Mixer</b> and shows the effects rack: Reverb and Delay (shared, fed by the sends), then <b>Lo-fi</b> and the <b>main Low-pass</b> on the whole mix. Signal path: instruments + Reverb + Delay → Lo-fi → Low-pass → Master.</li>
       <li><b>The Delay follows the tempo</b> (1/16 to dotted 1/4). Ping-pong bounces left and right.</li>
+      <li><b>Lo-fi is tape and vinyl</b>, not a bit-crusher: Wow and Flutter (slow and fast pitch wobble), Saturation (soft tape warmth), Age (the highs and lowest lows fade), Noise (tape hiss, or darker record surface) and Crackle. <b>Tape</b> and <b>Vinyl</b> set good starting points.</li>
       <li><b>Everything is shared</b> like the instruments: faders, sends and effect settings are in the song; others see your hand on a fader, and undo is per person.</li>
       <li><b>The Scope is its own panel</b> (pick it in any of the four panel slots): the master or one instrument, a steady trigger so waves stand still, time zoom, Freeze, and a Spectrum view.</li>
       <li>The sounds here are rough browser previews; the real ones run in the studio's audio engine like Basalt and Flint.</li>
@@ -164,13 +165,21 @@ def('rev.ret', 0.7, 'Return', pct, (v) => A && (A.rev.ret.gain.value = v));
 def('dly.fb', 0.45, 'Feedback', pct, (v) => A && (A.dly.fbL.gain.value = A.dly.fbR.gain.value = v * 0.9));
 def('dly.tone', 0.55, 'Tone', (v) => fmtHz(hz(v, 500, 14000)), (v) => A && (A.dly.tone.frequency.value = hz(v, 500, 14000)));
 def('dly.ret', 0.6, 'Return', pct, (v) => A && (A.dly.ret.gain.value = v));
-def('lofi.bits', 0.35, 'Bits', (v) => Math.round(16 - v * 13), () => lofi());
-def('lofi.rate', 0.3, 'Rate', (v) => fmtHz(hz(1 - v, 2000, 48000)), () => lofi());
-def('lofi.noise', 0.2, 'Hiss', pct, () => lofi());
-def('lofi.mix', 0.6, 'Mix', pct, () => lofi());
+// Lo-fi = tape and vinyl: pitch wobble, soft saturation, worn tone, hiss / surface noise, crackle
+def('lofi.wow', 0.35, 'Wow', pct, () => lofi());
+def('lofi.flutter', 0.3, 'Flutter', pct, () => lofi());
+def('lofi.sat', 0.5, 'Saturation', pct, () => lofi());
+def('lofi.age', 0.35, 'Age', (v) => fmtHz(18000 * Math.pow(3000 / 18000, v)), () => lofi());
+def('lofi.noise', 0.25, 'Noise', pct, () => lofi());
+def('lofi.crackle', 0, 'Crackle', pct, () => lofi());
+def('lofi.mix', 1, 'Mix', pct, () => lofi());
+const STYLES = {
+  tape: { wow: 0.35, flutter: 0.3, sat: 0.5, age: 0.35, noise: 0.25, crackle: 0, mix: 1 },
+  vinyl: { wow: 0.15, flutter: 0.05, sat: 0.2, age: 0.55, noise: 0.3, crackle: 0.45, mix: 1 },
+};
 def('lp.cut', 0.75, 'Cutoff', (v) => fmtHz(hz(v, 60, 20000)), (v) => A && A.lp.frequency.setTargetAtTime(hz(v, 60, 20000), A.ctx.currentTime, 0.02));
 def('lp.res', 0.2, 'Resonance', (v) => (0.7 + v * 14).toFixed(1), (v) => A && (A.lp.Q.value = 0.7 + v * 14));
-const S = { mute: {}, solo: {}, div: 2, pp: true, on: { rev: true, dly: true, lofi: false, lp: true } };
+const S = { mute: {}, solo: {}, div: 2, pp: true, style: 'tape', on: { rev: true, dly: true, lofi: false, lp: true } };
 
 // ---- knobs: drag up/down, wheel, arrow keys; double-click = default ----
 function knob(id, big) {
@@ -217,7 +226,7 @@ function render() {
   $('#rack').innerHTML =
     unit('rev', 'Reverb', 'shared · fed by the sends', `<div class="pic" id="pic-rev"></div><div class="knobs">${knob('rev.size')}${knob('rev.pre')}${knob('rev.tone')}${knob('rev.ret')}</div>`)
     + unit('dly', 'Delay', 'shared · follows the tempo', `<div class="pic" id="pic-dly"></div><div class="seg" role="group" aria-label="Delay time">${DIV.map(([l], i) => `<button data-div="${i}" aria-pressed="${S.div === i}">${l}</button>`).join('')}<button data-pp aria-pressed="${S.pp}">Ping-pong</button></div><div class="knobs">${knob('dly.fb')}${knob('dly.tone')}${knob('dly.ret')}</div>`)
-    + unit('lofi', 'Lo-fi', 'whole mix', `<div class="pic" id="pic-lofi"></div><div class="knobs">${knob('lofi.bits')}${knob('lofi.rate')}${knob('lofi.noise')}${knob('lofi.mix')}</div>`)
+    + unit('lofi', 'Lo-fi', 'tape & vinyl · whole mix', `<div class="pic" id="pic-lofi"></div><div class="seg" role="group" aria-label="Style">${['tape', 'vinyl'].map((k) => `<button data-style="${k}" aria-pressed="${S.style === k}">${k === 'tape' ? 'Tape' : 'Vinyl'}</button>`).join('')}</div><div class="knobs">${['wow', 'flutter', 'sat', 'age', 'noise', 'crackle', 'mix'].map((k) => knob('lofi.' + k)).join('')}</div>`)
     + unit('lp', 'Low-pass', 'whole mix', `<div class="pic" id="pic-lp"></div><div class="knobs" style="justify-content:space-around">${knob('lp.cut', true)}${knob('lp.res')}</div>`);
   chain();
   pics();
@@ -239,10 +248,16 @@ function pics() {
   let bars = '';
   for (let k = 0, a = 1; k < 12 && a > 0.03; k++, a *= fb) { const x = 8 + k * beat * 40; if (x > W - 6) break; bars += `<rect class="fl" x="${x}" y="${H - 4 - a * (H - 10)}" width="6" height="${a * (H - 10)}" rx="2" transform="translate(0 ${S.pp ? (k % 2 ? 2 : -2) : 0})"/>`; }
   d.innerHTML = svg(bars);
-  const bits = Math.round(16 - P['lofi.bits'].v * 13), q = Math.pow(2, Math.min(bits, 6) - 1), hold = 1 + P['lofi.rate'].v * 14;
-  let w = '';
-  for (let x = 0; x <= W; x++) { const xs = Math.floor(x / hold) * hold; const y = Math.round(Math.sin((xs / W) * Math.PI * 4) * q) / q; w += (x ? 'L' : 'M') + x + ' ' + (H / 2 - y * (H / 2 - 6)); }
-  l.innerHTML = svg(`<path class="ln" d="${w}"/>`);
+  // a wave whose pitch wobbles (wow, flutter), flattened by saturation, roughened by noise; crackle as ticks
+  const L = (k) => P['lofi.' + k].v, drive = 1 + L('sat') * 5, norm = Math.tanh(drive);
+  let w = '', ph = 0, ticks = '';
+  for (let x = 0; x <= W; x++) {
+    ph += 0.075 * (1 + L('wow') * 0.35 * Math.sin((x / W) * Math.PI * 2) + L('flutter') * 0.12 * Math.sin(x * 0.45));
+    const y = Math.tanh(Math.sin(ph) * drive) / norm + (Math.random() * 2 - 1) * L('noise') * 0.12;
+    w += (x ? 'L' : 'M') + x + ' ' + (H / 2 - y * (H / 2 - 8) * (1 - L('age') * 0.3));
+  }
+  for (let k = 0; k < Math.round(L('crackle') * 14); k++) { const x = Math.random() * W, h = 4 + Math.random() * 14; ticks += `<rect class="fl" x="${x}" y="${H / 2 - h / 2}" width="2" height="${h}"/>`; }
+  l.innerHTML = svg(`${ticks}<path class="ln" d="${w}"/>`);
   const fc = hz(P['lp.cut'].v, 60, 20000), Q = 0.7 + P['lp.res'].v * 14;
   let c = '';
   for (let x = 0; x <= W; x += 2) { const fr = hz(x / W, 20, 20000), rr = fr / fc, mag = 1 / Math.sqrt((1 - rr * rr) ** 2 + (rr / Q) ** 2), db = Math.max(-40, Math.min(18, 20 * Math.log10(mag))); c += (x ? 'L' : 'M') + x + ' ' + (H * 0.35 - db * (H * 0.6 / 40)); }
@@ -261,11 +276,32 @@ async function audio() {
   sum.connect(lofiIn); lofiOut.connect(lpf); lpf.connect(master); master.connect(scope); scope.connect(ctx.destination);
   A = { ctx, sum, lp: lpf, master, scope, lofiIn, lofiOut, lofiNode: null, ch: {}, an: {} };
   try {
-    const code = `class L extends AudioWorkletProcessor{static get parameterDescriptors(){return[{name:'bits',defaultValue:16},{name:'rate',defaultValue:48000},{name:'mix',defaultValue:0},{name:'noise',defaultValue:0}]}
-      constructor(){super();this.ph=0;this.h=[0,0]}
-      process(i,o,p){const x=i[0],y=o[0];if(!x||!x.length)return true;const q=Math.pow(2,p.bits[0]-1),st=Math.max(1,sampleRate/p.rate[0]),m=p.mix[0],nz=p.noise[0];let ph=this.ph;
-      for(let c=0;c<y.length;c++){const a=x[c]||x[0],b=y[c];let h=this.h[c]||0;ph=this.ph;for(let n=0;n<b.length;n++){ph+=1;if(ph>=st){ph-=st;h=Math.round(a[n]*q)/q}b[n]=a[n]*(1-m)+(h+(Math.random()*2-1)*nz*0.03)*m}this.h[c]=h}this.ph=ph;return true}}
-      registerProcessor('lofi',L)`;
+    // Tape / vinyl: a modulated delay line (wow + flutter), tanh saturation, two-pole high cut and a
+    // low cut that close in with Age, hiss (tape) or darker surface noise (vinyl), and crackle.
+    const code = `class T extends AudioWorkletProcessor{
+      static get parameterDescriptors(){return['wow','flutter','sat','age','noise','crackle','mix','vinyl'].map((n)=>({name:n,defaultValue:0}))}
+      constructor(){super();this.N=4096;this.b=[new Float32Array(4096),new Float32Array(4096)];this.w=0;this.t=0;this.l1=[0,0];this.l2=[0,0];this.hy=[0,0];this.hx=[0,0];this.nz=[0,0];this.pop=0}
+      process(i,o,p){const x=i[0],y=o[0];if(!y||!y.length)return true;const g=(k)=>p[k][0],sr=sampleRate;
+        const wow=g('wow'),fl=g('flutter'),sat=g('sat'),age=g('age'),nz=g('noise'),cr=g('crackle'),mix=g('mix'),vin=g('vinyl')>0.5;
+        const drive=1+sat*5,norm=0.5/Math.tanh(drive*0.5),fc=18000*Math.pow(3000/18000,age),a=1-Math.exp(-2*Math.PI*fc/sr);
+        const hc=20*Math.pow(vin?14:8,age),ah=Math.exp(-2*Math.PI*hc/sr),base=0.008*sr;
+        for(let s=0;s<y[0].length;s++){this.t+=1/sr;const t=this.t;
+          const mod=wow*0.003*(Math.sin(2*Math.PI*0.55*t)+0.35*Math.sin(2*Math.PI*0.93*t+1))+fl*0.00012*(Math.sin(2*Math.PI*6.7*t)+0.5*Math.sin(2*Math.PI*11.3*t));
+          const d=base+mod*sr;
+          if(cr>0&&Math.random()<cr*cr*0.0012)this.pop=(Math.random()*2-1)*(Math.random()<0.12?0.5:0.15)*cr;
+          const crack=this.pop;this.pop*=0.55;
+          for(let c=0;c<y.length;c++){const xin=x&&x.length?(x[c]||x[0])[s]:0,B=this.b[c];B[this.w]=xin;
+            let r=this.w-d;while(r<0)r+=this.N;const i0=r|0,f=r-i0,v0=B[i0]*(1-f)+B[(i0+1)%this.N]*f;
+            const dry=B[(this.w-base+this.N)%this.N];
+            let v=Math.tanh(v0*drive)*norm; // same level at -6 dB, warmer and squashed above it
+            this.l1[c]+=a*(v-this.l1[c]);this.l2[c]+=a*(this.l1[c]-this.l2[c]);v=this.l2[c];
+            const h=ah*(this.hy[c]+v-this.hx[c]);this.hx[c]=v;this.hy[c]=h;v=h;
+            const wn=Math.random()*2-1;this.nz[c]+=(vin?0.06:0.5)*(wn-this.nz[c]);
+            v+=this.nz[c]*nz*(vin?0.06:0.016)+crack;
+            y[c][s]=dry*(1-mix)+v*mix}
+          this.w=(this.w+1)%this.N}
+        return true}}
+      registerProcessor('lofi',T)`;
     await ctx.audioWorklet.addModule(URL.createObjectURL(new Blob([code], { type: 'text/javascript' })));
     A.lofiNode = new AudioWorkletNode(ctx, 'lofi', { outputChannelCount: [2] });
   } catch { /* no worklet here: Lo-fi is bypassed in the preview */ }
@@ -302,10 +338,9 @@ function lofi() {
   const n = A?.lofiNode;
   if (!n) return;
   const t = A.ctx.currentTime;
-  n.parameters.get('bits').setValueAtTime(16 - P['lofi.bits'].v * 13, t);
-  n.parameters.get('rate').setValueAtTime(hz(1 - P['lofi.rate'].v, 2000, 48000), t);
-  n.parameters.get('noise').setValueAtTime(P['lofi.noise'].v, t);
-  n.parameters.get('mix').setValueAtTime(S.on.lofi ? P['lofi.mix'].v : 0, t);
+  for (const k of ['wow', 'flutter', 'sat', 'age', 'noise', 'crackle']) n.parameters.get(k).setTargetAtTime(P['lofi.' + k].v, t, 0.02);
+  n.parameters.get('vinyl').setValueAtTime(S.style === 'vinyl' ? 1 : 0, t);
+  n.parameters.get('mix').setTargetAtTime(S.on.lofi ? P['lofi.mix'].v : 0, t, 0.02);
 }
 function onOff() {
   if (!A) return;
@@ -400,6 +435,7 @@ document.addEventListener('click', (e) => {
   if (b.dataset.mute) { S.mute[b.dataset.mute] = !S.mute[b.dataset.mute]; b.setAttribute('aria-pressed', S.mute[b.dataset.mute]); CH.forEach((c) => level(c.id)); return; }
   if (b.dataset.solo) { S.solo[b.dataset.solo] = !S.solo[b.dataset.solo]; b.setAttribute('aria-pressed', S.solo[b.dataset.solo]); CH.forEach((c) => level(c.id)); return; }
   if (b.dataset.on) { const k = b.dataset.on; S.on[k] = !S.on[k]; b.setAttribute('aria-pressed', S.on[k]); b.textContent = S.on[k] ? 'On' : 'Off'; b.closest('.unit').classList.toggle('off', !S.on[k]); chain(); onOff(); return; }
+  if (b.dataset.style) { S.style = b.dataset.style; for (const x of document.querySelectorAll('[data-style]')) x.setAttribute('aria-pressed', x === b); for (const [k, v] of Object.entries(STYLES[S.style])) set('lofi.' + k, v); lofi(); return; }
   if (b.dataset.div) { S.div = Number(b.dataset.div); for (const x of document.querySelectorAll('[data-div]')) x.setAttribute('aria-pressed', x === b); divTime(); pics(); return; }
   if (b.hasAttribute('data-pp')) { S.pp = !S.pp; b.setAttribute('aria-pressed', S.pp); onOff(); pics(); }
 });
