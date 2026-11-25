@@ -297,10 +297,10 @@
 /* effects chain: the sound flows left to right, arrows between the steps */
 .fwm-fxrack { padding: 0 10px 12px; }
 .fwm-fxview .fwm-fxrack { padding-top: 10px; }
-.fwm-fxflow { display: flex; align-items: stretch; overflow-x: auto; padding: 2px 2px 10px; scrollbar-width: thin; }
+.fwm-fxflow { display: flex; flex-wrap: wrap; align-items: stretch; row-gap: 10px; padding: 2px 2px 10px; }
 .fwm-fxstep { display: flex; align-items: stretch; flex: none; }
 .fwm-arrow { flex: none; display: grid; place-items: center; width: 34px; font-size: 28px; line-height: 1; color: var(--fwm-note); text-shadow: 0 0 calc(8px * var(--fwm-glow)) var(--fwm-note); }
-.fwm-endcap { flex: none; width: 100px; display: grid; place-content: center; gap: 4px; text-align: center; padding: 8px; border-radius: calc(10px * var(--fwm-round)); border: 2px dashed color-mix(in srgb, var(--fwm-roll-ink) 35%, transparent); background: var(--fwm-roll-deep); color: var(--fwm-roll-ink); }
+.fwm-endcap { flex: none; width: 240px; min-height: 120px; display: grid; place-content: center; gap: 4px; text-align: center; padding: 8px; border-radius: calc(10px * var(--fwm-round)); border: 2px dashed color-mix(in srgb, var(--fwm-roll-ink) 35%, transparent); background: var(--fwm-roll-deep); color: var(--fwm-roll-ink); }
 .fwm-endcap b { font: 900 14px/1 var(--fwm-font-display); letter-spacing: .04em; }
 .fwm-endcap small { font-size: 11px; opacity: .75; }
 .fwm-endcap.is-drop { border-color: var(--fwm-note); }

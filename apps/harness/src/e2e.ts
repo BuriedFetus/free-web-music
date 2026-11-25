@@ -850,6 +850,18 @@ async function runFx(p: Project, engineRef: { current: Engine | null }, ok: (c: 
     const id = p.addTrack(m, undefined, 0);
     // C5: well above the low-pass when it is closed (a bass note's sub oscillator would sit right on it)
     for (const st of [0, 4, 8, 12]) p.addNote(id, p.patternList(id)[0].id, { s: st, l: 1, m: 72, v: 0.9 });
+    // Effects in the panel menu brings the Mixer beside it
+    const sel1 = $<HTMLSelectElement>('[aria-label="Panel 1 view"]')!;
+    const was1 = sel1.value;
+    sel1.value = 'fx';
+    sel1.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(150);
+    ok($<HTMLSelectElement>('[aria-label="Panel 2 view"]')!.value === 'mixer' && !!$('.fwm-fxview .fwm-fxu[data-fx=lowpass]'),
+      'choosing Effects in a panel shows the chain, with the Mixer beside it');
+    ok(!$('.fwm-fxview .fwm-endcap'), 'no INSTRUMENTS / MASTER blocks in the chain');
+    sel1.value = was1;
+    sel1.dispatchEvent(new Event('change', { bubbles: true }));
+    await sleep(100);
     const sel = $<HTMLSelectElement>('[aria-label="Panel 2 view"]')!;
     sel.value = 'mixer';
     sel.dispatchEvent(new Event('change', { bubbles: true }));
@@ -857,7 +869,7 @@ async function runFx(p: Project, engineRef: { current: Engine | null }, ok: (c: 
     ($('.fwm-strip__chain') as HTMLButtonElement).click(); // the master's chain button maximises the Mixer
     await sleep(150);
     ok(order() === 'reverb,delay,lofi,lowpass', `maximised: the chain shows Reverb ➜ Delay ➜ Lo-fi ➜ Low-pass (${order()})`);
-    ok(document.querySelectorAll('.fwm-fxflow .fwm-arrow').length === 5, 'an arrow between every step');
+    ok(document.querySelectorAll('.fwm-fxflow .fwm-arrow').length === 3, 'an arrow between every two effects');
     btn('Sound')!.click();
     await until('engine', () => !!engineRef.current?.last);
     const shapes = document.querySelectorAll('.fwm-cell .fwm-cell__pv .fwm-cell__note').length;
@@ -912,7 +924,7 @@ async function runFx(p: Project, engineRef: { current: Engine | null }, ok: (c: 
     await sleep(50);
     ok(order() === 'delay,reverb,lowpass,lofi', `clicking it on the shelf adds it at the end (${order()})`);
     const dt = new DataTransfer();
-    const fire = (type: string, el: Element, x = 0) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: 10 }));
+    const fire = (type: string, el: Element, x = 0) => el.dispatchEvent(new DragEvent(type, { bubbles: true, cancelable: true, dataTransfer: dt, clientX: x, clientY: el.getBoundingClientRect().top + 20 }));
     const first = $('.fwm-fxflow .fwm-fxu')!;
     const lpHead = $('.fwm-fxu[data-fx=lowpass] .fwm-fxu__h')!;
     fire('dragstart', lpHead);

@@ -1,5 +1,5 @@
 // The effects chain: its own panel (Effects in the panel menu), and below the Mixer when that panel is maximised. It is drawn the way the sound flows:
-// INSTRUMENTS ➜ effect ➜ effect ➜ … ➜ MASTER. Drag an effect by its title to move it (or ◀ ▶),
+// effect ➜ effect ➜ … (the instruments feed in on the left, the master comes out on the right). Drag an effect by its title to move it (or ◀ ▶),
 // onto the shelf to take it out (or ×), and back from the shelf to put it in. Shared like the rest.
 import { useRef, useState, type DragEvent } from 'react';
 import type { Peer } from '../../collab/presence';
@@ -42,11 +42,13 @@ export function FxRack({ peers }: { peers: Peer[] }) {
     project.setFxChain(c);
   };
   // Where a drop lands in the chain: before the first effect whose middle is right of the pointer.
-  const dropIndex = (x: number) => {
+  // The chain wraps onto more lines in a narrow panel: drop before the first unit on a line above
+  // the pointer, or on its line and to the right of the pointer.
+  const dropIndex = (x: number, y: number) => {
     const units = [...(flow.current?.querySelectorAll<HTMLElement>('.fwm-fxu') ?? [])].filter((u) => u.dataset.fx !== drag);
     const i = units.findIndex((u) => {
       const r = u.getBoundingClientRect();
-      return x < r.left + r.width / 2;
+      return y < r.top || (y < r.bottom && x < r.left + r.width / 2);
     });
     return i < 0 ? units.length : i;
   };
@@ -158,30 +160,22 @@ export function FxRack({ peers }: { peers: Peer[] }) {
         onDragOver={(e) => {
           if (!drag) return;
           e.preventDefault();
-          setDrop(dropIndex(e.clientX));
+          setDrop(dropIndex(e.clientX, e.clientY));
         }}
         onDragLeave={(e) => !e.currentTarget.contains(e.relatedTarget as Node) && setDrop(null)}
         onDrop={(e) => {
           if (!drag) return;
           e.preventDefault();
-          move(drag, dropIndex(e.clientX));
+          move(drag, dropIndex(e.clientX, e.clientY));
           endDrag();
         }}>
-        <div className={'fwm-endcap' + (drop === 0 && !others.length ? ' is-drop' : '')}>
-          <b>INSTRUMENTS</b>
-          <small>their Reverb and Delay knobs feed those effects</small>
-        </div>
-        <span className="fwm-arrow" aria-hidden="true">➜</span>
         {chain.map((id, i) => (
           <span key={id} className="fwm-fxstep">
+            {i > 0 && <span className="fwm-arrow" aria-hidden="true">➜</span>}
             {unit(id, i)}
-            <span className="fwm-arrow" aria-hidden="true">➜</span>
           </span>
         ))}
-        <div className="fwm-endcap">
-          <b>MASTER</b>
-          <small>to your speakers</small>
-        </div>
+        {!chain.length && <div className={'fwm-endcap' + (drop === 0 ? ' is-drop' : '')}><small>No effects: drag one here from below</small></div>}
       </div>
       <div className={'fwm-shelf' + (drop === 'shelf' ? ' is-over' : '')}
         onDragOver={(e) => {

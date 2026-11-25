@@ -75,7 +75,10 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
               onChange={(e) => {
                 const views = L.views.slice();
                 views[i] = e.target.value as ViewId;
-                save({ ...L, views });
+                // Effects brings the Mixer with it: beside it in the same row, unless a Mixer is already open.
+                const bring = views[i] === 'fx' && !views.includes('mixer');
+                if (bring) views[i ^ 1] = 'mixer';
+                save({ ...L, views, max: bring ? -1 : L.max }); // un-maximise so both show
                 e.target.blur();
               }}>
               {Object.entries(VIEWS).map(([id, label]) => (
