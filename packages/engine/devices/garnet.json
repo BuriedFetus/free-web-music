@@ -4,7 +4,7 @@
   "kind": "instrument",
   "version": 1,
   "voices": "6 strings",
-  "description": "String synth: six modelled strings (pluck position and hardness, sustain, brightness), a guitar body (Nylon, Steel, Hollow) or an electric pickup, and an amp (Drive, Cab, Presence). Notes go to strings the way a guitarist plays them.",
+  "description": "String synth: six modelled strings (pluck position and hardness, sustain, brightness), a guitar body (Nylon, Steel, Hollow) or an electric pickup, a distortion pedal (warm fuzz to high-gain metal) and an amp (Drive, Cab, Presence). Notes go to strings the way a guitarist plays them.",
   "params": [
     { "id": "pick",    "label": "Position",  "section": "pick", "type": "float", "default": 0.2,  "unit": "",   "map": "lin", "min": 0, "max": 100 },
     { "id": "hard",    "label": "Pick",      "section": "pick", "type": "float", "default": 0.6,  "unit": "",   "map": "lin", "min": 0, "max": 100 },
@@ -21,7 +21,8 @@
     { "id": "vib",     "label": "Vibrato",   "section": "play", "type": "float", "default": 0,    "unit": "%",  "map": "lin", "min": 0, "max": 100 },
     { "id": "slide",   "label": "Slide",     "section": "play", "type": "float", "default": 0,    "unit": "ms", "map": "sq0", "min": 4, "max": 304 },
     { "id": "mute",    "label": "Palm mute", "section": "play", "type": "enum", "options": ["Off", "On"], "default": 0 },
-    { "id": "ring",    "label": "Ring",      "section": "play", "type": "float", "default": 0.5,  "unit": "%",  "map": "lin", "min": 0, "max": 100 }
+    { "id": "ring",    "label": "Ring",      "section": "play", "type": "float", "default": 0.5,  "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "dist",    "label": "Distortion","section": "amp",  "type": "float", "default": 0,    "unit": "%",  "map": "lin", "min": 0, "max": 100 }
   ],
   "modSources": [],
   "notes": {

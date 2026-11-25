@@ -182,8 +182,9 @@ fn every_body_and_cab_is_bounded_and_ends() {
     let fs = 48_000.0;
     for body in 0..4 {
         for cab in 0..3 {
-            for drive in [0.0, 0.6, 1.0] {
+            for (drive, dist) in [(0.0, 0.0), (0.6, 0.0), (1.0, 0.0), (0.3, 1.0), (1.0, 1.0)] {
                 let mut g = garnet(fs);
+                g.set_param(p::DIST, dist);
                 g.set_param(p::BODY, body as f32);
                 g.set_param(p::CAB, cab as f32);
                 g.set_param(p::DRIVE, drive);
@@ -197,7 +198,7 @@ fn every_body_and_cab_is_bounded_and_ends() {
                 let (l, r) = render(&mut g, fs as usize);
                 let pk = l.iter().chain(&r).fold(0f32, |m, v| m.max(v.abs()));
                 assert!(l.iter().chain(&r).all(|v| v.is_finite()));
-                assert!(pk < 1.0 && pk > 0.05, "body {body} cab {cab} drive {drive}: peak {pk}");
+                assert!(pk < 1.0 && pk > 0.05, "body {body} cab {cab} drive {drive} dist {dist}: peak {pk}");
                 g.all_notes_off();
                 render(&mut g, fs as usize);
                 assert!(!g.active(), "body {body} cab {cab}: strings stop after all-notes-off");
@@ -248,6 +249,7 @@ fn six_strings_fit_the_cpu_budget() {
     let mut g = garnet(fs);
     g.set_param(p::SUSTAIN, 1.0);
     g.set_param(p::DRIVE, 0.6);
+    g.set_param(p::DIST, 1.0);
     for n in [40, 47, 52, 56, 59, 64] {
         g.note_on(n, 1.0);
     }
@@ -257,4 +259,64 @@ fn six_strings_fit_the_cpu_budget() {
     let used = t.elapsed().as_secs_f32() / secs;
     println!("six strings + body + amp: {:.2}% of one core", used * 100.0);
     assert!(used < 0.05, "{used}");
+}
+
+/// Share of the energy above 2 kHz on a low note (harmonics the distortion adds).
+fn bright_share(x: &[f32], fs: f32) -> f32 {
+    // one-pole high-pass at 2 kHz, twice
+    let a = (-2.0 * std::f32::consts::PI * 2000.0 / fs).exp();
+    let (mut y1, mut x1, mut y2, mut x2) = (0.0f32, 0.0f32, 0.0f32, 0.0f32);
+    let mut hi = 0.0f64;
+    for &v in x {
+        let h1 = a * (y1 + v - x1);
+        x1 = v;
+        y1 = h1;
+        let h2 = a * (y2 + h1 - x2);
+        x2 = h1;
+        y2 = h2;
+        hi += (h2 * h2) as f64;
+    }
+    let all: f64 = x.iter().map(|v| (v * v) as f64).sum();
+    (hi / all.max(1e-12)) as f32
+}
+
+#[test]
+fn distortion_squashes_and_fills_at_about_the_same_level() {
+    let fs = 48_000.0;
+    let run = |dist: f32| {
+        let mut g = garnet(fs);
+        g.set_param(p::DIST, dist);
+        g.set_param(p::CAB, 0.0); // Direct: hear the pedal, not the speaker
+        g.set_param(p::DRIVE, 0.0);
+        g.note_on(40, 0.8); // low E
+        let (l, _) = render(&mut g, (fs * 1.2) as usize);
+        let x = &l[(fs * 0.1) as usize..];
+        let pk = x.iter().fold(0f32, |m, v| m.max(v.abs()));
+        // how much of the level is left a second in (distortion compresses: notes sustain)
+        let late = rms(&l[(fs * 0.9) as usize..]) / rms(&l[(fs * 0.1) as usize..(fs * 0.3) as usize]);
+        (rms(x), pk / rms(x), late)
+    };
+    let (c_rms, c_crest, c_late) = run(0.0);
+    let (w_rms, w_crest, w_late) = run(0.35);
+    let (m_rms, m_crest, m_late) = run(1.0);
+    let db = |a: f32| 20.0 * (a / c_rms).log10();
+    println!("distortion 0 / 35% / 100%: level {:+.1} / {:+.1} dB; crest {c_crest:.2} / {w_crest:.2} / {m_crest:.2}; sustain {c_late:.3} / {w_late:.3} / {m_late:.3}", db(w_rms), db(m_rms));
+    assert!(db(w_rms).abs() < 6.0 && db(m_rms).abs() < 6.0, "level-matched");
+    assert!(w_crest < c_crest * 0.8 && m_crest < w_crest, "denser as it goes up");
+    assert!(m_late > c_late * 2.0, "a distorted note sustains");
+}
+
+#[test]
+fn distortion_keeps_notes_in_tune() {
+    for fs in [44_100.0, 48_000.0] {
+        for note in [40u8, 52, 64] {
+            let mut g = garnet(fs);
+            g.set_param(p::DIST, 1.0);
+            g.note_on(note, 0.8);
+            let (l, _) = render(&mut g, (fs * 0.6) as usize);
+            let at = (fs * 0.25) as usize;
+            let cents = 1200.0 * (pitch(&l[at..at + 8192], fs) / hz(note)).log2();
+            assert!(cents.abs() < 3.0, "note {note} at {fs}: {cents} cents");
+        }
+    }
 }

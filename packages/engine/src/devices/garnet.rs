@@ -7,7 +7,8 @@
 //! length and the length is read with interpolation, so every note is in tune (tests: within a few cents).
 //!
 //! Body: three resonances and a tone filter per guitar (Nylon, Steel, Hollow), or Electric: a pickup
-//! resonance instead of a wooden box. Amp: Drive (tanh, 2× oversampled, level-matched at a typical level, so it adds grit, not volume),
+//! resonance instead of a wooden box. Distortion: a pedal before the amp, warm fuzz at low settings, tight
+//! high-gain metal at the top (two clipping stages, 4× oversampled). Amp: Drive (tanh, 2× oversampled, level-matched at a typical level, so it adds grit, not volume),
 //! Cab (Direct, Combo, Stack), Presence, Level.
 //!
 //! Notes are given to strings the way a guitarist's hand would: a note already ringing on a string is
@@ -48,16 +49,17 @@ pub mod p {
     pub const SLIDE: usize = 13;
     pub const MUTE: usize = 14;
     pub const RING: usize = 15;
-    pub const COUNT: usize = 16;
+    pub const DIST: usize = 16;
+    pub const COUNT: usize = 17;
 }
 
 /// Parameter ids, in index order (they match `devices/garnet.json`).
 pub const IDS: [&str; p::COUNT] =
-    ["pick", "hard", "sustain", "bright", "body", "reso", "tone", "drive", "cab", "pres", "lvl", "strum", "vib", "slide", "mute", "ring"];
+    ["pick", "hard", "sustain", "bright", "body", "reso", "tone", "drive", "cab", "pres", "lvl", "strum", "vib", "slide", "mute", "ring", "dist"];
 
 /// "Clean Electric".
 pub fn defaults() -> [f32; p::COUNT] {
-    [0.2, 0.6, 0.55, 0.6, 3.0, 0.6, 0.55, 0.12, 1.0, 0.55, 0.75, 0.35, 0.0, 0.0, 0.0, 0.5]
+    [0.2, 0.6, 0.55, 0.6, 3.0, 0.6, 0.55, 0.12, 1.0, 0.55, 0.75, 0.35, 0.0, 0.0, 0.0, 0.5, 0.0]
 }
 
 fn discrete_max(i: usize) -> Option<f32> {
@@ -154,10 +156,17 @@ pub struct Garnet {
     cbell: [Biquad; 2],
     clp: [Biquad; 2],
     pres: [Biquad; 2],
+    /// The amp runs at four times the rate: 4× → 2× → 1× through two half-band decimators.
     dec: [Decimator; 2],
+    dec2: [Decimator; 2],
     prev: [f32; 2],
-    // block-rate smoothed knobs: reso, tone, drive, pres, lvl
-    sm: [f32; 5],
+    /// Distortion pedal: tightening (low cut, mid push, fizz cut) and the filter between its two stages.
+    dhp: [Biquad; 2],
+    dmid: [Biquad; 2],
+    dlp: [Biquad; 2],
+    dz: [f32; 2],
+    // block-rate smoothed knobs: reso, tone, drive, pres, lvl, dist
+    sm: [f32; 6],
     primed: bool,
 }
 
@@ -193,8 +202,13 @@ impl Garnet {
             clp: [Biquad::new(); 2],
             pres: [Biquad::new(); 2],
             dec: [Decimator::new(), Decimator::new()],
+            dec2: [Decimator::new(), Decimator::new()],
             prev: [0.0; 2],
-            sm: [0.0; 5],
+            dhp: [Biquad::new(); 2],
+            dmid: [Biquad::new(); 2],
+            dlp: [Biquad::new(); 2],
+            dz: [0.0; 2],
+            sm: [0.0; 6],
             primed: false,
         }
     }
@@ -291,8 +305,12 @@ impl Garnet {
         let fs = self.fs;
         let body = &BODIES[self.params[p::BODY] as usize];
         let cab = &CABS[self.params[p::CAB] as usize];
-        let (reso, tone, pres) = (self.sm[0], self.sm[1], self.sm[3]);
+        let (reso, tone, pres, dist) = (self.sm[0], self.sm[1], self.sm[3], self.sm[5]);
         for ch in 0..2 {
+            // the pedal tightens as it gains: less boom, more mids, less fizz (all flat at 0)
+            self.dhp[ch].highpass(20.0 + dist * 160.0, 0.7, fs);
+            self.dmid[ch].peaking(850.0, 0.8, dist * 7.0, fs);
+            self.dlp[ch].lowpass(18_000.0 - dist * 11_000.0, 0.7, fs);
             self.hp[ch].highpass(body.hp, 0.7, fs);
             for (k, &(f, db, q)) in body.bells.iter().enumerate() {
                 self.bells[ch][k].peaking(f, q, db * reso * 1.6, fs);
@@ -378,7 +396,7 @@ impl Device for Garnet {
         let n = left.len().min(right.len());
         let fs = self.fs;
         // knobs glide over ~15 ms at block rate (no zipper noise from the filters)
-        let targets = [self.params[p::RESO], self.params[p::TONE], self.params[p::DRIVE], self.params[p::PRES], self.params[p::LVL]];
+        let targets = [self.params[p::RESO], self.params[p::TONE], self.params[p::DRIVE], self.params[p::PRES], self.params[p::LVL], self.params[p::DIST]];
         let k = if self.primed { one_pole_coef(0.015, fs / n.max(1) as f32) } else { 1.0 };
         for (s, t) in self.sm.iter_mut().zip(targets) {
             *s += (t - *s) * k;
@@ -391,10 +409,25 @@ impl Device for Garnet {
         let vib = self.params[p::VIB] * 0.006;
         let dphase = 5.2 / fs;
         let drive = 0.5 + self.sm[2] * 12.0;
-        let tk = libm::tanhf(drive);
+        let tk = sat(drive);
         // level-matched at a typical level into the amp: driving adds grit and squash, not volume
         const REF: f32 = 0.15;
-        let post = REF / (libm::tanhf(REF * drive) / tk);
+        let post = REF / (sat(REF * drive) / tk);
+        // Distortion pedal: an asymmetric stage (even harmonics: warm, fuzzy), a smoothing filter, a second
+        // stage for the high-gain end. Level-matched at a typical level; blended in over the first 1/6 of the
+        // knob so it starts from exactly clean.
+        let d = self.sm[5];
+        let g1 = 1.0 + d * d * 60.0;
+        let g2 = 1.0 + d * 6.0;
+        const BIAS: f32 = 0.3;
+        // `sat` is a fast tanh (Padé), cheap enough for twelve curves per sample
+        let tb = sat(BIAS);
+        let st1 = move |v: f32| sat(g1 * v + BIAS) - tb;
+        let chain = move |v: f32| sat(g2 * st1(v));
+        const DREF: f32 = 0.035;
+        let dpost = DREF / chain(DREF).abs().max(1e-6);
+        let wet = (d * 6.0).min(1.0);
+        let zc = 1.0 - expf(-TAU * 6500.0 / (4.0 * fs));
         let lvl = self.sm[4] * self.sm[4] * 1.6;
         let quiet_after = (0.2 * fs) as usize;
         for k in 0..n {
@@ -445,11 +478,24 @@ impl Device for Garnet {
                     x = b.process(x);
                 }
                 x = self.tone[ch].process(x);
-                // drive at twice the rate: the midpoint and the sample, then back down
-                let mid = 0.5 * (self.prev[ch] + x);
+                x = self.dlp[ch].process(self.dmid[ch].process(self.dhp[ch].process(x)));
+                // pedal and amp at four times the rate, then back down
+                let p0 = self.prev[ch];
                 self.prev[ch] = x;
-                let sh = |v: f32| libm::tanhf(drive * v) / tk;
-                x = self.dec[ch].process(sh(mid), sh(x)) * post;
+                let mut sub = [0.0f32; 4];
+                for (j, o) in sub.iter_mut().enumerate() {
+                    let v = p0 + (x - p0) * (j as f32 + 1.0) * 0.25;
+                    let mut y = v;
+                    if wet > 0.0 {
+                        let a = st1(v);
+                        self.dz[ch] = flush(self.dz[ch] + zc * (a - self.dz[ch]));
+                        y = v + (sat(g2 * self.dz[ch]) * dpost - v) * wet;
+                    }
+                    *o = sat(drive * y) / tk;
+                }
+                let a = self.dec[ch].process(sub[0], sub[1]);
+                let b = self.dec[ch].process(sub[2], sub[3]);
+                x = self.dec2[ch].process(a, b) * post;
                 x = self.chp[ch].process(x);
                 x = self.cbell[ch].process(x);
                 x = self.clp[ch].process(x);

@@ -204,8 +204,9 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
         <div>
           <div className="fwm-brk">Amp</div>
           <div className="fwm-garnet__amp">
-            <StepDial store={store} host={host} id="cab" set={set} />
+            {knob('dist', 'lg')}
             {knob('drive', 'lg')}
+            <StepDial store={store} host={host} id="cab" set={set} />
             {knob('pres')}
             {knob('lvl')}
           </div>
