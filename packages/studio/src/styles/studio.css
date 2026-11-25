@@ -9,6 +9,7 @@
 @import '../skins/flint.css';
 @import '../skins/opal.css';
 @import '../skins/garnet.css';
+@import '../skins/opal.css';
 @import '../skins/mixer.css';
 @import './shell.css';
 
@@ -244,3 +245,25 @@
   .fwm-garnet .fwm-garnet__ch b { font-size: 15px; }
 }
 @media (prefers-reduced-motion: reduce) { .fwm-garnet__str.is-ringing { animation: fwm-strglow 1.3s ease-out; } }
+
+/* ---------- Opal (pad synth): OSC rows + FILTER block, AMP and MOTION ---------- */
+.fwm-opal { container-type: inline-size; display: grid; gap: 10px;
+  /* play of colour: soft fire and sea-green glints over the pearl */
+  background: radial-gradient(ellipse 45% 60% at 22% 18%, color-mix(in srgb, var(--dev-acc) 22%, transparent), transparent 70%),
+    radial-gradient(ellipse 50% 60% at 78% 70%, color-mix(in srgb, var(--dev-lcdink) 30%, transparent), transparent 70%),
+    linear-gradient(160deg, var(--dev-case), color-mix(in srgb, var(--dev-case2) calc(var(--fwm-depth) * 100%), var(--dev-case))); }
+.fwm-opal .fwm-btn--hw, .fwm-opal .fwm-btn--seg { color: var(--dev-btnink); }
+.fwm-opal .fwm-btn--seg { background: var(--dev-btn); }
+.fwm-opal .fwm-btn--seg[aria-pressed=true] { background: var(--dev-acc); color: var(--dev-btn); }
+.fwm-opal .fwm-dev__hdr { padding-bottom: 4px; }
+.fwm-opal .fwm-lcd--scope { flex: 0 1 200px; height: 52px; }
+.fwm-opal .fwm-gstep__lbl { position: absolute; transform: translate(-50%, -50%); border: 0; background: none; padding: 2px 3px; cursor: pointer; white-space: nowrap;
+  font: 11px var(--fwm-font-label); color: var(--dev-silk); opacity: .6; }
+.fwm-opal .fwm-gstep__lbl.is-on { opacity: 1; color: var(--dev-acc); font-weight: 700; }
+.fwm-opal__face { grid-template-columns: minmax(0, 2.2fr) minmax(0, 1fr); }
+.fwm-opal__filter { display: grid; grid-template-columns: repeat(2, minmax(0, 1fr)); justify-items: center; align-items: center; gap: 4px; padding: 6px;
+  border-radius: calc(12px * var(--fwm-round)); background: var(--dev-sec); }
+.fwm-opal__low { display: grid; grid-template-columns: minmax(0, 1fr) minmax(0, 2fr); gap: 20px; }
+.fwm-opal__chorus { display: grid; gap: 4px; justify-items: center; font-size: 12px; }
+.fwm-opal__chorus .fwm-seg { margin: 0; }
+@container (max-width: 760px) { .fwm-opal__face, .fwm-opal__low { grid-template-columns: minmax(0, 1fr); } }

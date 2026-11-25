@@ -244,24 +244,24 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
   );
 }
 
-function defaultsOf(store: DeviceStore): Record<string, number> {
+export function defaultsOf(store: DeviceStore): Record<string, number> {
   return Object.fromEntries(store.manifest.params.map((p) => [p.id, p.default]));
 }
 
-function GKnob({ store, host, id, set, size }: { store: DeviceStore; host?: DeviceHost; id: string; set(id: string, v: number): void; size?: 'lg' }) {
+export function GKnob({ store, host, id, set, size, fmt = GARNET_FORMAT }: { store: DeviceStore; host?: DeviceHost; id: string; set(id: string, v: number): void; size?: 'lg'; fmt?: Record<string, (v: number) => string> }) {
   const { Knob } = usePrimitives();
   const state = useDeviceState(store);
   const spec = store.manifest.params.find((p) => p.id === id)!;
   return (
     <Knob value={state.params[id]} onChange={(v) => set(id, v)} label={spec.label} size={size}
-      format={(v) => (GARNET_FORMAT[id] ?? ((x: number) => formatParam(spec, x)))(v)}
+      format={(v) => (fmt[id] ?? ((x: number) => formatParam(spec, x)))(v)}
       defaultValue={spec.default} presence={host?.presenceFor(id) ?? []}
       onGestureStart={() => host?.touch(id)} onGestureEnd={() => host?.touch(null)} />
   );
 }
 
 /** A stepped dial: the knob snaps to its choices, which are printed around it (click one to pick it). */
-function StepDial({ store, host, id, set }: { store: DeviceStore; host?: DeviceHost; id: string; set(id: string, v: number): void }) {
+export function StepDial({ store, host, id, set }: { store: DeviceStore; host?: DeviceHost; id: string; set(id: string, v: number): void }) {
   const { Knob } = usePrimitives();
   const state = useDeviceState(store);
   const spec = store.manifest.params.find((p) => p.id === id)!;

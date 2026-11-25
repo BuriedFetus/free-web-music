@@ -27,6 +27,10 @@ export function formatParam(spec: ParamSpec, v: number): string {
       const s = Math.round(x);
       return (s > 0 ? '+' : '') + s;
     }
+    case 'ct': {
+      const c = Math.round(x);
+      return (c > 0 ? '+' : '') + c + ' ct';
+    }
     case '%':
       return Math.round(x) + '%';
     case 'Hz':

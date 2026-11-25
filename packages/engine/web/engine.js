@@ -10,7 +10,7 @@
 // The worklet and WASM files are found next to this module (`new URL(..., import.meta.url)`,
 // which Vite, webpack 5 and Rollup all understand), or under `base` if given.
 
-export const KINDS = { basalt: 1, flint: 2, garnet: 3 };
+export const KINDS = { basalt: 1, flint: 2, garnet: 3, opal: 4 };
 export const MOD_SOURCES = { lfo: 0, amp: 1, filt: 2 };
 /** Mixer strip settings. level: 0..1 (0.8 = 0 dB), pan: -1..1, mute: 0/1, sendA / sendB: 0..1. */
 export const MIX = { level: 0, pan: 1, mute: 2, sendA: 3, sendB: 4 };
@@ -31,20 +31,21 @@ const DEFAULT_URLS = () => ({
   basalt: new URL('./basalt.json', import.meta.url).href,
   flint: new URL('./flint.json', import.meta.url).href,
   garnet: new URL('./garnet.json', import.meta.url).href,
+  opal: new URL('./opal.json', import.meta.url).href,
 });
 
 export async function createEngine({ base, context, manifests } = {}) {
   const ctx = context || new AudioContext({ latencyHint: 'interactive' });
   const urls = base
     ? Object.fromEntries(
-        Object.entries({ wasm: 'fwm_engine.wasm', worklet: 'worklet.js', basalt: 'basalt.json', flint: 'flint.json', garnet: 'garnet.json' }).map(([k, f]) => [
+        Object.entries({ wasm: 'fwm_engine.wasm', worklet: 'worklet.js', basalt: 'basalt.json', flint: 'flint.json', garnet: 'garnet.json', opal: 'opal.json' }).map(([k, f]) => [
           k,
           new URL(f, new URL(base, location.href)).href,
         ]),
       )
     : DEFAULT_URLS();
   const loadManifest = async (m) => (typeof m === 'object' ? m : (await fetch(m)).json());
-  const [wasm, basalt, flint, garnet] = await Promise.all([
+  const [wasm, basalt, flint, garnet, opal] = await Promise.all([
     fetch(urls.wasm).then((r) => {
       if (!r.ok) throw new Error('engine wasm: HTTP ' + r.status);
       return r.arrayBuffer();
@@ -52,8 +53,9 @@ export async function createEngine({ base, context, manifests } = {}) {
     loadManifest(manifests?.basalt ?? urls.basalt),
     loadManifest(manifests?.flint ?? urls.flint),
     loadManifest(manifests?.garnet ?? urls.garnet),
+    loadManifest(manifests?.opal ?? urls.opal),
   ]);
-  const manifest = { basalt, flint, garnet };
+  const manifest = { basalt, flint, garnet, opal };
   await ctx.audioWorklet.addModule(urls.worklet);
   const node = new AudioWorkletNode(ctx, 'fwm-engine', {
     numberOfInputs: 0,

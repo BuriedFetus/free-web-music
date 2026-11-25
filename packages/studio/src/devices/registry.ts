@@ -10,6 +10,9 @@ import { Flint } from './flint/Flint';
 import { FLINT_KITS } from './flint/kits';
 import { Garnet } from './garnet/Garnet';
 import { GARNET_PRESETS } from './garnet/presets';
+import opalManifest from '@fwm/engine/devices/opal.json';
+import { Opal } from './opal/Opal';
+import { OPAL_PRESETS } from './opal/presets';
 
 export interface DeviceEntry {
   id: string;
@@ -41,7 +44,10 @@ export const LIBRARY: DeviceEntry[] = [
   },
   { id: 'cobalt', name: 'Cobalt', kind: 'Chip lead + arpeggiator', category: 'Synths', roll: { low: 60, high: 96 }, rootNote: 72, available: false, soon: 'Phase 5' },
   { id: 'quartz', name: 'Quartz', kind: 'FM keys', category: 'Keys & pads', roll: { low: 42, high: 78 }, rootNote: 60, available: false, soon: 'Phase 5' },
-  { id: 'opal', name: 'Opal', kind: 'Pad synth', category: 'Keys & pads', roll: { low: 42, high: 78 }, rootNote: 60, available: false, soon: 'Phase 5' },
+  {
+    id: 'opal', name: 'Opal', kind: 'Pad synth: 8 voices, stack & chorus', category: 'Keys & pads', roll: { low: 36, high: 84 }, rootNote: 60,
+    available: true, manifest: opalManifest as DeviceManifest, Component: Opal, presets: OPAL_PRESETS,
+  },
   {
     id: 'flint', name: 'Flint', kind: 'Drum machine', category: 'Drums', roll: { low: 36, high: 43 }, rootNote: 36, layout: 'pads',
     available: true, manifest: flintManifest as DeviceManifest, Component: Flint, presets: FLINT_KITS,

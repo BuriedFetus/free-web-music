@@ -1,20 +1,20 @@
-/* Opal: pad synth. Misty lilac casing, magenta accent, plum screen. */
+/* Opal: pad synth. Milky pearl casing with a play of colour (the panel draws the sheen from --dev-acc
+   and --dev-lcdink), dark knobs, ink-blue screens, opal-fire pink accent. */
 :where(.opal, [data-device="opal"]) {
-  --dev-case: #d9d2ee;
-  --dev-case2: #a99fd0;
-  --dev-edge: #8c81b8;
-  --dev-silk: #2a2142;
-  --dev-acc: #d6338a;
-  --dev-lcd: #24122b;
-  --dev-lcdink: #ff9bd2;
-  --dev-cap: #2a2142;
-  --dev-capd: #120d1f;
-  --dev-btn: #efeafc;
-  --dev-btn2: #c3b9e6;
-  --dev-btnink: #2a2142;
-  --dev-btnedge: #7d72aa;
-  --dev-sec: rgba(255,255,255,.3);
-  --dev-track: #7d72aa;
-  --dev-key: #faf7ff;
-  --dev-keyb: #2a2142;
+  --dev-case: #e6e8f0;
+  --dev-case2: #a9b1c9;
+  --dev-texture: none;
+  --dev-edge: #7d86a3;
+  --dev-silk: #23263a;
+  --dev-acc: #d9468f;
+  --dev-lcd: #191c2c;
+  --dev-lcdink: #8ff0e2;
+  --dev-cap: #3a3f56;
+  --dev-capd: #14161f;
+  --dev-btn: #f7f8fb;
+  --dev-btn2: #c9cfe0;
+  --dev-btnink: #23263a;
+  --dev-btnedge: #8a92ad;
+  --dev-sec: rgba(35, 38, 58, .07);
+  --dev-track: #2a2e42;
 }

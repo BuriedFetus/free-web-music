@@ -1,0 +1,226 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geode: grow a sound</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Big+Shoulders+Display:wght@800&family=Figtree:wght@400;600&display=swap" rel="stylesheet">
+<style>
+/* VOICE: friendly, zero jargon, for people who have never made music.
+   IDEA: a geode cracked open: your sound is the stone, variations grow out of it as crystals.
+   PICTURE: the geode itself, large, the thing you touch.
+   COLOUR and TYPE: cave-dark ground in both themes; each crystal's colour comes from its sound (dull = deep, bright = gold).
+   LAYOUT: title, three numbered steps, the geode, big note pads, then saved sounds. */
+:root{color-scheme:dark;--bg:#120f17;--bg2:#1d1824;--ink:#f4efe7;--mute:#b4aabb;--line:#3a3142;--acc:#ffc46b;--on-acc:#22160a}
+*{box-sizing:border-box;min-width:0}
+body{margin:0;background:radial-gradient(ellipse 80% 60% at 50% 38%,#2b2233,var(--bg) 72%);color:var(--ink);font:16px/1.5 Figtree,system-ui,sans-serif;min-height:100vh;overflow-x:clip}
+main{max-width:900px;margin:0 auto;padding:clamp(16px,3vw,32px) max(4vw,14px)}
+h1{font:800 clamp(36px,6vw,52px)/1.05 'Big Shoulders Display',Impact,sans-serif;margin:0}
+.steps{display:flex;flex-wrap:wrap;gap:6px 22px;margin:8px 0 16px;padding:0;list-style:none;color:var(--mute)}
+.steps b{display:inline-grid;place-items:center;width:24px;height:24px;border-radius:50%;background:var(--acc);color:var(--on-acc);margin-right:6px;font-size:14px}
+.row{display:flex;flex-wrap:wrap;gap:8px;align-items:center}
+button{font:inherit;color:inherit;background:var(--bg2);border:1px solid var(--line);border-radius:999px;min-height:44px;padding:8px 18px;cursor:pointer}
+button:hover{border-color:var(--acc)}
+button:focus-visible,.cr:focus-visible{outline:3px solid var(--acc);outline-offset:3px}
+button.on{background:var(--acc);color:var(--on-acc);border-color:var(--acc)}
+button:disabled{opacity:.4;cursor:default}
+.big{background:var(--acc);color:var(--on-acc);border-color:var(--acc);font-weight:600}
+.lab{color:var(--mute);font-size:14px;margin-right:4px}
+.fig{position:relative;aspect-ratio:3/2;max-height:62vh;margin:8px auto 0;width:100%}
+.fig svg{position:absolute;inset:0;width:100%;height:100%;touch-action:manipulation}
+.cr{cursor:pointer;outline:none}
+.cr .grow{transform-origin:0 0;animation:grow .55s cubic-bezier(.2,1.5,.4,1) both}
+.cr:hover .face{filter:brightness(1.25)}
+.cr.sel .face{stroke:var(--acc);stroke-width:3}
+.cr.sel text{fill:var(--acc);font-weight:600}
+.cr text{fill:var(--ink);font-size:17px}
+.wob .grow{animation:grow .55s cubic-bezier(.2,1.5,.4,1) both,shim 1.6s ease-in-out .6s infinite alternate}
+@keyframes grow{from{transform:scale(0)}to{transform:scale(1)}}
+@keyframes shim{to{transform:scale(1.04,.9)}}
+@media (prefers-reduced-motion:reduce){.cr .grow,.wob .grow{animation:none}}
+.now{text-align:center;min-height:1.5em;margin:4px 0 10px;color:var(--mute)}
+.now b{color:var(--ink)}
+.ctrls{justify-content:center;gap:10px 14px}
+input[type=range]{width:160px;accent-color:var(--acc);height:44px}
+.pads{display:grid;grid-template-columns:repeat(8,minmax(0,1fr));gap:6px;margin:18px 0 6px}
+.pad{border-radius:12px;min-height:72px;padding:0;background:linear-gradient(var(--bg2),#15111a);font-weight:600;display:grid;place-items:end center;padding-bottom:8px}
+.pad.down{background:var(--acc);color:var(--on-acc)}
+.hint{color:var(--mute);font-size:14px;text-align:center;margin:0 0 18px}
+h2{font-size:17px;margin:18px 0 8px}
+.saved button{display:flex;gap:8px;align-items:center}
+.dot{width:14px;height:14px;border-radius:3px;transform:rotate(45deg)}
+.empty{color:var(--mute);font-size:14px}
+.note{color:var(--mute);font-size:13px;margin-top:22px}
+@media(max-width:600px){.pads{grid-template-columns:repeat(4,minmax(0,1fr))}.fig{aspect-ratio:1/1}}
+</style>
+</head>
+<body>
+<main>
+  <h1>Geode</h1>
+  <ol class="steps">
+    <li><b>1</b>Pick a sound to start from</li>
+    <li><b>2</b>Tap a crystal to hear it</li>
+    <li><b>3</b>Tap it again to grow new ones from it</li>
+  </ol>
+  <div class="row" id="seeds" aria-label="Start from"></div>
+  <div class="fig"><svg id="geo" viewBox="0 0 900 600" role="group" aria-label="Your sound and its variations"></svg></div>
+  <p class="now" id="now" aria-live="polite"></p>
+  <div class="row ctrls">
+    <button id="back" disabled>↶ Back</button>
+    <span class="row"><span class="lab">How different?</span><span class="lab">A little</span>
+      <input type="range" id="amt" min="0.08" max="1" step="0.01" value="0.4" aria-label="How different the new crystals are"><span class="lab">A lot</span></span>
+    <button id="again">Grow new ones</button>
+    <button id="surprise">Surprise me</button>
+    <button id="keep" class="big">♥ Keep this sound</button>
+  </div>
+  <div class="pads" id="pads"></div>
+  <p class="hint">Play with the pads or the keys A S D F G H J K. Every note fits, so nothing sounds wrong.</p>
+  <h2>Sounds you kept</h2>
+  <div class="row saved" id="saved"><span class="empty">None yet. Tap ♥ when you like one.</span></div>
+  <p class="note">Mock-up: in the studio Geode works on any instrument (Basalt, Garnet, Opal…), changing its settings for you, and the sound you pick reaches everyone in the session.</p>
+</main>
+<script>
+{
+const K=['wave','det','cut','res','env','atk','dec','sus','rel','lfo','wob','echo'];
+const SEEDS={
+  'Twinkle':{wave:.15,det:.2,cut:.75,res:.2,env:.35,atk:0,dec:.45,sus:0,rel:.55,lfo:.5,wob:.04,echo:.45,oct:1},
+  'Pluck':{wave:.7,det:.15,cut:.35,res:.35,env:.6,atk:0,dec:.3,sus:.05,rel:.25,lfo:.3,wob:0,echo:.15,oct:0},
+  'Dreamy':{wave:.6,det:.55,cut:.4,res:.15,env:.2,atk:.65,dec:.6,sus:.8,rel:.7,lfo:.25,wob:.12,echo:.4,oct:0},
+  'Deep bass':{wave:.75,det:.1,cut:.25,res:.4,env:.45,atk:0,dec:.35,sus:.5,rel:.15,lfo:.3,wob:0,echo:0,oct:-1},
+  'Wobble':{wave:.85,det:.2,cut:.35,res:.6,env:.2,atk:.05,dec:.5,sus:.8,rel:.2,lfo:.45,wob:.6,echo:.1,oct:-1},
+  'Buzz':{wave:.9,det:.35,cut:.6,res:.3,env:.3,atk:.02,dec:.4,sus:.7,rel:.25,lfo:.55,wob:.15,echo:.25,oct:0},
+};
+// plain words for what changed (more, less)
+const WORDS={cut:['brighter','darker'],wave:['buzzier','smoother'],det:['thicker','thinner'],res:['squelchier','gentler'],env:['zappier','calmer'],atk:['softer start','punchier'],dec:['rings longer','snappier'],sus:['fuller','plinkier'],rel:['longer tail','shorter tail'],lfo:['faster shimmer','slower shimmer'],wob:['wobblier','steadier'],echo:['echoey','drier']};
+const clamp=v=>Math.max(0,Math.min(1,v));
+const gauss=()=>Math.sqrt(-2*Math.log(1-Math.random()))*Math.cos(2*Math.PI*Math.random());
+const $=id=>document.getElementById(id);
+
+let center=null,name='',kids=[],sel=-1,hist=[],gen=0;
+const saved=[];
+
+// ---- sound (WebAudio) ----
+let ac,master,dly;
+function audio(){
+  if(ac)return ac;
+  ac=new (window.AudioContext||window.webkitAudioContext)();
+  const comp=ac.createDynamicsCompressor();
+  master=ac.createGain();master.gain.value=.32;master.connect(comp).connect(ac.destination);
+  dly=ac.createDelay(1);dly.delayTime.value=.33;
+  const fb=ac.createGain();fb.gain.value=.4;const dl=ac.createBiquadFilter();dl.type='lowpass';dl.frequency.value=3200;
+  dly.connect(dl).connect(fb).connect(dly);dl.connect(master);
+  return ac;
+}
+function voice(p,m){
+  audio();if(ac.state!=='running')ac.resume();
+  const t=ac.currentTime+.01,f=440*2**((m+12*p.oct-69)/12);
+  const A=.002+p.atk**2*2,D=.05+p.dec**2*2,S=p.sus,R=.04+p.rel**2*3;
+  const amp=ac.createGain(),flt=ac.createBiquadFilter(),mix=ac.createGain();
+  flt.type='lowpass';flt.Q.value=.5+p.res**2*14;
+  const base=120*2**(p.cut*7),peak=Math.min(18000,base*2**(p.env*5));
+  flt.frequency.setValueAtTime(base,t);flt.frequency.linearRampToValueAtTime(peak,t+A);flt.frequency.setTargetAtTime(base,t+A,D/3);
+  const oscs=[['sine',1-p.wave,0],['sawtooth',p.wave*.6,-p.det*12],['square',.15+p.det*.3,4+p.det*30]].map(([ty,g,dt])=>{
+    const o=ac.createOscillator(),gg=ac.createGain();o.type=ty;o.frequency.value=f;o.detune.value=dt;gg.gain.value=g;o.connect(gg).connect(mix);o.start(t);return o;});
+  const lfo=ac.createOscillator();lfo.frequency.value=.3+p.lfo**2*9;
+  const lp=ac.createGain();lp.gain.value=p.wob*40;const lf=ac.createGain();lf.gain.value=p.wob*1500;
+  lfo.connect(lp);oscs.forEach(o=>lp.connect(o.detune));lfo.connect(lf).connect(flt.detune);lfo.start(t);
+  mix.gain.value=.5;mix.connect(flt).connect(amp);
+  amp.gain.setValueAtTime(0,t);amp.gain.linearRampToValueAtTime(1,t+A);amp.gain.setTargetAtTime(S,t+A,D/3);
+  amp.connect(master);const snd=ac.createGain();snd.gain.value=p.echo*.7;amp.connect(snd).connect(dly);
+  let done=false;
+  return{off(fast){if(done)return;done=true;const n=ac.currentTime,r=fast?.03:R;
+    const v=amp.gain.value;amp.gain.cancelScheduledValues(n);amp.gain.setValueAtTime(v,n);amp.gain.setTargetAtTime(0,n,r/4);
+    const end=n+r*1.6+.1;oscs.forEach(o=>o.stop(end));lfo.stop(end);}};
+}
+// a short tune so you can hear a crystal without playing
+let preview=[],timers=[];
+function audition(p){
+  preview.forEach(v=>v.off(true));timers.forEach(clearTimeout);preview=[];timers=[];
+  const slow=p.atk>.45||p.oct<0&&p.sus>.6;
+  const tune=slow?[[0,60],[0,64],[0,67]]:[[0,60],[200,64],[400,67],[600,72]];
+  const hold=slow?1400:180;
+  tune.forEach(([at,m])=>timers.push(setTimeout(()=>{const v=voice(p,m);preview.push(v);timers.push(setTimeout(()=>v.off(),hold));},at)));
+}
+
+// ---- growing ----
+function grow(){
+  const amt=+$('amt').value;
+  kids=Array.from({length:8},()=>{
+    const a=amt*(.45+.75*Math.random()),n={...center};
+    for(const k of K)n[k]=clamp(center[k]+gauss()*a*.32);
+    return n;});
+  sel=-1;gen++;draw();
+}
+function diffWord(c){
+  const d=K.map(k=>[k,(c[k]-center[k])*(k==='lfo'?Math.max(c.wob,center.wob)*2:1)]).sort((a,b)=>Math.abs(b[1])-Math.abs(a[1]));
+  return d.slice(0,Math.abs(d[1][1])>.12?2:1).map(([k,v])=>WORDS[k][v>0?0:1]).join(', ');
+}
+const dist=c=>Math.sqrt(K.reduce((s,k)=>s+(c[k]-center[k])**2,0)/K.length);
+const hue=p=>`hsl(${265-p.cut*220} ${50+p.wave*40}% ${42+(1-p.atk)*16}%)`;
+const hue2=p=>`hsl(${265-p.cut*220} ${45+p.wave*35}% ${26+(1-p.atk)*10}%)`;
+
+function crystal(i,c,ang){
+  const L=Math.min(175,40+dist(c)*620),w=26+c.sus*14+c.det*10;
+  const x=450+Math.cos(ang)*(78+L+26),y=300+Math.sin(ang)*(78+L+26);
+  const anchor=Math.cos(ang)>.3?'start':Math.cos(ang)<-.3?'end':'middle';
+  const word=diffWord(c);
+  return `<g class="cr${i===sel?' sel':''}${c.wob>.35?' wob':''}" data-i="${i}" tabindex="0" role="button" aria-label="A ${word} version${i===sel?', selected: tap again to grow from it':''}">
+   <g transform="translate(450 300) rotate(${ang*180/Math.PI}) translate(70 0)"><g class="grow" style="animation-delay:${i*45}ms">
+    <polygon class="face" fill="${hue2(c)}" points="0,${w/2} ${L*.78},${w/2} ${L},0 0,0"/>
+    <polygon class="face" fill="${hue(c)}" points="0,${-w/2} ${L*.78},${-w/2} ${L},0 0,0"/>
+    <polyline points="0,${-w/2} ${L*.78},${-w/2} ${L},0" fill="none" stroke="#fff" stroke-opacity=".35" stroke-width="1.5"/>
+   </g></g>
+   <text x="${x}" y="${y+6}" text-anchor="${anchor}">${word}</text></g>`;
+}
+function draw(){
+  const hex=r=>Array.from({length:6},(_,k)=>`${450+r*Math.cos(k*Math.PI/3+Math.PI/6)},${300+r*Math.sin(k*Math.PI/3+Math.PI/6)}`).join(' ');
+  $('geo').innerHTML=`
+   <ellipse cx="450" cy="312" rx="96" ry="88" fill="#000" opacity=".35"/>
+   <polygon points="${hex(84)}" fill="#3b3140" stroke="#5a4b5f" stroke-width="3"/>
+   <g class="cr${sel<0?' sel':''}" data-i="-1" tabindex="0" role="button" aria-label="Your sound: ${name}">
+    <polygon class="face" points="${hex(62)}" fill="${hue(center)}"/>
+    <polygon points="${hex(40)}" fill="${hue2(center)}" opacity=".7"/>
+    <text x="450" y="306" text-anchor="middle" style="font-size:15px;font-weight:600;fill:#fff">${gen>1?'yours':name}</text></g>
+   ${kids.map((c,i)=>crystal(i,c,(i/8)*Math.PI*2-Math.PI/2+Math.PI/8)).join('')}`;
+  $('back').disabled=!hist.length;
+  $('now').innerHTML=sel<0?`Playing <b>your sound</b> (started from ${name}${gen>1?`, grown ${gen-1} time${gen>2?'s':''}`:''}). Tap a crystal to hear a variation.`
+    :`Playing a <b>${diffWord(kids[sel])}</b> version. Tap it again to grow from it, or ♥ to keep it.`;
+}
+const current=()=>sel<0?center:kids[sel];
+function tap(i){
+  if(i<0){sel=-1;draw();return audition(center);}
+  if(i===sel){hist.push({center,kids,name,gen});center=kids[i];grow();return audition(center);}
+  sel=i;draw();audition(kids[i]);
+}
+function start(n,p){hist.length&&hist.push({center,kids,name,gen});center={...p};name=n;gen=0;grow();
+  document.querySelectorAll('#seeds button').forEach(b=>b.classList.toggle('on',b.textContent===n));}
+
+$('geo').addEventListener('click',e=>{const g=e.target.closest('.cr');if(g)tap(+g.dataset.i);});
+$('geo').addEventListener('keydown',e=>{const g=e.target.closest('.cr');if(g&&(e.key==='Enter'||e.key===' ')){e.preventDefault();tap(+g.dataset.i);requestAnimationFrame(()=>$('geo').querySelector(`[data-i="${g.dataset.i}"]`)?.focus());}});
+$('seeds').innerHTML=Object.keys(SEEDS).map(n=>`<button>${n}</button>`).join('');
+$('seeds').addEventListener('click',e=>{const b=e.target.closest('button');if(b){hist.push({center,kids,name,gen});start(b.textContent,SEEDS[b.textContent]);audition(center);}});
+$('back').onclick=()=>{const h=hist.pop();if(!h)return;({center,kids,name,gen}=h);sel=-1;draw();audition(center);};
+$('again').onclick=()=>{grow();};
+$('amt').onchange=()=>grow();
+$('surprise').onclick=()=>{hist.push({center,kids,name,gen});const r={oct:[-1,0,0,1][Math.random()*4|0]};K.forEach(k=>r[k]=Math.random());r.sus=Math.max(r.sus,.2);start('a surprise',r);audition(center);};
+$('keep').onclick=()=>{const p={...current()};saved.push({p,label:`Sound ${saved.length+1}`});
+  $('saved').innerHTML=saved.map((s,i)=>`<button data-s="${i}"><span class="dot" style="background:${hue(s.p)}"></span>${s.label}</button>`).join('');};
+$('saved').addEventListener('click',e=>{const b=e.target.closest('[data-s]');if(b){const s=saved[+b.dataset.s];hist.push({center,kids,name,gen});center={...s.p};name=s.label;gen=0;grow();audition(center);}});
+
+// ---- pads: C major pentatonic, so every note fits ----
+const NOTES=[60,62,64,67,69,72,74,76],KEYS='asdfghjk';
+$('pads').innerHTML=NOTES.map((m,i)=>`<button class="pad" data-k="${i}" aria-label="Note ${i+1}">${KEYS[i].toUpperCase()}</button>`).join('');
+const held={};
+function down(i){if(held[i])return;held[i]=voice(current(),NOTES[i]);$('pads').children[i].classList.add('down');}
+function up(i){held[i]?.off();delete held[i];$('pads').children[i].classList.remove('down');}
+$('pads').addEventListener('pointerdown',e=>{const b=e.target.closest('.pad');if(!b)return;e.preventDefault();const i=+b.dataset.k;down(i);
+  const u=()=>{up(i);removeEventListener('pointerup',u);removeEventListener('pointercancel',u);};addEventListener('pointerup',u);addEventListener('pointercancel',u);});
+addEventListener('keydown',e=>{const i=KEYS.indexOf(e.key.toLowerCase());if(i>=0&&!e.repeat&&!e.ctrlKey&&!e.metaKey&&e.target.tagName!=='INPUT')down(i);});
+addEventListener('keyup',e=>{const i=KEYS.indexOf(e.key.toLowerCase());if(i>=0)up(i);});
+
+start('Dreamy',SEEDS['Dreamy']);
+}
+</script>
+</body>
+</html>

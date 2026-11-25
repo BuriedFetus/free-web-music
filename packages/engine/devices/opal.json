@@ -1,0 +1,38 @@
+{
+  "id": "opal",
+  "name": "Opal",
+  "kind": "instrument",
+  "version": 1,
+  "voices": "8 voices",
+  "description": "Pad synth: eight voices, Osc 1 stacked up to seven times (detuned, spread left to right) with Osc 2 an interval away and Air (noise), a filter with Swell (a slow filter envelope), Drift, Movement (slow LFO), an ensemble chorus (I, II, I+II) and Width.",
+  "params": [
+    { "id": "w1",     "label": "Wave",     "section": "osc1",   "type": "enum", "options": ["Saw", "Square", "Triangle", "Sine"], "default": 0 },
+    { "id": "shape",  "label": "Shape",    "section": "osc1",   "type": "float", "default": 0.3,  "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "stack",  "label": "Stack",    "section": "osc1",   "type": "enum", "options": ["1", "3", "5", "7"], "default": 2 },
+    { "id": "detune", "label": "Detune",   "section": "osc1",   "type": "float", "default": 0.35, "unit": "ct", "map": "sq",  "min": 0, "max": 40 },
+    { "id": "w2",     "label": "Wave",     "section": "osc2",   "type": "enum", "options": ["Saw", "Square", "Triangle", "Sine"], "default": 1 },
+    { "id": "int2",   "label": "Interval", "section": "osc2",   "type": "enum", "options": ["−1 oct", "Unison", "+5th", "+1 oct", "+2 oct"], "default": 3 },
+    { "id": "fine2",  "label": "Fine",     "section": "osc2",   "type": "float", "default": 0.55, "unit": "ct", "map": "lin", "min": -50, "max": 50 },
+    { "id": "mix2",   "label": "Osc 2",    "section": "osc2",   "type": "float", "default": 0.3,  "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "air",    "label": "Air",      "section": "osc2",   "type": "float", "default": 0.05, "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "cut",    "label": "Cutoff",   "section": "filter", "type": "float", "default": 0.45, "unit": "Hz", "map": "exp", "min": 40, "max": 16000 },
+    { "id": "res",    "label": "Reso",     "section": "filter", "type": "float", "default": 0.2,  "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "fenv",   "label": "Env",      "section": "filter", "type": "float", "default": 0.35, "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "swell",  "label": "Swell",    "section": "filter", "type": "float", "default": 0.45, "unit": "s",  "map": "sq",  "min": 0.002, "max": 8 },
+    { "id": "atk",    "label": "Attack",   "section": "amp",    "type": "float", "default": 0.45, "unit": "s",  "map": "sq",  "min": 0.002, "max": 8 },
+    { "id": "dec",    "label": "Decay",    "section": "amp",    "type": "float", "default": 0.6,  "unit": "s",  "map": "sq",  "min": 0.05, "max": 8 },
+    { "id": "sus",    "label": "Sustain",  "section": "amp",    "type": "float", "default": 0.8,  "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "rel",    "label": "Release",  "section": "amp",    "type": "float", "default": 0.55, "unit": "s",  "map": "sq",  "min": 0.02, "max": 10 },
+    { "id": "drift",  "label": "Drift",    "section": "motion", "type": "float", "default": 0.3,  "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "rate",   "label": "Rate",     "section": "motion", "type": "float", "default": 0.3,  "unit": "Hz", "map": "exp", "min": 0.05, "max": 8 },
+    { "id": "move",   "label": "Movement", "section": "motion", "type": "float", "default": 0.25, "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "chorus", "label": "Chorus",   "section": "motion", "type": "enum", "options": ["Off", "I", "II", "I+II"], "default": 1 },
+    { "id": "width",  "label": "Width",    "section": "motion", "type": "float", "default": 0.7,  "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "lvl",    "label": "Level",    "section": "motion", "type": "float", "default": 0.7,  "unit": "%",  "map": "lin", "min": 0, "max": 100 }
+  ],
+  "modSources": [],
+  "notes": {
+    "values": "Every param is stored normalised 0..1 (enums as their index). map exp = min*(max/min)^v; sq = min + v*v*(max-min).",
+    "voices": "A re-pressed note takes its own voice back; otherwise a free voice, else the oldest released, else the oldest."
+  }
+}

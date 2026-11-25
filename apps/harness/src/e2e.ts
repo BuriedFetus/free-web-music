@@ -35,6 +35,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'fx') return runFx(p, engineRef, ok, out);
   if (role === 'scope') return runScope(p, engineRef, ok, out);
   if (role === 'garnet') return runGarnet(p, engineRef, ok, out);
+  if (role === 'opal') return runOpal(p, engineRef, ok, out);
   if (role === 'look') return runLook(s.doc, ok, out);
   if (role === 'arrange') return runArrange(p, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
@@ -1239,6 +1240,46 @@ async function runArrange(p: Project, ok: (c: boolean, l: string) => void, out: 
     ok(p.rows().length === n + 1 && p.cell(p.rows()[n].id, t) === groove, 'dropped on + Add TRACK: a new TRACK plays it');
   } catch (e) {
     out.push(`FAIL arrange: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab: Opal's panel. It shows, plays a held chord (computer keys), presets step, Chorus and Stack reach the engine. */
+async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  try {
+    await sleep(300);
+    ($('[aria-label="Add Opal as a new track"]') as HTMLButtonElement).click();
+    await sleep(400);
+    ok(!!$('.fwm-opal') && p.trackIds().length === 1, 'Opal shows in the Device panel');
+    ok(document.querySelectorAll('.fwm-opal [role=slider]').length >= 20, `every control is there (${document.querySelectorAll('.fwm-opal [role=slider]').length} dials)`);
+    const screen = () => $('.fwm-opal .fwm-preset')!.textContent ?? '';
+    ok(screen().includes('Warm Pad'), 'starts on Warm Pad');
+    btn('Sound')?.click();
+    await until('engine', () => !!engineRef.current?.last, 4000);
+    for (const k of ['a', 'd', 'g']) document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+    let pk = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 1800) {
+      pk = Math.max(pk, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+      await sleep(25);
+    }
+    for (const k of ['a', 'd', 'g']) document.body.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
+    ok(pk > 0.02 && pk <= 1, `a held chord swells in (peak ${pk.toFixed(3)})`);
+    ($('.fwm-opal [aria-label="Next sound"]') as HTMLButtonElement).click();
+    await sleep(100);
+    ok(screen().includes('Ensemble Strings'), `next sound: ${screen()}`);
+    const slot = Number(Object.keys(engineRef.current!.last!.devices)[0]);
+    ($('.fwm-opal [aria-label="Chorus I+II"]') as HTMLButtonElement).click();
+    await until('chorus in engine', () => engineRef.current!.last!.devices[slot].eff[20] === 3, 2000);
+    ok(true, 'Chorus I+II reaches the engine');
+    ($('.fwm-opal [aria-label="Stack: 1"]') as HTMLButtonElement).click();
+    await until('stack in engine', () => engineRef.current!.last!.devices[slot].eff[2] === 0, 2000);
+    ok(true, 'Stack 1 reaches the engine');
+  } catch (e) {
+    out.push(`FAIL opal: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

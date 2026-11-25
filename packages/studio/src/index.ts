@@ -5,6 +5,8 @@ export { Basalt, type BasaltProps, type DeviceProps } from './devices/basalt/Bas
 export { Flint } from './devices/flint/Flint';
 export { Garnet } from './devices/garnet/Garnet';
 export { GARNET_PRESETS } from './devices/garnet/presets';
+export { Opal } from './devices/opal/Opal';
+export { OPAL_PRESETS } from './devices/opal/presets';
 export { chordsOfKey, CHORD_TYPES, TUNING as GARNET_TUNING, type Chord, type ChordType } from './devices/garnet/music';
 export { FLINT_KITS, DRUM_TYPES, CHARACTERS } from './devices/flint/kits';
 export { BASALT_PRESETS, type Preset } from './devices/basalt/presets';
