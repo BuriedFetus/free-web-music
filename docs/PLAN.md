@@ -200,7 +200,16 @@ User's asks (2026-11-25): fake strings you can strum; the scale's notes lit; Cho
 ### Geode: a sampler with a little room in it (user, 2026-11-26; replaces the earlier "grow a sound" idea)
 Full approved plan (5 rounds with the user): sample-based synth, starts empty, records up to 30 s from any instrument in the session, the tape lives in the browser and is sent live to the others (never stored on a server). Front = a wireframe room with **Mica** (our own crystal character; not Anthropic's Clawd), controls in a dock at the bottom centre (always visible): Mica's face (record menu: Trim / Remove / Rec, zooms into her head), Thermometer (FREEZING…HOT macro, Mica's clothes), Fan (Air = the window: filter sweep, blinds sway = LFO), Room (Geode's own reverb, the room stretches into the distance) + Wet, Echo (her voice wave bounces off the back wall, one round trip per repeat) + Wet, Breath (Pluck…Swell, her singing follows the ADSR), Light (master low-pass, the room dims), Grains (dry/wet; memory wall + sparks), Crunch (dry/wet). Macros blend (weighted average of their "wishes", each link scaled), never a plain sum. The back of the device (every knob, the macro scale matrix) is a hidden debug flip.
 - [x] Slice 0: mock-up with sound `design/kit/geode.html` (published privately): JS AudioWorklet sampler (classic + grains, ADSR, crush), WebAudio chain (drive, body, thin, tone, window filter + LFO + air noise, chorus, echo, convolution room, lamp), the room on a canvas, Mica's outfits by temperature, rings that follow the envelope, echo wavefronts (spiky with drive, stepped with crunch, dotted with grains), memory wall + sparks, recording into her head (waits for sound, the keys play the input instrument while armed, trim, remove + undo), the back panel. `?selftest` renders offline at 44.1 / 48 kHz; preview options `?temp=&air=&room=&light=&crunch=&grains=&echo=&play&rec`
-- [ ] User review of the mock-up
+- [ ] Mock-up round 2 (user feedback, 2026-11-26: "design is good, sound isn't"):
+  - [ ] Compressor + limiter at the end of the chain (also in the engine plan)
+  - [ ] More control on the ADSR (Breath: the macro plus Attack / Decay / Sustain / Release)
+  - [ ] The window sweep should change the sound more, especially when warm
+  - [ ] Coloured noise for the wind, following the temperature: brown (HOT), pink (WARM), grey (CHILL), white (FREEZING)
+  - [ ] Neon: sharper and cooler when cold, softer and warmer glow when warm
+  - [ ] Grains come out of Mica's crystal outline as small fractal lines that split (not mouth bubbles)
+  - [ ] Tape speed on Mica's face icon
+  - [ ] More ways to shape the sound ("I don't feel that I can manipulate the sound that much"): grain size, density and spread on the Grains icon; drag on the memory wall to choose where the grains read
+- [ ] User review of the mock-up (later)
 - [ ] Slice 1 engine (`devices/geode.rs`, kind 6, sample bank, `macro_mix`), Slice 2 capture + sharing (`sampleStore`, `smp` chunks on the live channel), Slice 3 the panel in the studio
 
 ### Song arrangement cells (user, 2026-11-25: "double-click to remove a pattern … drag and drop (copy to this track)")
