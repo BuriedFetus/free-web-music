@@ -228,6 +228,12 @@
   box-shadow: 0 0 0 2px var(--dev-acc), 0 0 calc(14px * var(--fwm-glow)) var(--dev-lcdink); transition: transform .08s; }
 .fwm-garnet__dot.is-off { min-width: 8px; width: 8px; height: 8px; padding: 0; background: color-mix(in srgb, var(--dev-silk) 22%, transparent); }
 .fwm-garnet__neck.is-lock .fwm-garnet__dot.is-off { opacity: .25; }
+/* chord guide (Notes mode): root light blue, 2nd note light red, 3rd light green, the next chord purple */
+.fwm-garnet__dot.is-g-root, .fwm-garnet__dot.is-g-second, .fwm-garnet__dot.is-g-third, .fwm-garnet__dot.is-g-alt { color: var(--dev-guide-ink); opacity: 1; }
+.fwm-garnet__dot.is-g-root { background: var(--dev-guide-root); box-shadow: 0 0 0 2px var(--dev-cap), 0 0 calc(12px * var(--fwm-glow)) var(--dev-guide-root); }
+.fwm-garnet__dot.is-g-second { background: var(--dev-guide-2); }
+.fwm-garnet__dot.is-g-third { background: var(--dev-guide-3); }
+.fwm-garnet__dot.is-g-alt { background: var(--dev-guide-alt); }
 .fwm-garnet__cn { font: 700 12px var(--fwm-font-ui); color: var(--dev-silk); background: color-mix(in srgb, var(--dev-lcd) 80%, transparent); padding: 1px 6px; border-radius: 6px; }
 .fwm-garnet__cn.is-root { color: var(--dev-btnink); background: var(--dev-acc); }
 .fwm-garnet__cn.is-x { background: none; color: color-mix(in srgb, var(--dev-silk) 55%, transparent); font-size: 15px; }

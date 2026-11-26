@@ -23,4 +23,9 @@
   --dev-keybed: #000;       /* gaps between keys */
   --dev-keylabel: #777;     /* octave labels on white keys */
   --dev-keyhi: #fff;        /* white keys, top highlight */
+  --dev-guide-root: #8fd3ff;   /* chord guide: the root (light blue) */
+  --dev-guide-2: #ffa3a3;      /* chord guide: the chord's 2nd note (light red) */
+  --dev-guide-3: #a5eea0;      /* chord guide: the chord's 3rd note (light green) */
+  --dev-guide-alt: #c9a6ff;    /* chord guide: the next chord's notes (purple) */
+  --dev-guide-ink: #10131a;    /* text on the guide colours */
 }

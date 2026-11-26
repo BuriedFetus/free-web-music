@@ -11,7 +11,7 @@ import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
 import type { DeviceHost, DeviceProps } from '../basalt/Basalt';
 import { Scope } from '../Scope';
 import { Sends } from '../Sends';
-import { CHORD_TYPES, FRETS, TUNING, chordsOfKey, inScale, neckKey, noteName, type ChordType } from './music';
+import { CHORD_TYPES, FRETS, NO_GUIDE, TUNING, chordsOfKey, guideRoles, guideStep, inScale, neckKey, noteName, type ChordType, type Guide, type GuideRole } from './music';
 import { GARNET_FORMAT, GARNET_PRESETS } from './presets';
 
 type Mode = 'chords' | 'notes';
@@ -19,16 +19,18 @@ interface NeckView {
   mode: Mode;
   type: ChordType;
   lock: boolean;
+  /** Chord guide on the neck (Notes mode). */
+  guide: boolean;
 }
 const VIEW_KEY = 'fwm.garnet.neck';
 function loadView(): NeckView {
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY) || 'null');
-    if (v && (v.mode === 'chords' || v.mode === 'notes') && CHORD_TYPES.some(([id]) => id === v.type)) return { mode: v.mode, type: v.type, lock: !!v.lock };
+    if (v && (v.mode === 'chords' || v.mode === 'notes') && CHORD_TYPES.some(([id]) => id === v.type)) return { mode: v.mode, type: v.type, lock: !!v.lock, guide: v.guide !== false };
   } catch {
     /* no storage */
   }
-  return { mode: 'chords', type: 'triad', lock: false };
+  return { mode: 'chords', type: 'triad', lock: false, guide: true };
 }
 /** A plucked string rings until it is plucked again, a chord without it is strummed, or this long. */
 const RING_MS = 4000;
@@ -175,10 +177,22 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
     }
   }
   const mineKey = [...mine].map(([st, f]) => `${st}:${f}`).join(',');
+  // chord guide: each pressed note (neck or computer keys) moves it on (see guideStep in music.ts)
+  const [guide, setGuide] = useState<Guide>(NO_GUIDE);
+  const guideOn = view.mode === 'notes' && view.guide;
+  const press = (m: number) => guideOn && setGuide((g) => guideStep(g, m, keyRef.current));
+  const keyRef = useRef(key);
+  keyRef.current = key;
+  const roles = guideOn ? guideRoles(guide, key) : new Map<number, GuideRole>();
   const prevMine = useRef(new Set<string>());
   useEffect(() => {
     const now = new Set(mineKey ? mineKey.split(',') : []);
-    for (const k of now) if (!prevMine.current.has(k)) shake(Number(k.split(':')[0]));
+    for (const k of now)
+      if (!prevMine.current.has(k)) {
+        const [st, f] = k.split(':').map(Number);
+        shake(st);
+        press(TUNING[st] + f);
+      }
     prevMine.current = now;
   }, [mineKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
@@ -249,15 +263,21 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
             ))}
           </div>
         ) : (
-          <P.Button variant="hw" label="Only scale notes" pressed={view.lock} onPress={() => setView({ lock: !view.lock })}>Only scale notes</P.Button>
+          <>
+            <P.Button variant="hw" label="Only scale notes" pressed={view.lock} onPress={() => setView({ lock: !view.lock })}>Only scale notes</P.Button>
+            <P.Button variant="hw" label="Chord guide" pressed={view.guide} onPress={() => { setGuide(NO_GUIDE); setView({ guide: !view.guide }); }}>Chord guide</P.Button>
+          </>
         )}
         <P.Button variant="hw" label="Palm mute" pressed={state.params.mute >= 0.5} presence={host?.presenceFor('mute')}
           onPress={() => set('mute', state.params.mute >= 0.5 ? 0 : 1)}>Palm mute</P.Button>
         <Whammy value={state.params.wham ?? 0.5} set={(v) => set('wham', v)} host={host} />
       </div>
 
-      <Neck mode={view.mode} lock={view.lock} songKey={key} chords={chords} peerNotes={peerNotes} mine={mine} strings={strings}
-        onPluck={pluck} onSlide={slideTo} onDamp={damp} onStrum={strum} />
+      <Neck mode={view.mode} lock={view.lock} songKey={key} chords={chords} peerNotes={peerNotes} mine={mine} roles={roles} strings={strings}
+        onPluck={(st: number, m: number, v: number) => {
+          if (view.mode === 'notes') press(m);
+          pluck(st, m, v);
+        }} onSlide={slideTo} onDamp={damp} onStrum={strum} />
       <p className="fwm-silk fwm-garnet__hint">
         {view.mode === 'chords'
           ? `Chords of ${NOTE_NAMES[key.root]} ${SCALES[key.scale]?.label.toLowerCase()}${songKey.scale === 'chromatic' ? ' (the song has no key: set one in the top bar)' : ''}. Drag across the strings inside a strip to strum, click one string to pick it. Keys 1–7 strum (Shift: up).`
@@ -321,6 +341,8 @@ interface NeckProps {
   peerNotes: Map<number, string>;
   /** Notes this person holds on the computer keyboard: string → fret. */
   mine: Map<number, number>;
+  /** Chord guide colours per pitch class. */
+  roles: Map<number, GuideRole>;
   strings: React.MutableRefObject<(HTMLDivElement | null)[]>;
   onPluck(s: number, m: number, v: number): void;
   onSlide(s: number, m: number): void;
@@ -329,7 +351,7 @@ interface NeckProps {
 }
 
 /** Six strings, low E at the bottom. Chords: one strip per chord of the key. Notes: frets 0–12. */
-function Neck({ mode, lock, songKey, chords, peerNotes, mine, strings, onPluck, onSlide, onDamp, onStrum }: NeckProps) {
+function Neck({ mode, lock, songKey, chords, peerNotes, mine, roles, strings, onPluck, onSlide, onDamp, onStrum }: NeckProps) {
   const neck = useRef<HTMLDivElement>(null);
   const drag = useRef<{ s: number; c: number; y: number; t: number } | null>(null);
   const cols = mode === 'chords' ? chords.length : FRETS + 1;
@@ -431,11 +453,12 @@ function Neck({ mode, lock, songKey, chords, peerNotes, mine, strings, onPluck, 
               const m = TUNING[s] + c;
               const ins = inScale(m, songKey);
               const peer = peerNotes.get(m);
+              const role = roles.get(m % 12);
               return (
                 <div key={s} className="fwm-garnet__cell">
-                  <span className={'fwm-garnet__dot' + (mine.get(s) === c ? ' is-mine' : ins ? (m % 12 === songKey.root ? ' is-root' : '') : ' is-off')}
+                  <span className={'fwm-garnet__dot' + (mine.get(s) === c ? ' is-mine' : role ? ` is-g-${role}` : ins ? (m % 12 === songKey.root ? ' is-root' : '') : ' is-off')}
                     style={peer ? ({ boxShadow: `0 0 0 3px ${peer}` } as CSSProperties) : undefined}>
-                    {ins || mine.get(s) === c ? noteName(m, songKey) : ''}
+                    {ins || role || mine.get(s) === c ? noteName(m, songKey) : ''}
                   </span>
                 </div>
               );

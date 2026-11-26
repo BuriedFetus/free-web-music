@@ -1118,6 +1118,29 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
     await sleep(100);
     ok(mineDots === 1 && ringing >= 1 && !$('.fwm-garnet__neck .is-mine'), `a computer key shows its place on the neck and rings the string (${mineDots}, ${ringing})`);
+    // chord guide (Notes mode, song in C major): C → root blue + E / G; then E → Em's G and B purple
+    p.setKey({ root: 0, scale: 'major' });
+    await sleep(150);
+    const gRoles = () => {
+      const r: Record<string, Set<string>> = {};
+      for (const d of document.querySelectorAll('.fwm-garnet__neck .fwm-garnet__dot')) {
+        const c = [...d.classList].find((x) => x.startsWith('is-g-'));
+        if (c) (r[c.slice(5)] ??= new Set()).add(d.textContent ?? '');
+      }
+      return Object.entries(r).map(([k, v]) => `${k}:${[...v].sort().join('')}`).sort().join(' ');
+    };
+    const tapKey = async (k: string) => {
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+      await sleep(80);
+      document.body.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
+      await sleep(80);
+    };
+    await tapKey('a'); // C (A = the root of the key)
+    ok(gRoles() === 'root:C second:E third:G', `guide after C: ${gRoles()}`);
+    await tapKey('d'); // E
+    ok(gRoles() === 'alt:BG root:C second:E', `guide after E: C stays the root, Em's G and B purple (${gRoles()})`);
+    await tapKey('g'); // G: one of the purple notes → E becomes the root
+    ok(gRoles().includes('root:E'), `a purple note makes E the root (${gRoles()})`);
     // whammy ribbon: drag to the left end dives, letting go springs back to rest
     const rib = $('.fwm-garnet [role=slider][aria-label="Whammy"]')!;
     const rr = rib.getBoundingClientRect();

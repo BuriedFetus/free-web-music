@@ -132,6 +132,7 @@ const DEV_TOKENS: [string, string][] = [
   ['--dev-btn, --dev-btn2, --dev-btnink, --dev-btnedge', 'hardware buttons: top, bottom, text, lower edge'],
   ['--dev-sec, --dev-track', 'section panels, fader tracks'],
   ['--dev-key, --dev-keyb, --dev-keyb2, --dev-keybed, --dev-keyhi, --dev-keylabel', 'on-screen keys (Garnet: the strings are --dev-key and --dev-keyb)'],
+  ['--dev-guide-root, --dev-guide-2, --dev-guide-3, --dev-guide-alt, --dev-guide-ink', "Garnet's chord guide: root, the chord's 2nd and 3rd notes, the next chord, text on them"],
 ];
 const AREAS: [string, string][] = [
   ['&', 'the studio root: set tokens here'],

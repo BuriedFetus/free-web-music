@@ -89,6 +89,48 @@ export function chordsOfKey(key: SongKey, type: ChordType): Chord[] {
   });
 }
 
+// ---- chord guide (Notes mode): a pressed note shows its chord on the neck ----
+/** The guide: the main chord's root and, optionally, a second chord built on one of its notes (pitch classes). */
+export interface Guide {
+  main: number | null;
+  second: number | null;
+}
+export const NO_GUIDE: Guide = { main: null, second: null };
+export type GuideRole = 'root' | 'second' | 'third' | 'alt';
+
+/** The triad on `pc`: the key's own chord when the note is in the key, else a major triad. Root first. */
+export function triadOf(pc: number, key: SongKey): number[] {
+  const k = neckKey(key);
+  const c = inScale(pc, k) ? chordsOfKey(k, 'triad').find((ch) => ch.root === ((pc % 12) + 12) % 12) : undefined;
+  if (c && c.pcs.length === 3) return c.pcs;
+  return [pc, pc + 4, pc + 7].map((x) => ((x % 12) + 12) % 12);
+}
+
+/** A note was pressed: the first note (or one outside both chords) starts a guide; a note of the main
+ *  chord shows its own chord as the second; a note of the second chord's other notes makes the second
+ *  chord the main one (and the pressed note shows its chord as the second). */
+export function guideStep(g: Guide, pc: number, key: SongKey): Guide {
+  pc = ((pc % 12) + 12) % 12;
+  if (g.main == null) return { main: pc, second: null };
+  const main = triadOf(g.main, key);
+  // one of the second chord's other notes (the purple ones): that chord becomes the main one
+  if (g.second != null && pc !== g.main && triadOf(g.second, key).slice(1).includes(pc)) return { main: g.second, second: pc };
+  if (pc === g.main) return { main: pc, second: null };
+  if (main.includes(pc)) return { main: g.main, second: pc };
+  return { main: pc, second: null };
+}
+
+/** Colour role of each pitch class on the neck: the main root, its 2nd and 3rd notes, and the second
+ *  chord's other two notes (purple; never over the main root). */
+export function guideRoles(g: Guide, key: SongKey): Map<number, GuideRole> {
+  const out = new Map<number, GuideRole>();
+  if (g.main == null) return out;
+  const [r, a, b] = triadOf(g.main, key);
+  out.set(r, 'root').set(a, 'second').set(b, 'third');
+  if (g.second != null) for (const pc of triadOf(g.second, key).slice(1)) if (pc !== r) out.set(pc, 'alt');
+  return out;
+}
+
 interface Want {
   root: number;
   pcs: number[];
