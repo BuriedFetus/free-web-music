@@ -1270,6 +1270,12 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
     }
     for (const k of ['a', 'd', 'g']) document.body.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
     ok(pk > 0.02 && pk <= 1, `a held chord swells in (peak ${pk.toFixed(3)})`);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'd', bubbles: true }));
+    await sleep(80);
+    const lit = document.querySelectorAll('.fwm-opal .fwm-keys .is-on').length;
+    document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'd', bubbles: true }));
+    await sleep(80);
+    ok(lit === 1 && document.querySelectorAll('.fwm-opal .fwm-keys .is-on').length === 0, `a computer key lights its key on the panel while held (${lit})`);
     ($('.fwm-opal [aria-label="Next sound"]') as HTMLButtonElement).click();
     await sleep(100);
     ok(screen().includes('Ensemble Strings'), `next sound: ${screen()}`);

@@ -33,6 +33,8 @@ export interface DeviceHost {
   presenceFor(control: string): Presence[];
   /** Keys other people are holding on this device. */
   peerHeld: { note: number; color: string }[];
+  /** Keys this person holds on the computer keyboard (lit on the panel's keys). */
+  myHeld?: number[];
   /** Everyone looking at this device (for the avatars). */
   people: Presence[];
   /** This user starts / stops touching a control (null = released). */
@@ -272,7 +274,7 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
           <P.Screen variant="readout">C{oct}</P.Screen>
           <P.Button variant="hw" label="Octave down" onPress={() => setOct((o) => Math.max(0, o - 1))}>−</P.Button>
         </div>
-        <P.Keys low={low} high={low + 24} held={held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} scale={keyScale} />
+        <P.Keys low={low} high={low + 24} held={host?.myHeld?.length ? [...held, ...host.myHeld] : held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} scale={keyScale} />
       </div>
     </div>
   );

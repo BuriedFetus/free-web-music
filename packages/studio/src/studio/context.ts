@@ -55,6 +55,8 @@ export interface StudioCtx {
   audition(track: string, note: number, on: boolean): void;
   /** Keys others are holding, per track. */
   peerHeld: Record<string, { note: number; color: string }[]>;
+  /** Notes this person holds on the computer keyboard, per track. */
+  myHeld: Record<string, number[]>;
   toast(msg: string, action?: { label: string; run(): void }): void;
   /** This person's own look (a stylesheet only they see; never in the shared song). */
   look: LookCtl;

@@ -23,6 +23,7 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
       noteOff: (n) => st.releaseNote(t.id, n),
       presenceFor: (control) => peers.filter((p) => p.touch?.track === t.id && p.touch.control === control).map(toPresence),
       peerHeld: st.peerHeld[t.id] ?? [],
+      myHeld: st.myHeld[t.id] ?? [],
       people: [{ userId: 'me', name: st.user.name, color: st.user.color }, ...here.map(toPresence)],
       touch: (control) => st.presence.set({ touch: control ? { track: t.id, control } : null }),
       paramChanged: (id, v) => {

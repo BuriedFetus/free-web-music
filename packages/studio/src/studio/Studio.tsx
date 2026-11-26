@@ -401,6 +401,10 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   // ---- keyboard: computer keys play the selected track; Space = play/stop; Ctrl+Z = undo ----
   const [octave, setOctave] = useState(0);
   const keyTrack = useRef(new Map<number, string>());
+  // notes this person holds on the computer keyboard, per track (the panel's keys light up)
+  const [myHeld, setMyHeld] = useState<Record<string, number[]>>({});
+  const holdKey = (t: string, n: number, on: boolean) =>
+    setMyHeld((h) => ({ ...h, [t]: on ? [...(h[t] ?? []).filter((x) => x !== n), n] : (h[t] ?? []).filter((x) => x !== n) }));
   const entry = selTrack ? deviceEntry(selTrack.device) : null;
   const padLayout = entry?.layout === 'pads';
   useComputerKeys({
@@ -412,12 +416,16 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     onNoteOn: (n, v) => {
       if (!selTrack) return;
       keyTrack.current.set(n, selTrack.id);
+      holdKey(selTrack.id, n, true);
       playNote(selTrack.id, n, v);
     },
     onNoteOff: (n) => {
       const t = keyTrack.current.get(n) ?? selTrack?.id;
       keyTrack.current.delete(n);
-      if (t) releaseNote(t, n);
+      if (t) {
+        holdKey(t, n, false);
+        releaseNote(t, n);
+      }
     },
     onOctave: (d) => setOctave((o) => Math.max(-3, Math.min(4, o + d))),
   });
@@ -454,7 +462,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   const ctx: StudioCtx = {
     project, presence, user, channel, songs, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop,
     transport: sync, liveTiming: timing, rec, setRec, slotOf, cueRow,
-    playNote, releaseNote, audition, peerHeld, toast,
+    playNote, releaseNote, audition, peerHeld, myHeld, toast,
     look: { css: keptLook, set: setLook, preview: lookPreview, setPreview: setLookPreview, hostKeeps: hostLook !== undefined, off: lookOff },
   };
 

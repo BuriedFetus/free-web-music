@@ -43,7 +43,7 @@ export function PanelKeys({ host, slot, octave = 3 }: { host?: DeviceHost; slot:
         <P.Screen variant="readout">C{oct}</P.Screen>
         <P.Button variant="hw" label="Octave down" onPress={() => setOct((o) => Math.max(0, o - 1))}>−</P.Button>
       </div>
-      <P.Keys low={low} high={low + 24} held={held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} scale={scale} />
+      <P.Keys low={low} high={low + 24} held={host?.myHeld?.length ? [...held, ...host.myHeld] : held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} scale={scale} />
     </div>
   );
 }
