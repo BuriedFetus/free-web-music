@@ -71,12 +71,19 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
         <button type="button" className="fwm-tb fwm-tb--play" aria-pressed={playing} onClick={() => setPlaying(!playing)}>
           {playing ? '■ Stop' : '▶ Play'}
         </button>
-        <button type="button" className="fwm-tb fwm-tb--rec" aria-pressed={rec} onClick={() => setRec(!rec, 'over')}
+        <button type="button" className="fwm-tb fwm-tb--rec" aria-pressed={rec}
+          onClick={() => {
+            // arming with the button also starts the song (Shift+Space arms and waits for your first note)
+            setRec(!rec, 'over');
+            if (!rec && !playing) setPlaying(true);
+          }}
           onContextMenu={(e) => {
             e.preventDefault();
-            setRec(!rec || recMode !== 'replace', 'replace');
+            const on = !rec || recMode !== 'replace';
+            setRec(on, 'replace');
+            if (on && !playing) setPlaying(true);
           }}
-          title={'Record (Shift+Space). Song stopped: Rec waits, and your first note starts the song and lands at the start of the pattern. While playing, notes you play (and knob moves) are written into the pattern. Click = overdub (adds to the notes there); right-click = replace (your first note clears the pattern). A recording keeps going past the loop, the pattern grows up to 32 bars (128 beats), then wraps and overdubs.'}>
+          title={'Record. Click: arms and starts the song. Shift+Space: arms and waits, and your first note starts the song and lands at the start of the pattern. While playing, notes you play (and knob moves) are written into the pattern. Click = overdub (adds to the notes there); right-click = replace (your first note clears the pattern). A recording keeps going past the loop, the pattern grows up to 32 bars (128 beats), then wraps and overdubs.'}>
           ● Rec{rec && recMode === 'replace' ? ' · replace' : ''}{rec && !playing ? ' · waiting' : ''}
         </button>
         <span className="fwm-lcdt" aria-label="Position">

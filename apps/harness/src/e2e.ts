@@ -1383,8 +1383,7 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
       // right-click = replace: the first note clears the pattern
       btn('● Rec')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
       await sleep(100);
-      ok((btn('● Rec')?.textContent ?? '').includes('replace'), 'right-click arms Rec in replace mode');
-      btn('▶ Play')!.click();
+      ok((btn('● Rec')?.textContent ?? '').includes('replace') && !!btn('■ Stop'), 'right-click arms Rec in replace mode and starts the song');
       await sleep(300);
       await tap('d');
       await sleep(100);
@@ -1394,9 +1393,9 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
       // wait for a note: song stopped + Rec armed → the first note starts the song at the pattern's start
       await sleep(300);
       p.clearPattern(tid, pat);
-      btn('● Rec')!.click();
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', shiftKey: true, bubbles: true }));
       await sleep(100);
-      ok((btn('● Rec')?.textContent ?? '').includes('waiting'), 'Rec armed while stopped: waiting');
+      ok((btn('● Rec')?.textContent ?? '').includes('waiting') && !!btn('▶ Play'), 'Shift+Space while stopped: armed and waiting');
       await sleep(500);
       const tA = performance.now();
       await tap('a');
@@ -1412,6 +1411,12 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
       btn('■ Stop')?.click();
       btn('● Rec')!.click();
       p.setBpm(120);
+      await sleep(200);
+      btn('● Rec')!.click();
+      await sleep(150);
+      ok(btn('● Rec')?.getAttribute('aria-pressed') === 'true' && !!btn('■ Stop'), 'clicking Rec while stopped arms it and starts the song');
+      btn('■ Stop')!.click();
+      btn('● Rec')!.click();
     }
     // SEND knobs = the Mixer strip's sends, both ways
     const tid = p.trackIds()[0];
