@@ -212,6 +212,7 @@ Full approved plan (5 rounds with the user): sample-based synth, starts empty, r
   - [x] Not only granular (user: "more ways to modulate effects and samples"): tape modes Classic / Reverse / Slices (8 slices on 8 keys) in Mica's menu; a **Motion** icon = the modulation hub (LFO shape sine / triangle / square / random, tempo-synced speed 1/8 … 4 bars, depth; moves Window, Pitch, Pan, Grain position, Echo, Room, Crunch; Mica sways with it)
   - [x] Stuck notes fixed (a note let go before the sound was ready never got its off); Escape = all notes off; popups sit to the side so Mica stays visible
   - [x] Image prompts for the user's image generator in `design/refs/prompt/` (git-ignored): Mica's outfits, the room, the dock icons, recording in her head, the temperature sequence
+  - [x] Round 3 (user: "hard to play around, no sample playback on Mica's icon"; "drag and drop Mica for PAN … automated walk"): **▶ PLAY** in Mica's menu plays the trimmed tape once (a playhead runs along the film strip, the reels spin); **drag Mica** in the room: left / right = pan, farther back = quieter with more room (front/back is my addition: easy to drop); **Mica walks** (in Motion): Stay, Left ↔ right, Boomerang, Circle, Random, 1–8 bars, around where you dropped her, with stepping legs and a lean; "Back to the room" moved to the top right
 - [ ] User review of the mock-up (later)
 - [ ] Slice 1 engine (`devices/geode.rs`, kind 6, sample bank, `macro_mix`), Slice 2 capture + sharing (`sampleStore`, `smp` chunks on the live channel), Slice 3 the panel in the studio
 

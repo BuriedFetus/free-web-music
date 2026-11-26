@@ -47,9 +47,9 @@ input[type=range]{width:100%;accent-color:var(--line);height:28px}
 .thermo{display:grid;grid-template-columns:110px 1fr;gap:16px;align-items:center}
 .thermo svg{width:110px;height:230px;touch-action:none;cursor:ns-resize}
 .thermo .lbls{display:grid;gap:30px;font-size:13px;letter-spacing:.16em}
-.menu{position:absolute;left:50%;top:64%;transform:translate(-50%,-50%);display:grid;gap:12px;justify-items:center;text-align:center}
+.menu{position:absolute;left:50%;top:62%;transform:translate(-50%,-50%);display:grid;gap:8px;justify-items:center;text-align:center}
 .menu .big{display:flex;gap:14px}
-.menu .big button{width:92px;height:92px;border-radius:50%;border:1.5px solid var(--line);background:#04050ae6;color:var(--line);display:grid;place-items:center;cursor:pointer;font:500 11px Saira,sans-serif;letter-spacing:.08em}
+.menu .big button{width:76px;height:76px;border-radius:50%;border:1.5px solid var(--line);background:#04050ae6;color:var(--line);display:grid;place-items:center;cursor:pointer;font:500 11px Saira,sans-serif;letter-spacing:.08em}
 .menu .big button svg{width:34px;height:34px;stroke:currentColor;fill:none;stroke-width:1.6;stroke-linecap:round;stroke-linejoin:round}
 .menu .big button.on{color:var(--rec);border-color:var(--rec)}
 .menu .note{color:var(--mute);font-size:13px;max-width:440px;background:#04050acc;padding:4px 10px;border-radius:8px}
@@ -73,7 +73,7 @@ td.n{text-align:right;color:var(--acc);font-variant-numeric:tabular-nums}
 <body>
 <main>
   <h1>Geode</h1>
-  <p class="lead">A sampler with a little room in it. Mica makes the sound: play <kbd>A</kbd>–<kbd>K</kbd> (or the keys below), or press ▶ Demo, then use the icons at the bottom. Click Mica's face to record into her memory, change how the tape plays (Classic, Reverse, Slices), its speed and position. Motion moves things in time with the song.</p>
+  <p class="lead">A sampler with a little room in it. Mica makes the sound: play <kbd>A</kbd>–<kbd>K</kbd> (or the keys below), or press ▶ Demo, then use the icons at the bottom. Click Mica's face to record into her memory, change how the tape plays (Classic, Reverse, Slices), its speed and position. Motion moves things in time with the song. Drag Mica around the room to pan her (or let her walk).</p>
   <div class="flip"><div class="card" id="card">
     <div class="face">
       <div class="screen" id="screen">
@@ -84,6 +84,7 @@ td.n{text-align:right;color:var(--acc);font-variant-numeric:tabular-nums}
           <div class="big">
             <button id="mCut" aria-label="Scissors: trim the tape"><svg viewBox="0 0 32 32"><circle cx="9" cy="23" r="4"/><circle cx="23" cy="23" r="4"/><path d="M12 20 24 5M20 20 8 5"/></svg>TRIM</button>
             <button id="mTrash" aria-label="Trash: remove the tape"><svg viewBox="0 0 32 32"><path d="M7 9h18M12 9V6h8v3M9 9l1.5 18h11L23 9M14 13v10M18 13v10"/></svg>REMOVE</button>
+            <button id="mPlay" aria-label="Play the tape"><svg viewBox="0 0 32 32"><path d="M11 8l13 8-13 8z"/></svg>PLAY</button>
             <button id="mRec" aria-label="Rec: wait for sound, then record"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="8" fill="currentColor"/></svg>REC</button>
           </div>
           <label class="note">Record from <select id="inSel"><option value="pad">Opal (pad)</option><option value="bass">Basalt (bass)</option></select> · <span id="recMsg">Rec waits for sound, then records up to 30 s. While armed, your keys play the instrument you record.</span></label>
@@ -97,8 +98,8 @@ td.n{text-align:right;color:var(--acc);font-variant-numeric:tabular-nums}
             <div class="row"><span>Start</span><input id="tStart" type="range" min="0" max="1" step="0.001" value="0" aria-label="Trim start"><output id="tStartO"></output></div>
             <div class="row"><span>End</span><input id="tEnd" type="range" min="0" max="1" step="0.001" value="1" aria-label="Trim end"><output id="tEndO"></output></div>
           </div>
-          <button class="btn" id="mBack">Back to the room</button>
         </div>
+        <button class="btn" id="mBack" hidden style="position:absolute;right:14px;top:64px">← Back to the room</button>
         <div class="pop" id="pop" hidden role="dialog" aria-label="Control"></div>
         <div class="dock" id="dock" role="toolbar" aria-label="Geode controls"></div>
       </div>
@@ -133,7 +134,7 @@ const WORKLET = `
 const hann=(x)=>0.5-0.5*Math.cos(2*Math.PI*x);
 class Geode extends AudioWorkletProcessor{
   constructor(){super();this.ch=[new Float32Array(2),new Float32Array(2)];this.len=2;this.ssr=sampleRate;this.v=[];this.g=[];this.p={gw:0.8,size:0.1,dens:24,spray:0.15,gp:0,gsp:1,jit:0.15,a:0.05,d:0.4,s:0.8,r:0.6,st:0,en:1,crush:0,spd:1,pos:0,pm:0,bend:0};this.hold=[0,0];this.hc=0;this.ev=[];this.evT=0;
-    this.port.onmessage=(e)=>{const d=e.data;if(d.t==='smp'){this.ch=d.ch;this.len=d.ch[0].length;this.ssr=d.sr;}else if(d.t==='p')Object.assign(this.p,d.p);else if(d.t==='on'){let v=this.v.find(x=>x.n===d.n&&x.st<3);if(!v){if(this.v.length>=8){this.v.sort((a,b)=>a.age-b.age);this.v.shift();}v={n:d.n,age:currentTime};this.v.push(v);}Object.assign(v,{vel:d.vel,st:0,e:v.e||0,pos:0,head:0,gt:0,age:currentTime,sl:d.sl||0});}else if(d.t==='off'){for(const v of this.v)if(v.n===d.n&&v.st<3)v.st=3;}else if(d.t==='seek'){for(const v of this.v)v.head=0;}};}
+    this.port.onmessage=(e)=>{const d=e.data;if(d.t==='smp'){this.ch=d.ch;this.len=d.ch[0].length;this.ssr=d.sr;}else if(d.t==='p')Object.assign(this.p,d.p);else if(d.t==='on'){let v=this.v.find(x=>x.n===d.n&&x.st<3);if(!v){if(this.v.length>=8){this.v.sort((a,b)=>a.age-b.age);this.v.shift();}v={n:d.n,age:currentTime};this.v.push(v);}Object.assign(v,{vel:d.vel,st:0,e:v.e||0,pos:0,head:0,gt:0,age:currentTime,sl:d.sl||0});}else if(d.t==='off'){for(const v of this.v)if(v.n===d.n&&v.st<3)v.st=3;}else if(d.t==='seek'){for(const v of this.v)v.head=0;}else if(d.t==='aud'){this.aud=d.on?{pos:0}:null;}};}
   read(c,x){const L=this.len,i=Math.floor(x),f=x-i,a=((i%L)+L)%L,b=(a+1)%L;return c[a]+(c[b]-c[a])*f;}
   process(_,outs){const o=outs[0],L=o[0],R=o[1]||o[0],n=L.length,p=this.p,sr=sampleRate,k=this.ssr/sr;
     const A=1/Math.max(1,p.a*sr),D=1/Math.max(1,p.d*sr),Rl=1/Math.max(1,p.r*sr);
@@ -150,10 +151,11 @@ class Geode extends AudioWorkletProcessor{
       }
       if(this.g.length){const gw=p.gw*0.55;for(let j=this.g.length-1;j>=0;j--){const gr=this.g[j];const w=hann(gr.t/gr.L)*gw;
           const sl=this.read(this.ch[0],gr.x),sr2=this.read(this.ch[1],gr.x);l+=sl*w*(1-gr.pan)*1.4*gr.a;r+=sr2*w*gr.pan*1.4*gr.a;gr.x+=gr.r;gr.t++;if(gr.t>=gr.L)this.g.splice(j,1);}}
+      if(this.aud){const x=s0+Math.min(span-1,this.aud.pos);l+=this.read(this.ch[0],x)*0.8;r+=this.read(this.ch[1],x)*0.8;this.aud.pos+=k*p.spd;if(this.aud.pos>=span)this.aud=null;}
       if(p.crush>0.01){const bits=Math.pow(2,Math.round(16-p.crush*13)),hold=1+Math.floor(p.crush*p.crush*24);if(this.hc++%hold===0){this.hold[0]=Math.round(l*bits)/bits;this.hold[1]=Math.round(r*bits)/bits;}l=l+(this.hold[0]-l)*Math.min(1,p.crush*1.6);r=r+(this.hold[1]-r)*Math.min(1,p.crush*1.6);}
       L[i]=l;R[i]=r;}
     this.v=this.v.filter(v=>v.st<4);
-    if(currentTime-this.evT>0.05){this.evT=currentTime;this.port.postMessage({t:'st',ev:this.ev.splice(0),vs:this.v.map(v=>[v.n,v.e*v.vel])});}
+    if(currentTime-this.evT>0.05){this.evT=currentTime;this.port.postMessage({t:'st',ev:this.ev.splice(0),vs:this.v.map(v=>[v.n,v.e*v.vel]).concat(this.aud?[[60,0.6]]:[]),au:this.aud?this.aud.pos/span:-1});}
     return true;}}
 registerProcessor('geode',Geode);
 class Cap extends AudioWorkletProcessor{constructor(){super();this.on=false;this.rec=false;this.buf=[[],[]];this.n=0;this.max=30*sampleRate;this.port.onmessage=e=>{if(e.data==='arm'){this.on=true;this.rec=false;this.buf=[[],[]];this.n=0;}else if(e.data==='stop')this.finish();};}
@@ -248,7 +250,7 @@ async function audio() {
   ac = new AudioContext(want ? { sampleRate: want } : undefined);
   await ac.audioWorklet.addModule(WORKLET_URL);
   gNode = new AudioWorkletNode(ac, 'geode', { numberOfInputs: 0, outputChannelCount: [2] });
-  gNode.port.onmessage = (e) => { if (e.data.t === 'st') { vis.voices = e.data.vs; for (const [x, m] of e.data.ev) spawnGrain(x, m); } };
+  gNode.port.onmessage = (e) => { if (e.data.t === 'st') { vis.voices = e.data.vs; vis.aud = e.data.au; $('mPlay').classList.toggle('on', e.data.au >= 0); for (const [x, m] of e.data.ev) spawnGrain(x, m); } };
   const N = nodes;
   N.drv = ac.createWaveShaper(); N.drv.oversample = '2x'; N.drvIn = ac.createGain(); N.drvOut = ac.createGain();
   N.body = ac.createBiquadFilter(); N.body.type = 'lowshelf'; N.body.frequency.value = 220;
@@ -286,8 +288,8 @@ async function audio() {
   N.lim = ac.createDynamicsCompressor(); N.lim.threshold.value = -2; N.lim.knee.value = 0; N.lim.ratio.value = 20; N.lim.attack.value = 0.001; N.lim.release.value = 0.08;
   N.out = ac.createGain(); N.out.gain.value = 0.8; N.an = ac.createAnalyser(); N.an.fftSize = 1024;
   gNode.connect(N.drvIn).connect(N.drv).connect(N.drvOut).connect(N.body).connect(N.hp).connect(N.lp).connect(N.win).connect(N.chIn);
-  N.chOut.connect(N.eIn); N.eOut.connect(N.rIn); N.pan = ac.createStereoPanner();
-  N.rOut.connect(N.comp).connect(N.make).connect(N.lim).connect(N.pan).connect(N.lamp).connect(N.out).connect(N.an); N.out.connect(ac.destination);
+  N.chOut.connect(N.eIn); N.eOut.connect(N.rIn); N.pan = ac.createStereoPanner(); N.place = ac.createStereoPanner(); N.dist = ac.createGain();
+  N.rOut.connect(N.comp).connect(N.make).connect(N.lim).connect(N.dist).connect(N.place).connect(N.pan).connect(N.lamp).connect(N.out).connect(N.an); N.out.connect(ac.destination);
   // recording input instruments (pretend Opal / Basalt) and the capture tap
   cap = new AudioWorkletNode(ac, 'cap', { numberOfInputs: 1, numberOfOutputs: 0 });
   cap.port.onmessage = (e) => onCap(e.data);
@@ -401,6 +403,7 @@ $('mRec').onclick = async () => {
   if (recState === 'idle') { recState = 'armed'; recSec = 0; $('mRec').classList.add('on'); cap.port.postMessage('arm'); $('recMsg').textContent = 'Waiting for sound… play the keys (they play the instrument you record).'; }
   else { cap.port.postMessage('stop'); for (const n of [...inputVoices.keys()]) stopInput(n); if (recState === 'armed') { recState = 'idle'; $('mRec').classList.remove('on'); $('recMsg').textContent = 'Recording cancelled.'; } }
 };
+$('mPlay').onclick = async () => { await audio(); gNode.port.postMessage({ t: 'aud', on: !(vis.aud >= 0) }); };
 $('mTrash').onclick = () => {
   if (!sample) return; sampleBackup = sample; const n = ac ? ac.sampleRate : 48000;
   setSample({ l: new Float32Array(n / 10), r: new Float32Array(n / 10), sr: n, name: 'Empty' });
@@ -461,7 +464,9 @@ const POPS = {
     <div class="row"><span>Speed</span><span class="seg">${MRATES.map(([, l], i) => `<button data-mr="${i}" aria-pressed="${MOT.rate === i}">${l}</button>`).join('')}</span><span></span></div>
     ${sl('depth', 'Depth', 0, 1, 0.01, pct, MOT)}
     <div class="row"><span>Moves</span><span class="seg">${MTARGETS.map(([k, l]) => `<button data-mt="${k}" aria-pressed="${MOT.on.has(k)}">${l}</button>`).join('')}</span><span></span></div>
-    <p class="small">One movement, in time with the song, on everything you switch on. Mica sways with it.</p>`,
+    <div class="row"><span>Mica walks</span><span class="seg">${WALKS.map(([k, l]) => `<button data-wk="${k}" aria-pressed="${WALK.kind === k}">${l}</button>`).join('')}</span><span></span></div>
+    <div class="row"><span>Walk speed</span><span class="seg">${[1, 2, 4, 8].map((b) => `<button data-wb="${b}" aria-pressed="${WALK.bars === b}">${b} bar${b > 1 ? 's' : ''}</button>`).join('')}</span><span></span></div>
+    <p class="small">One movement, in time with the song, on everything you switch on. Mica sways with it. Drag Mica in the room to place her: left / right = pan, farther back = farther away; her walks go around that spot.</p>`,
   lamp: () => `<h3>Light</h3>${sl('light', 'Dimmer', 0, 1, 0.01, FMT.light)}<p class="small">Dim the room to calm the whole sound (a master low-pass).</p>`,
   grains: () => `<h3>Grains</h3>${sl('grains', 'Dry / wet', 0, 1, 0.01, FMT.grains)}${sl('gsize', 'Size', 0, 1, 0.01, FMT.gsize)}${sl('gdens', 'Density', 0, 1, 0.01, FMT.gdens)}${sl('spread', 'Spread', 0, 1, 0.01, FMT.spread, base)}<p class="small">Tiny slices of the tape. Drag on the film strip (right wall) to choose where they come from.</p>`,
   crunch: () => `<h3>Crunch</h3>${sl('crunch', 'Dry / wet', 0, 1, 0.01, FMT.crunch)}<p class="small">Bitcrush. The waves turn into steps.</p>`,
@@ -490,7 +495,10 @@ $('pop').addEventListener('click', (e) => {
   if (sh) { MOT.shape = +sh.dataset.msh; $('pop').querySelectorAll('[data-msh]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.msh === MOT.shape))); }
   if (mr) { MOT.rate = +mr.dataset.mr; $('pop').querySelectorAll('[data-mr]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.mr === MOT.rate))); }
   if (mt) { const k = mt.dataset.mt; MOT.on.has(k) ? MOT.on.delete(k) : MOT.on.add(k); mt.setAttribute('aria-pressed', String(MOT.on.has(k))); if (MOT.depth < 0.05) { MOT.depth = 0.5; refreshOutputs(); const d = $('pop').querySelector('[data-k="depth"]'); if (d) d.value = 0.5; } }
-  if (sh || mr || mt) return;
+  const wk = e.target.closest('[data-wk]'), wb = e.target.closest('[data-wb]');
+  if (wk) { WALK.kind = wk.dataset.wk; WALK.ph = 0; $('pop').querySelectorAll('[data-wk]').forEach((x) => x.setAttribute('aria-pressed', String(x.dataset.wk === WALK.kind))); }
+  if (wb) { WALK.bars = +wb.dataset.wb; $('pop').querySelectorAll('[data-wb]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.wb === WALK.bars))); }
+  if (sh || mr || mt || wk || wb) return;
   const d = e.target.closest('[data-div]'); if (!d) return; M.div = +d.dataset.div; $('pop').querySelectorAll('[data-div]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.div === M.div))); push(); });
 $('screen').addEventListener('pointerdown', (e) => { if (e.target === $('cv') && openId) closePop(); });
 function bindThermo() {
@@ -543,6 +551,24 @@ const sc = (Z) => G.D / (G.D + Z);
 const P = (x, y, Z) => { const s = sc(Z); return [G.vx + x * G.hw * s, G.vy + (y < 0 ? -y * G.top : y * G.bot) * s]; };
 const line = (pts, close) => { cx2.beginPath(); pts.forEach(([x, y], i) => (i ? cx2.lineTo(x, y) : cx2.moveTo(x, y))); if (close) cx2.closePath(); cx2.stroke(); };
 const MICA_Z = 0.55;
+const MP = { bx: 0, bz: MICA_Z, x: 0, z: MICA_Z, vx: 0, vz: 0, step: 0, tx: 0, tz: MICA_Z, rt: 0 }; // dragged base, walking target, smoothed place
+const WALKS = [['off', 'Stay'], ['lr', 'Left ↔ right'], ['boom', 'Boomerang'], ['circle', 'Circle'], ['random', 'Random']];
+const WALK = { kind: 'off', bars: 2, ph: 0 };
+function walk(dt) {
+  const cyc = WALK.bars * 4 * 60 / BPM; WALK.ph = (WALK.ph + dt / cyc) % 1; const p = WALK.ph, A = 0.6, Lz = Math.min(G.L - 0.35, 2.2);
+  let tx = MP.bx, tz = MP.bz;
+  if (WALK.kind === 'lr') tx = MP.bx + A * (1 - 4 * Math.abs(p - 0.5));
+  else if (WALK.kind === 'boom') { tx = MP.bx + A * Math.sin(2 * Math.PI * p); tz = MP.bz + 0.9 * Math.sin(Math.PI * p) ** 2; }
+  else if (WALK.kind === 'circle') { tx = MP.bx + 0.5 * Math.cos(2 * Math.PI * p); tz = MP.bz + 0.4 + 0.4 * Math.sin(2 * Math.PI * p); }
+  else if (WALK.kind === 'random') { MP.rt -= dt; if (MP.rt <= 0) { MP.rt = cyc / 4; MP.rx = MP.bx + (Math.random() * 2 - 1) * A; MP.rz = MP.bz + Math.random() * 0.8; } tx = MP.rx ?? tx; tz = MP.rz ?? tz; }
+  MP.tx = clamp(tx, -0.85, 0.85); MP.tz = clamp(tz, 0.25, Math.max(0.3, Lz));
+  const k = matchMedia('(prefers-reduced-motion: reduce)').matches ? 1 : Math.min(1, dt * 3.2), ox = MP.x, oz = MP.z;
+  MP.x += (MP.tx - MP.x) * k; MP.z += (MP.tz - MP.z) * k;
+  const sp = Math.hypot(MP.x - ox, MP.z - oz) / Math.max(dt, 1e-3); MP.step += sp * dt * 14; MP.speed = sp; MP.dir = Math.sign(MP.x - ox) || MP.dir || 1;
+  // where she stands is what you hear: left/right = pan, farther = quieter with more room
+  if (ac && nodes.dist) { const d = clamp((MP.z - 0.35) / 1.6), t = ac.currentTime;
+    nodes.dist.gain.setTargetAtTime(1 - d * 0.4, t, 0.05); nodes.place.pan.setTargetAtTime(MP.x / 0.85 * 0.9, t, 0.05); nodes.rW.gain.setTargetAtTime(M.wet * 0.8 * (1 + d * 0.9) * (MOT.on.has('room') && MOT.depth > 0.01 ? 1 + MOT.v : 1), t, 0.05); }
+}
 const MICA_SHAPE = [[0, -1.25], [0.42, -1.05], [0.48, -0.45], [0.3, -0.18], [-0.3, -0.18], [-0.48, -0.45], [-0.42, -1.05]];
 function spawnGrain(x, m) {
   // a grain = a small fractal crack of light leaving Mica's crystal edge, splitting twice
@@ -561,12 +587,13 @@ function frame(now) {
   if (reduce) { S.temp = T.temp; S.air = T.airT; S.room = M.room; S.z = zoomOn ? 1 : 0; }
   else { spring('temp', 'tv', T.temp, 4.2, dt); spring('air', 'av', T.airT, 5, dt); S.room += (M.room - S.room) * Math.min(1, dt * 4); spring('z', 'zv', zoomOn ? 1 : 0, 6, dt); }
   if (Math.abs(S.temp - (push.lt ?? -1)) > 0.004 || Math.abs(S.air - (push.la ?? -1)) > 0.004) { push.lt = S.temp; push.la = S.air; push(); }
-  $('menu').hidden = !(zoomOn && S.z > 0.85);
+  $('menu').hidden = !(zoomOn && S.z > 0.85); $('mBack').hidden = $('menu').hidden;
   const th = $('th'); if (th) { const h = 160 * S.temp; $('merc').setAttribute('y', 180 - h); $('merc').setAttribute('height', h + 6); const c = tempColor(S.temp); $('merc').setAttribute('fill', c); $('bulb').setAttribute('fill', c); th.setAttribute('aria-valuenow', Math.round(S.temp * 100)); }
   const fan = document.querySelector('[data-id="fan"] .blades'); if (fan) { fan.style.transformOrigin = '16px 16px'; fan.style.transform = `rotate(${(now / 1000) * 360 * S.air * 2}deg)`; }
   $('hudV').textContent = ['FREEZING', 'CHILL', 'WARM', 'HOT'][Math.min(3, Math.floor(S.temp * 3.999))]; $('hudV').style.color = tempColor(S.temp);
   $('hudR').textContent = FMT.room(M.room);
   motion(dt);
+  geom(); walk(dt);
   draw(now / 1000, dt);
   requestAnimationFrame(frame);
 }
@@ -580,7 +607,6 @@ function motion(dt) {
   N.win.detune.setTargetAtTime(on('win') ? m * 2400 : 0, t, 0.02);
   N.pan.pan.setTargetAtTime(on('pan') ? m * 0.9 : 0, t, 0.02);
   N.eW.gain.setTargetAtTime(on('echo') ? clamp(M.echoWet * (1 + m)) : M.echoWet, t, 0.03);
-  N.rW.gain.setTargetAtTime((on('room') ? clamp(M.wet * (1 + m)) : M.wet) * 0.8, t, 0.03);
   MOT.tick = (MOT.tick || 0) + dt; if (MOT.tick < 0.03) return; MOT.tick = 0;
   gNode.port.postMessage({ t: 'p', p: { bend: on('pitch') ? m * 2 : 0, pos: on('pos') ? (((M.pos + m * 0.25) % 1) + 1) % 1 : M.pos, crush: on('crunch') ? clamp(M.crunch + (m * 0.5 + 0.5) * MOT.depth * 0.7) : M.crunch } });
 }
@@ -590,7 +616,7 @@ function draw(t, dt) {
   const c = cx2; c.setTransform(DPR, 0, 0, DPR, 0, 0); c.fillStyle = '#04050a'; c.fillRect(0, 0, W, H);
   geom();
   // camera zoom into Mica's head (recording)
-  const mh = P(0, 1, MICA_Z), msz = Math.min(W, H) * 0.2 * sc(MICA_Z) * G.zoom, head = [mh[0], mh[1] - msz * 1.05];
+  const mh = P(MP.x, 1, MP.z), msz = Math.min(W, H) * 0.2 * sc(MP.z) * G.zoom, head = [mh[0], mh[1] - msz * 1.05];
   const z = sstep(0, 1, S.z), zs = lerp(1, 5.2, z);
   c.save(); c.translate(lerp(W / 2, W / 2, z), lerp(H / 2, H * 0.5, z)); c.scale(zs, zs); c.translate(-lerp(W / 2, head[0], z), -lerp(H / 2, head[1], z));
   const lit = lerp(0.3, 1, M.light); neon(S.temp);
@@ -645,6 +671,15 @@ function wallU(px, py) {
   const s2 = (px - G.vx) / G.hw; if (s2 <= 0.01) return null; const Z = G.D / s2 - G.D; return clamp((Z - w.z0) / (w.z1 - w.z0));
 }
 cv.addEventListener('pointerdown', (e) => {
+  const mg = vis.mg, r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top;
+  if (!mg || zoomOn || Math.abs(px - mg.x) > mg.u * 0.65 || py < mg.y - mg.u * 1.4 || py > mg.y + mg.u * 0.15) return;
+  e.stopImmediatePropagation(); e.preventDefault(); cv.setPointerCapture(e.pointerId); void audio(); cv.style.cursor = 'grabbing';
+  const place = (ev) => { const sx = ev.clientX - r.left, sy = ev.clientY - r.top; const s2 = (sy - G.vy) / G.bot; if (s2 <= 0.05) return;
+    const Z = G.D / s2 - G.D, x = (sx - G.vx) / (G.hw * s2); MP.bx = clamp(x, -0.85, 0.85); MP.bz = clamp(Z, 0.25, Math.max(0.3, Math.min(G.L - 0.35, 2.2))); };
+  const mv = (ev) => place(ev); cv.addEventListener('pointermove', mv); cv.addEventListener('pointerup', () => { cv.removeEventListener('pointermove', mv); cv.style.cursor = ''; }, { once: true });
+}, { capture: true });
+cv.addEventListener('pointermove', (e) => { const mg = vis.mg; if (!mg) return; const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top; if (!e.buttons) cv.style.cursor = Math.abs(px - mg.x) < mg.u * 0.65 && py > mg.y - mg.u * 1.4 && py < mg.y + mg.u * 0.15 ? 'grab' : wallU(px, py) != null ? 'ew-resize' : ''; });
+cv.addEventListener('pointerdown', (e) => {
   const r = cv.getBoundingClientRect(), at = (ev) => wallU(ev.clientX - r.left, ev.clientY - r.top); const u = at(e); if (u == null) return;
   e.preventDefault(); cv.setPointerCapture(e.pointerId); void audio();
   const set = (uu) => { M.pos = clamp((uu - trimS) / Math.max(0.02, trimE - trimS)); $('mPos').value = M.pos; $('mPosO').textContent = pct(M.pos); push(); gNode?.port.postMessage({ t: 'seek' }); };
@@ -662,6 +697,7 @@ function drawMemoryWall(c, t, lit) {
   c.stroke();
   // trim shading
   c.fillStyle = 'rgba(4,5,10,.6)'; for (const [a, b] of [[0, trimS], [trimE, 1]]) { if (b - a < 0.002) continue; c.beginPath(); [q(a, y0), q(b, y0), q(b, y1), q(a, y1)].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.fill(); }
+  if (vis.aud >= 0) { const u = trimS + vis.aud * (trimE - trimS); c.strokeStyle = `rgba(${NC},${lit})`; c.lineWidth = 2.5; line([q(u, y0 - 0.1), q(u, y1 + 0.1)]); c.lineWidth = 1.3; }
   { const u = trimS + M.pos * (trimE - trimS); c.strokeStyle = `rgba(255,209,102,${lit})`; c.lineWidth = 2; line([q(u, y0 - 0.06), q(u, y1 + 0.06)]); c.lineWidth = 1.3; }
   vis.grains = vis.grains.filter((g) => { g.t += 0.016; const u = trimS + g.x * (trimE - trimS), w = 0.008; c.strokeStyle = `rgba(255,209,102,${(1 - g.t / 0.3) * 0.8 * lit})`; line([q(u - w, y0 - 0.01), q(u + w, y0 - 0.01), q(u + w, y1 + 0.01), q(u - w, y1 + 0.01)], true); return g.t < 0.3; });
 }
@@ -683,22 +719,22 @@ function wobble(u, amp, t) {
 function drawWaves(c, t, dt, lit) {
   // each sounding voice sends rings from Mica (their size follows the envelope); with echo, wavefronts travel to the back wall and back, once per repeat
   const vs = vis.voices; vis.ringT = (vis.ringT || 0) + dt;
-  if (vis.ringT > 0.16) { vis.ringT = 0; for (const [n, e] of vs) if (e > 0.02) vis.rings.push({ n, a: e, r: 0.05, t: 0 }); }
-  for (const nt of vis.notes.splice(0)) { if (M.echoWet > 0.02) vis.echoes.push({ n: nt.n, a: 1, p: 0, born: t }); }
+  if (vis.ringT > 0.16) { vis.ringT = 0; for (const [n, e] of vs) if (e > 0.02) vis.rings.push({ n, a: e, r: 0.05, t: 0, x: MP.x, z: MP.z }); }
+  for (const nt of vis.notes.splice(0)) { if (M.echoWet > 0.02) vis.echoes.push({ n: nt.n, a: 1, p: 0, born: t, z: MP.z }); }
   const life = lerp(0.6, 3.2, R.decay) * (0.5 + M.wet);
   waveStyle(c, lit); c.lineWidth = 1.3;
   vis.rings = vis.rings.filter((g) => {
     g.t += dt; g.r += dt * lerp(0.6, 1.4, S.room); const a = g.a * (1 - g.t / life) * (1 - sstep(0.7, 1.1, g.r));
     if (a <= 0) return false;
     c.strokeStyle = hue(g.n); c.globalAlpha = a * lit; c.beginPath();
-    for (let i = 0; i <= 64; i++) { const th = i / 64 * Math.PI * 2, rr = g.r * (1 + wobble(i / 64, 0.06 * g.a, t)); const [x, y] = P(Math.cos(th) * rr, 1, MICA_Z + Math.sin(th) * rr * 0.9); if (i) c.lineTo(x, y); else c.moveTo(x, y); }
+    for (let i = 0; i <= 64; i++) { const th = i / 64 * Math.PI * 2, rr = g.r * (1 + wobble(i / 64, 0.06 * g.a, t)); const [x, y] = P(g.x + Math.cos(th) * rr, 1, g.z + Math.sin(th) * rr * 0.9); if (i) c.lineTo(x, y); else c.moveTo(x, y); }
     c.stroke(); c.globalAlpha = 1; return true;
   });
   const T2 = echoSec(), back = G.L - 0.05, fb = M.fb * 0.92;
   vis.echoes = vis.echoes.filter((e) => {
     const age = t - e.born, trip = age / T2, k = Math.floor(trip), f = trip - k, amp = Math.pow(fb, k) * M.echoWet * 1.6;
     if (amp < 0.03 || k > 40) return false;
-    const Z = f < 0.5 ? lerp(MICA_Z, back, f * 2) : lerp(back, MICA_Z, (f - 0.5) * 2);
+    const Z = f < 0.5 ? lerp(e.z, back, f * 2) : lerp(back, e.z, (f - 0.5) * 2);
     c.strokeStyle = hue(e.n); c.globalAlpha = Math.min(1, amp) * lit; c.beginPath();
     for (let i = 0; i <= 60; i++) { const u = i / 60, x = lerp(-0.92, 0.92, u), [px, py] = P(x, 1 - 0.05 - Math.abs(wobble(u, 0.25 * amp, t)), Z); if (i) c.lineTo(px, py); else c.moveTo(px, py); }
     c.stroke(); c.globalAlpha = 1; return true;
@@ -726,9 +762,10 @@ function drawMica(c, t, dt, u, foot, lit) {
   const x = foot[0] + shiver + sway, y = foot[1] - bob;
   vis.mg = { x, y, u };
   const col = `rgba(214,200,255,${lit})`;
-  c.save(); c.translate(x, y); c.rotate(MOT.on.size ? MOT.v * 0.12 : 0); c.lineWidth = 1.6; c.strokeStyle = col; c.shadowColor = '#c9b8ff'; c.shadowBlur = 6 * lit;
+  c.save(); c.translate(x, y); c.rotate((MOT.on.size ? MOT.v * 0.12 : 0) + (MP.dir || 0) * Math.min(1, (MP.speed || 0) * 2.5) * 0.08); c.lineWidth = 1.6; c.strokeStyle = col; c.shadowColor = '#c9b8ff'; c.shadowBlur = 6 * lit;
   // legs and feet
-  line([[-u * 0.18, -u * 0.2], [-u * 0.2, 0], [-u * 0.32, 0]]); line([[u * 0.18, -u * 0.2], [u * 0.2, 0], [u * 0.32, 0]]);
+  const wk = Math.min(1, (MP.speed || 0) * 2.5), lg = Math.sin(MP.step) * wk * u * 0.1, lift = (v) => Math.max(0, v) * 0.8;
+  line([[-u * 0.18, -u * 0.2], [-u * 0.2 + lg, -lift(lg)], [-u * 0.32 + lg, -lift(lg)]]); line([[u * 0.18, -u * 0.2], [u * 0.2 - lg, -lift(-lg)], [u * 0.32 - lg, -lift(-lg)]]);
   // body: a faceted crystal
   const B = [[0, -u * 1.25], [u * 0.42, -u * 1.05], [u * 0.48, -u * 0.45], [u * 0.3, -u * 0.18], [-u * 0.3, -u * 0.18], [-u * 0.48, -u * 0.45], [-u * 0.42, -u * 1.05]];
   c.fillStyle = 'rgba(20,16,40,.9)'; c.beginPath(); B.forEach(([a, b], i) => (i ? c.lineTo(a, b) : c.moveTo(a, b))); c.closePath(); c.fill(); c.stroke();
@@ -767,12 +804,12 @@ function drawMica(c, t, dt, u, foot, lit) {
 function drawBrain(c, z, t) {
   // inside Mica's head: a little tape machine recording into her memory
   c.save(); c.globalAlpha = sstep(0.4, 1, z); c.fillStyle = 'rgba(4,5,10,.82)'; c.fillRect(0, 0, W, H);
-  const cx = W / 2, cy = H * 0.2, r = Math.min(W, H) * 0.075, spin = recState === 'rec' ? t * 3 : recState === 'armed' ? t * 0.4 : 0;
+  const cx = W / 2, cy = H * 0.2, r = Math.min(W, H) * 0.075, spin = recState === 'rec' || vis.aud >= 0 ? t * 3 : recState === 'armed' ? t * 0.4 : 0;
   c.strokeStyle = '#e6f4ff'; c.lineWidth = 1.5; c.shadowColor = '#5fd4ff'; c.shadowBlur = 6;
   for (const dx of [-1.6, 1.6]) { c.beginPath(); c.arc(cx + dx * r, cy, r, 0, 7); c.stroke(); c.beginPath(); c.arc(cx + dx * r, cy, r * 0.2, 0, 7); c.stroke(); for (let k = 0; k < 3; k++) { const a = spin + k * 2.09; line([[cx + dx * r + Math.cos(a) * r * 0.28, cy + Math.sin(a) * r * 0.28], [cx + dx * r + Math.cos(a) * r * 0.8, cy + Math.sin(a) * r * 0.8]]); } }
   line([[cx - 1.6 * r, cy + r], [cx - 0.3 * r, cy + r * 1.25], [cx + 0.3 * r, cy + r * 1.25], [cx + 1.6 * r, cy + r]]);
   c.font = `300 ${Math.round(r * 0.45)}px Saira`; c.fillStyle = recState === 'rec' ? '#ff3b4a' : '#e6f4ff'; c.textAlign = 'center';
-  const s = recState === 'idle' && sample ? sample.l.length / sample.sr : recSec; c.fillText(`00:${String(Math.floor(s)).padStart(2, '0')}.${Math.floor((s % 1) * 10)}`, cx, cy - r * 1.25);
+  const tapeLen = sample ? sample.l.length / sample.sr * (trimE - trimS) : 0, s = vis.aud >= 0 ? vis.aud * tapeLen : recState === 'idle' && sample ? tapeLen : recSec; c.fillText(`00:${String(Math.floor(s)).padStart(2, '0')}.${Math.floor((s % 1) * 10)}`, cx, cy - r * 1.25);
   c.font = `300 ${Math.round(r * 0.22)}px Saira`; c.fillStyle = '#7f93a8'; c.fillText(recState === 'armed' ? 'WAITING FOR SOUND' : recState === 'rec' ? 'RECORDING INTO MEMORY' : (sample?.name || 'EMPTY').toUpperCase(), cx, cy + r * 1.6);
   c.restore();
 }
@@ -786,6 +823,7 @@ size(); push.lt = null;
   if (num('echo') != null) { M.echoWet = num('echo'); M.fb = 0.7; }
   if (num('room') != null) S.room = M.room;
   if (q.has('play')) setTimeout(() => $('demo').click(), 300);
+  if (q.has('walk')) WALK.kind = q.get('walk') || 'circle';
   if (q.has('motion')) { MOT.depth = 0.7; MOT.on = new Set(['win', 'pan', 'pos']); MOT.rate = 1; }
   if (q.has('pop')) setTimeout(() => document.querySelector(`[data-id="${q.get('pop')}"]`)?.click(), 400);
   if (q.has('rec')) setTimeout(() => setZoom(true), 300); }

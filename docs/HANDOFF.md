@@ -1,8 +1,8 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
 ## START HERE (2026-11-26, evening): Geode mock-up round 2 waiting for the user's review
-Geode = a sampler in a little room with Mica (plan approved, 5 rounds; see PLAN.md "Geode"). The mock-up `design/kit/geode.html` (artifact "Geode: Mica's room") has had two rounds; the user reviews later and said the goal now is **look / utility / feel**. They may bring images made from the prompts in `design/refs/prompt/` (git-ignored: never commit or publish anything from design/refs). Next: their feedback, then slice 1 (the Rust engine, kind 6).
-Mock-up test: serve design/kit, `geode.html?selftest` (offline render 44.1 / 48 kHz); preview options `?temp=&air=&room=&light=&crunch=&grains=&echo=&play&rec&motion&pop=<icon>`.
+Geode = a sampler in a little room with Mica (plan approved, 5 rounds; see PLAN.md "Geode"). The mock-up `design/kit/geode.html` (artifact "Geode: Mica's room") has had three rounds (latest: tape PLAY, drag Mica to pan, walks); the user reviews later and said the goal now is **look / utility / feel**. They may bring images made from the prompts in `design/refs/prompt/` (git-ignored: never commit or publish anything from design/refs). Next: their feedback, then slice 1 (the Rust engine, kind 6).
+Mock-up test: serve design/kit, `geode.html?selftest` (offline render 44.1 / 48 kHz); preview options `?temp=&air=&room=&light=&crunch=&grains=&echo=&play&rec&motion&walk=<lr|boom|circle|random>&pop=<icon>`.
 
 ## START HERE (2026-11-26): instruments polished, recording takes, piano roll length
 Done today (all tested, pushed):
