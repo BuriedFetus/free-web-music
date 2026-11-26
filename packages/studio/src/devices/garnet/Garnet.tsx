@@ -465,10 +465,10 @@ function Neck({ mode, lock, songKey, chords, peerNotes, mine, roles, badges, str
               const badge = mine.get(s) === c ? undefined : badges.get(m % 12);
               return (
                 <div key={s} className="fwm-garnet__cell">
-                  {badge && <i className={`fwm-garnet__rn-badge is-${badge.role}`}>{badge.rn}</i>}
                   <span className={'fwm-garnet__dot' + (mine.get(s) === c ? ' is-mine' : role ? ` is-g-${role}` : ins ? (m % 12 === songKey.root ? ' is-root' : '') : ' is-off')}
                     style={peer ? ({ boxShadow: `0 0 0 3px ${peer}` } as CSSProperties) : undefined}>
                     {ins || role || mine.get(s) === c ? noteName(m, songKey) : ''}
+                    {badge && <small className={`fwm-garnet__rn-badge is-${badge.role}`}>{badge.rn}</small>}
                   </span>
                 </div>
               );

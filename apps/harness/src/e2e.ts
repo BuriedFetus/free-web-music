@@ -1125,7 +1125,7 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
       const r: Record<string, Set<string>> = {};
       for (const d of document.querySelectorAll('.fwm-garnet__neck .fwm-garnet__dot')) {
         const c = [...d.classList].find((x) => x.startsWith('is-g-'));
-        if (c) (r[c.slice(5)] ??= new Set()).add(d.textContent ?? '');
+        if (c) (r[c.slice(5)] ??= new Set()).add(d.firstChild?.textContent ?? '');
       }
       return Object.entries(r).map(([k, v]) => `${k}:${[...v].sort().join('')}`).sort().join(' ');
     };
