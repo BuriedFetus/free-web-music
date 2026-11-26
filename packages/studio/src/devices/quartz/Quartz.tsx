@@ -7,6 +7,7 @@ import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
 import type { DeviceProps } from '../basalt/Basalt';
 import { GKnob, StepDial, defaultsOf } from '../garnet/Garnet';
 import { Scope } from '../Scope';
+import { PanelKeys } from '../PanelKeys';
 import { Sends } from '../Sends';
 import { QUARTZ_FORMAT, QUARTZ_PRESETS } from './presets';
 
@@ -94,6 +95,8 @@ export function Quartz({ store, host, slot, user = { name: 'You', color: 'var(--
           <div className="fwm-garnet__play">{['trem', 'trate', 'drive', 'lvl'].map((id) => knob(id))}</div>
         </div>
       </div>
+
+      <PanelKeys host={host} slot={slot} />
     </div>
   );
 }

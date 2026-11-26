@@ -9,6 +9,7 @@ import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
 import { ParamKnob, type DeviceProps, type ParamCtx } from '../basalt/Basalt';
 import { StepDial, defaultsOf } from '../garnet/Garnet';
 import { Scope } from '../Scope';
+import { PanelKeys } from '../PanelKeys';
 import { Sends } from '../Sends';
 import { OPAL_FORMAT, OPAL_PRESETS } from './presets';
 
@@ -167,6 +168,8 @@ export function Opal({ store, host, slot, user = { name: 'You', color: 'var(--fw
           })}
         </ul>
       </div>
+
+      <PanelKeys host={host} slot={slot} />
     </div>
   );
 }
