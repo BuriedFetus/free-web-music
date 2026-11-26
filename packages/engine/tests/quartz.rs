@@ -32,6 +32,7 @@ fn plain(o: &mut Quartz) {
 #[test]
 fn manifest_matches_the_engine() {
     let json = std::fs::read_to_string(concat!(env!("CARGO_MANIFEST_DIR"), "/devices/quartz.json")).unwrap();
+    let json = json.split("\"modSources\"").next().unwrap().to_string();
     let ids: Vec<String> = json.split("\"id\": \"").skip(2).map(|s| s.split('"').next().unwrap().to_string()).collect();
     assert_eq!(ids, IDS.iter().map(|s| s.to_string()).collect::<Vec<_>>());
     let defs: Vec<f32> = json
@@ -157,4 +158,26 @@ fn eight_voices_fit_the_cpu_budget() {
     let share = t.elapsed().as_secs_f32() / secs;
     println!("8 voices: {:.1}% of a core", share * 100.0);
     assert!(share < 0.12);
+}
+
+#[test]
+fn routes_move_the_knobs() {
+    use fwm_engine::device::ModSource;
+    let mut o = quartz(48_000.0);
+    o.set_param(p::LRATE, 1.0);
+    assert!(o.set_route(0, ModSource::Lfo, p::CUT, 0.5).is_ok());
+    assert!(o.set_route(1, ModSource::Lfo, p::LRATE, 0.5).is_err());
+    assert!(o.set_route(1, ModSource::FiltEnv, p::ENV1, 0.5).is_err());
+    assert!(o.set_route(1, ModSource::AmpEnv, p::DEPTH2, 0.5).is_ok());
+    o.note_on(60, 1.0);
+    let mut cuts = vec![];
+    for _ in 0..40 {
+        let _ = render(&mut o, 1200);
+        cuts.push(o.effective()[p::CUT]);
+    }
+    let (lo, hi) = cuts.iter().fold((1.0f32, 0.0f32), |(a, b), &c| (a.min(c), b.max(c)));
+    assert!(hi - lo > 0.3, "the LFO sweeps the cutoff ({lo} … {hi})");
+    o.clear_route(0);
+    let _ = render(&mut o, 1200);
+    assert!((o.effective()[p::CUT] - 0.85).abs() < 0.02);
 }

@@ -1,15 +1,19 @@
 // Quartz: FM keys, front panel. The synth family layout: two rows (each a carrier pushed by its own
 // modulator) with the FILTER block on the right, then AMP and PLAY. Only theme primitives and --dev-* tokens.
 import { type CSSProperties } from 'react';
+import type { ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
 import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
 import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
-import type { DeviceProps } from '../basalt/Basalt';
-import { GKnob, StepDial, defaultsOf } from '../garnet/Garnet';
+import { ParamKnob, type DeviceProps, type ParamCtx } from '../basalt/Basalt';
+import { StepDial, defaultsOf } from '../garnet/Garnet';
+import { ModRow, useAssign } from '../ModRow';
 import { Scope } from '../Scope';
 import { PanelKeys } from '../PanelKeys';
 import { Sends } from '../Sends';
 import { QUARTZ_FORMAT, QUARTZ_PRESETS } from './presets';
+
+const SRC_LABEL: Record<ModSourceId, string> = { lfo: 'LFO', amp: 'Amp env', filt: 'Bark env' };
 
 export function Quartz({ store, host, slot, user = { name: 'You', color: 'var(--fwm-me)' } }: DeviceProps) {
   const { engine, status } = useEngine();
@@ -29,7 +33,9 @@ export function Quartz({ store, host, slot, user = { name: 'You', color: 'var(--
     host?.paramChanged?.(id, v);
   };
   const people = host?.people ?? [{ userId: 'me', name: user.name, color: user.color }];
-  const knob = (id: string, size?: 'lg') => <GKnob key={id} store={store} host={host} id={id} set={set} size={size} fmt={QUARTZ_FORMAT} />;
+  const [assign, setAssign] = useAssign();
+  const ctx: ParamCtx = { store, slot, assign, setAssign, host };
+  const knob = (id: string, size?: 'lg') => <ParamKnob key={id} ctx={ctx} id={id} size={size} format={QUARTZ_FORMAT[id]} />;
   const dial = (id: string) => <StepDial key={id} store={store} host={host} id={id} set={set} />;
 
   return (
@@ -95,6 +101,10 @@ export function Quartz({ store, host, slot, user = { name: 'You', color: 'var(--
           <div className="fwm-garnet__play">{['trem', 'trate', 'drive', 'lvl'].map((id) => knob(id))}</div>
         </div>
       </div>
+
+      <ModRow ctx={ctx} labels={SRC_LABEL} hint="Press Assign, then click a knob: the LFO or an envelope of the note played last (Bark env = row 1's push) moves it.">
+        {knob('lrate')}
+      </ModRow>
 
       <PanelKeys host={host} slot={slot} />
     </div>

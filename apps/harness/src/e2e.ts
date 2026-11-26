@@ -1344,6 +1344,21 @@ async function runQuartz(p: Project, engineRef: { current: Engine | null }, ok: 
     await until('harmonics in engine', () => engineRef.current!.last!.devices[slot].eff[2] === 3, 2000);
     ok(true, 'Harmonics reaches the engine');
     ok(!!$('.fwm-quartz .fwm-sends'), 'SEND knobs on Quartz');
+    [...document.querySelectorAll<HTMLButtonElement>('.fwm-quartz .fwm-btn--assign')][0].click();
+    await sleep(50);
+    $('.fwm-quartz [role=slider][aria-label="Cutoff"]')!.closest('.fwm-target')!.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, cancelable: true, pointerId: 1 }));
+    await sleep(100);
+    const qs = p.deviceStore(p.trackIds()[0], deviceEntry('quartz')!.manifest!)!.getState();
+    ok(qs.routes.some((r) => r.src === 'lfo' && r.target === 'cut'), 'Quartz: Assign LFO → Cutoff adds a route');
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    const seenQ = new Set<string>();
+    const tq = performance.now();
+    while (performance.now() - tq < 1500) {
+      seenQ.add(engineRef.current!.last!.devices[slot].eff[12].toFixed(2));
+      await sleep(40);
+    }
+    document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+    ok(seenQ.size > 3, `Quartz: the engine's cutoff moves with the LFO (${seenQ.size} values)`);
   } catch (e) {
     out.push(`FAIL quartz: ${String(e)}`);
   }

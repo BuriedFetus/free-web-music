@@ -7,9 +7,10 @@
 //! Then a low-pass filter (Cutoff, Reso) and the amp envelope; Touch = how much harder playing brightens;
 //! Tremolo (the sound swings left and right, like a stage piano's), Drive, Level.
 
-use crate::device::{Device, ModSource, RouteError};
+use crate::device::{Device, ModSource, RouteError, MAX_ROUTES};
 use crate::dsp::env::{Adsr, AdsrCoefs, AdsrTimes};
 use crate::dsp::svf::Svf;
+use crate::dsp::rng::Rng;
 use crate::dsp::{clamp01, exp2, expf, flush, note_hz, one_pole_coef, sat, sinf, TAU};
 
 pub const VOICES: usize = 8;
@@ -41,23 +42,25 @@ pub mod p {
     pub const TRATE: usize = 20;
     pub const DRIVE: usize = 21;
     pub const LVL: usize = 22;
-    pub const COUNT: usize = 23;
+    pub const LRATE: usize = 23;
+    pub const LWAVE: usize = 24;
+    pub const COUNT: usize = 25;
 }
 
 /// Parameter ids, in index order (they match `devices/quartz.json`).
 pub const IDS: [&str; p::COUNT] = [
     "w1", "pitch1", "harm1", "depth1", "env1", "lvl1", "w2", "pitch2", "harm2", "depth2", "env2", "lvl2", "cut", "res", "touch", "atk", "dec",
-    "sus", "rel", "trem", "trate", "drive", "lvl",
+    "sus", "rel", "trem", "trate", "drive", "lvl", "lrate", "lwave",
 ];
 
 /// "Tine Keys".
 pub fn defaults() -> [f32; p::COUNT] {
-    [0.0, 1.0, 1.0, 0.35, 0.35, 0.85, 0.0, 1.0, 8.0, 0.3, 0.15, 0.35, 0.85, 0.1, 0.6, 0.0, 0.55, 0.2, 0.3, 0.3, 0.4, 0.15, 0.7]
+    [0.0, 1.0, 1.0, 0.35, 0.35, 0.85, 0.0, 1.0, 8.0, 0.3, 0.15, 0.35, 0.85, 0.1, 0.6, 0.0, 0.55, 0.2, 0.3, 0.3, 0.4, 0.15, 0.7, 0.3, 0.0]
 }
 
 fn discrete_max(i: usize) -> Option<f32> {
     match i {
-        p::W1 | p::W2 => Some(3.0),
+        p::W1 | p::W2 | p::LWAVE => Some(3.0),
         p::PITCH1 | p::PITCH2 => Some(5.0),
         p::HARM1 | p::HARM2 => Some(8.0),
         _ => None,
@@ -84,6 +87,25 @@ fn bend(s: f32, w: u32) -> f32 {
         3 => sat(s * 7.0),                // Pulse: nearly square
         _ => s,                           // Sine
     }
+}
+
+/// A source may not modulate its own controls (no feedback loops).
+fn route_allowed(src: ModSource, target: usize) -> bool {
+    if target >= p::COUNT || discrete_max(target).is_some() {
+        return false;
+    }
+    match src {
+        ModSource::Lfo => target != p::LRATE,
+        ModSource::AmpEnv => !(p::ATK..=p::REL).contains(&target),
+        ModSource::FiltEnv => target != p::ENV1,
+    }
+}
+
+#[derive(Clone, Copy)]
+struct Route {
+    src: ModSource,
+    target: usize,
+    depth: f32,
 }
 
 #[derive(Clone, Copy)]
@@ -118,6 +140,15 @@ pub struct Quartz {
     fs: f32,
     params: [f32; p::COUNT],
     sm: [f32; p::COUNT],
+    /// Values after modulation (what the sound uses, and what the knobs' arcs show).
+    eff: [f32; p::COUNT],
+    routes: [Option<Route>; MAX_ROUTES],
+    /// The voice played last: its envelopes are the Amp env / Bark env sources.
+    last: usize,
+    lfo: f32,
+    lfo_out: f32,
+    lfo_hold: f32,
+    rng: Rng,
     primed: bool,
     v: [Voice; VOICES],
     vc: [VCtl; VOICES],
@@ -141,6 +172,13 @@ impl Quartz {
             fs: 48_000.0,
             params: d,
             sm: d,
+            eff: d,
+            routes: [None; MAX_ROUTES],
+            last: 0,
+            lfo: 0.0,
+            lfo_out: 0.0,
+            lfo_hold: 0.0,
+            rng: Rng::new(0x0A27),
             primed: false,
             v: [Voice::new(); VOICES],
             vc: [VCtl::default(); VOICES],
@@ -168,9 +206,45 @@ impl Quartz {
         oldest(false).or_else(|| oldest(true)).unwrap_or(0)
     }
 
+    /// Amp env and Bark env (row 1's push) of the voice played last.
+    fn env_levels(&self) -> (f32, f32) {
+        let v = &self.v[self.last];
+        if v.live { (v.amp.level, v.menv[0]) } else { (0.0, 0.0) }
+    }
+
     fn control(&mut self) {
         let fs = self.fs;
-        let s = self.sm;
+        // mod LFO: Sine, Triangle, Square or Random (a new value each cycle)
+        let ph = (self.lfo + exp_map(self.eff[p::LRATE], 0.05, 8.0) * CTL as f32 / fs) % 1.0;
+        let wrapped = ph < self.lfo;
+        self.lfo = ph;
+        self.lfo_out = match self.params[p::LWAVE] as u32 {
+            1 => 1.0 - 4.0 * libm::fabsf(ph - 0.5),
+            2 => if ph < 0.5 { 1.0 } else { -1.0 },
+            3 => {
+                if wrapped {
+                    self.lfo_hold = self.rng.bipolar();
+                }
+                self.lfo_hold
+            }
+            _ => sinf(ph * TAU),
+        };
+        let (amp_l, bark_l) = self.env_levels();
+        self.eff = self.sm;
+        for r in self.routes.iter().flatten() {
+            let src = match r.src {
+                ModSource::Lfo => self.lfo_out,
+                ModSource::AmpEnv => amp_l,
+                ModSource::FiltEnv => bark_l,
+            };
+            self.eff[r.target] += r.depth * src;
+        }
+        for i in 0..p::COUNT {
+            if discrete_max(i).is_none() {
+                self.eff[i] = clamp01(self.eff[i]);
+            }
+        }
+        let s = self.eff;
         self.amp_c = AdsrCoefs::new(
             &AdsrTimes { a: sq_map(s[p::ATK], 0.001, 4.0), d: sq_map(s[p::DEC], 0.05, 10.0), s: s[p::SUS], r: sq_map(s[p::REL], 0.02, 6.0) },
             fs,
@@ -226,14 +300,30 @@ impl Device for Quartz {
         self.params.get(index).copied().unwrap_or(0.0)
     }
     fn effective(&self) -> &[f32] {
-        &self.params
+        &self.eff
     }
-    fn set_route(&mut self, _slot: usize, _src: ModSource, _target: usize, _depth: f32) -> Result<(), RouteError> {
-        Err(RouteError::NotAllowed)
+    fn set_route(&mut self, slot: usize, src: ModSource, target: usize, depth: f32) -> Result<(), RouteError> {
+        if slot >= MAX_ROUTES {
+            return Err(RouteError::NoSlot);
+        }
+        if !route_allowed(src, target) {
+            return Err(RouteError::NotAllowed);
+        }
+        self.routes[slot] = Some(Route { src, target, depth: depth.clamp(-1.0, 1.0) });
+        Ok(())
     }
-    fn clear_route(&mut self, _slot: usize) {}
-    fn mod_source_value(&self, _src: ModSource) -> f32 {
-        0.0
+    fn clear_route(&mut self, slot: usize) {
+        if slot < MAX_ROUTES {
+            self.routes[slot] = None;
+        }
+    }
+    fn mod_source_value(&self, src: ModSource) -> f32 {
+        let (a, b) = self.env_levels();
+        match src {
+            ModSource::Lfo => self.lfo_out,
+            ModSource::AmpEnv => a,
+            ModSource::FiltEnv => b,
+        }
     }
     fn note_on(&mut self, note: u8, velocity: f32) {
         if velocity <= 0.0 {
@@ -256,6 +346,7 @@ impl Device for Quartz {
         v.live = true;
         v.age = self.clock;
         v.amp.gate_on();
+        self.last = i;
         self.ctl_n = 0;
     }
     fn note_off(&mut self, note: u8) {
@@ -278,18 +369,21 @@ impl Device for Quartz {
             self.sm[i] = if discrete_max(i).is_some() { self.params[i] } else { self.sm[i] + (self.params[i] - self.sm[i]) * k };
         }
         self.primed = true;
-        let s = self.sm;
         let w = [self.params[p::W1] as u32, self.params[p::W2] as u32];
-        let lv = [s[p::LVL1] * s[p::LVL1], s[p::LVL2] * s[p::LVL2]];
-        let rk = 2.0 * (1.0 - 0.95 * s[p::RES]);
-        let drive = 1.0 + s[p::DRIVE] * s[p::DRIVE] * 6.0;
-        // level-matched: more Drive, more grit, about the same loudness
-        let gain = s[p::LVL] * s[p::LVL] * 0.5 / libm::sqrtf(drive);
-        let trate = exp_map(s[p::TRATE], 0.5, 9.0) / fs;
-        let tdepth = s[p::TREM] * 0.9;
+        let (mut lv, mut rk, mut drive, mut gain, mut trate, mut tdepth) = ([0.0f32; 2], 2.0f32, 1.0f32, 0.0f32, 0.0f32, 0.0f32);
+        // the per-period values below are worked out at the first sample of every block
+        self.ctl_n = 0;
         for i in 0..n {
             if self.ctl_n == 0 {
                 self.control();
+                let s = &self.eff;
+                lv = [s[p::LVL1] * s[p::LVL1], s[p::LVL2] * s[p::LVL2]];
+                rk = 2.0 * (1.0 - 0.95 * s[p::RES]);
+                drive = 1.0 + s[p::DRIVE] * s[p::DRIVE] * 6.0;
+                // level-matched: more Drive, more grit, about the same loudness
+                gain = s[p::LVL] * s[p::LVL] * 0.5 / libm::sqrtf(drive);
+                trate = exp_map(s[p::TRATE], 0.5, 9.0) / fs;
+                tdepth = s[p::TREM] * 0.9;
             }
             self.ctl_n = (self.ctl_n + 1) % CTL;
             let mut out = 0.0f32;

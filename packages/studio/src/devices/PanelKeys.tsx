@@ -39,9 +39,9 @@ export function PanelKeys({ host, slot, octave = 3 }: { host?: DeviceHost; slot:
     <div className="fwm-perf">
       <div className="fwm-oct">
         <span className="fwm-silk">Octave</span>
-        <P.Button variant="hw" label="Octave down" onPress={() => setOct((o) => Math.max(0, o - 1))}>−</P.Button>
-        <P.Screen variant="readout">C{oct}</P.Screen>
         <P.Button variant="hw" label="Octave up" onPress={() => setOct((o) => Math.min(6, o + 1))}>+</P.Button>
+        <P.Screen variant="readout">C{oct}</P.Screen>
+        <P.Button variant="hw" label="Octave down" onPress={() => setOct((o) => Math.max(0, o - 1))}>−</P.Button>
       </div>
       <P.Keys low={low} high={low + 24} held={held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} scale={scale} />
     </div>
