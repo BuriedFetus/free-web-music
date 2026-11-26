@@ -62,10 +62,15 @@ describe('<Studio>', () => {
     fireEvent.focus(name);
     fireEvent.change(name, { target: { value: 'Drop' } });
     fireEvent.blur(name);
-    fireEvent.click(within(roll).getByRole('button', { name: '2 bars' }));
+    fireEvent.change(within(roll).getByRole('combobox', { name: 'Length presets (bars)' }), { target: { value: '2' } });
     expect(p.patternInfo(a, p.cell(r2, a))).toMatchObject({ name: 'Drop', len: 32 });
     expect(screen.getByRole('button', { name: 'TRACK 2, Basalt: Drop' })).toBeTruthy();
     expect(screen.getByRole('button', { name: 'TRACK 2, 2 bars' })).toBeTruthy();
+    // the length can be typed, in bars
+    const lenIn = within(roll).getByRole('textbox', { name: 'Pattern length in bars' });
+    fireEvent.change(lenIn, { target: { value: '1.5' } });
+    fireEvent.blur(lenIn);
+    expect(screen.getByRole('button', { name: /TRACK 2, 1\.5 bars|TRACK 2, 24 steps|TRACK 2, 1 bar 8/ })).toBeTruthy();
     // Basalt 2 is silent in TRACK 2 until a pattern is picked for it; patterns are per instrument.
     expect(p.cell(r2, b)).toBeNull();
     fireEvent.click(screen.getByRole('button', { name: 'TRACK 2, Basalt 2: silent' }));

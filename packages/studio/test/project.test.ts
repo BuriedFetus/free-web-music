@@ -126,6 +126,25 @@ describe('Project (shared)', () => {
     expect(you.automation(id, P, 'cut')[3]).toBe(0.7);
   });
 
+  it('duplicate: twice as long, notes and automation repeated, one undo step, never past the max', () => {
+    const [you] = pair();
+    const id = you.addTrack(m);
+    const P = you.patternList(id)[0].id;
+    you.setPatternLen(id, P, 16);
+    you.addNote(id, P, { s: 2, l: 1, m: 40, v: 0.8 });
+    you.addNote(id, P, { s: 20, l: 1, m: 41, v: 0.8 }); // past the end: silent, not copied
+    you.setAutomation(id, P, 'cut', 3, 0.5);
+    expect(you.duplicatePattern(id, P)).toBe(true);
+    expect(you.patternInfo(id, P)!.len).toBe(32);
+    expect(you.notes(id, P).map(([, n]) => n.s).sort((a, b) => a - b)).toEqual([2, 18, 20]);
+    expect(you.automation(id, P, 'cut')[19]).toBe(0.5);
+    you.undo();
+    expect(you.patternInfo(id, P)!.len).toBe(16);
+    expect(you.notes(id, P).length).toBe(2);
+    you.setPatternLen(id, P, 300);
+    expect(you.duplicatePattern(id, P)).toBe(false);
+  });
+
   it('notes keep micro-timing and are clamped to the pattern', () => {
     const [you] = pair();
     const id = you.addTrack(m);

@@ -280,13 +280,16 @@ export function RollView({ peers }: { peers: Peer[] }) {
         <span className="fwm-lenbox" role="group" aria-label="Pattern length">
           Length
           <button type="button" className="fwm-tb fwm-tb--xs" aria-label="One step shorter" disabled={L <= 1} onClick={() => lenBtn(L - 1)}>−</button>
-          <span className="fwm-lcdt fwm-lcdt--sm" aria-label="Pattern length">{lenLabel(L)}</span>
+          <LenInput key={`${pat}:${L}`} steps={L} onCommit={lenBtn} />
+          <select className="fwm-lensel" aria-label="Length presets (bars)" title={lenLabel(L)}
+            value={L % BAR === 0 && [1, 2, 4, 8, 16, 32].includes(L / BAR) ? String(L / BAR) : ''}
+            onChange={(e) => e.target.value && lenBtn(Number(e.target.value) * BAR)}>
+            <option value="" disabled>{L === BAR ? 'bar' : 'bars'}</option>
+            {[1, 2, 4, 8, 16, 32].map((b) => (
+              <option key={b} value={b}>{b} bar{b > 1 ? 's' : ''}</option>
+            ))}
+          </select>
           <button type="button" className="fwm-tb fwm-tb--xs" aria-label="One step longer" disabled={L >= MAX_LEN} onClick={() => lenBtn(L + 1)}>+</button>
-          {[1, 2, 4, 8, 16, 32].map((b) => (
-            <button key={b} type="button" className="fwm-tb fwm-tb--xs" aria-pressed={L === b * BAR} onClick={() => lenBtn(b * BAR)}>
-              {b} bar{b > 1 ? 's' : ''}
-            </button>
-          ))}
         </span>
         <span className="fwm-grp" role="group" aria-label={`${t.name} direction`}>
           {DIRS.map(([d, icon, label]) => (
@@ -322,7 +325,14 @@ export function RollView({ peers }: { peers: Peer[] }) {
         <button type="button" className="fwm-tb fwm-tb--xs" disabled={!q} onClick={() => project.quantize(t.id, pat, q)}>
           Quantize notes to {ws.snap}
         </button>
-        <button type="button" className="fwm-tb fwm-tb--xs"
+        <button type="button" className="fwm-tb fwm-tb--xs fwm-tb--ok" disabled={L * 2 > MAX_LEN}
+          title={L * 2 > MAX_LEN ? 'Already longer than half the longest pattern (32 bars)' : `Twice as long: ${lenLabel(L)} → ${lenLabel(L * 2)}, the notes and automation repeated`}
+          onClick={() => {
+            if (project.duplicatePattern(t.id, pat)) st.toast(`Duplicated ${info.name}: now ${lenLabel(L * 2)}`, { label: 'Undo', run: () => project.undo() });
+          }}>
+          Duplicate pattern
+        </button>
+        <button type="button" className="fwm-tb fwm-tb--xs fwm-tb--danger"
           onClick={() => {
             project.clearPattern(t.id, pat);
             st.toast(`Cleared ${t.name} · ${info.name}`, { label: 'Undo', run: () => project.undo() });
@@ -423,5 +433,31 @@ export function RollView({ peers }: { peers: Peer[] }) {
         Alt-drag or right-drag erases automation · with Rec + Play, knob moves are recorded here.
       </p>
     </div>
+  );
+}
+
+/** Pattern length, typed in bars (1.5 = a bar and a half; steps are 1/16 of a bar). Enter or leaving the
+ *  field applies it; Escape puts it back. */
+function LenInput({ steps, onCommit }: { steps: number; onCommit(steps: number): void }) {
+  const shown = String(Math.round((steps / BAR) * 1000) / 1000);
+  const [v, setV] = useState(shown);
+  const commit = () => {
+    const bars = Number(v.replace(',', '.'));
+    if (!Number.isFinite(bars) || bars <= 0) return setV(shown);
+    const n = Math.max(1, Math.min(MAX_LEN, Math.round(bars * BAR)));
+    if (n !== steps) onCommit(n);
+    else setV(shown);
+  };
+  return (
+    <input className="fwm-lenin" inputMode="decimal" aria-label="Pattern length in bars" value={v} size={4}
+      title="Length in bars (1.5 = a bar and a half; up to 32)"
+      onChange={(e) => setV(e.target.value)} onBlur={commit}
+      onKeyDown={(e) => {
+        if (e.key === 'Enter') (e.target as HTMLInputElement).blur();
+        else if (e.key === 'Escape') {
+          setV(shown);
+          (e.target as HTMLInputElement).blur();
+        }
+      }} />
   );
 }

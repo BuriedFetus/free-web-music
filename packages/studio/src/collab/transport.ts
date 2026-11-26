@@ -130,11 +130,14 @@ export class TransportSync {
 
   // ---- my actions ----
   /** Play from TRACK `row`, for everyone (or only me when alone / nobody else is here). */
-  play(row: string) {
+  /** Start `row`. With `since`, the song's step 0 is that moment (page ms, in the past): it starts already
+   *  that far in, so a note played at `since` sits on step 0 even after the head start everyone needs. */
+  play(row: string, since?: { t0: number; stepsPerMs: number }) {
     const at = this.now() + this.lead();
-    this.anchor = { row, pos: 0, at };
-    this.target?.play(row, 0, at);
-    this.mine('play', { playing: true, row, pos: 0, time: at });
+    const pos = since ? Math.max(0, (at - since.t0) * since.stepsPerMs) : 0;
+    this.anchor = { row, pos, at };
+    this.target?.play(row, pos, at);
+    this.mine('play', { playing: true, row, pos, time: at });
   }
   stop() {
     this.anchor = null;

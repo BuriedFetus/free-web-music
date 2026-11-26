@@ -28,6 +28,8 @@
   --fwm-rec: #ff3b4a;
   --fwm-on-note: #032033;   /* text on a --fwm-note fill */
   --fwm-on-rec: #ffffff;    /* text on a --fwm-rec fill */
+  --fwm-ok: #2fbf71;        /* go / add actions (Duplicate) */
+  --fwm-on-ok: #ffffff;     /* text on a --fwm-ok fill */
   --fwm-roll-key: #e9eef7;  /* piano-roll white key */
   --fwm-roll-keyb: #25324a; /* piano-roll black key */
   --fwm-roll-keyink: #333;  /* label on a white key */

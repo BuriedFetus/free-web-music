@@ -1398,13 +1398,17 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
       await sleep(100);
       ok((btn('● Rec')?.textContent ?? '').includes('waiting'), 'Rec armed while stopped: waiting');
       await sleep(500);
+      const tA = performance.now();
       await tap('a');
       await sleep(600);
       const playingNow = !!btn('■ Stop');
+      const gap = performance.now() - tA;
       await tap('s');
       await sleep(100);
       const ws2 = p.notes(tid, pat).map(([, n]) => n.s).sort((x, y) => x - y);
       ok(playingNow && ws2.length === 2 && ws2[0] < 0.5 && ws2[1] > 1, `the first note started the song at step 0 (notes at ${ws2.map((x) => x.toFixed(2)).join(', ')})`);
+      // in time: the second note was played ~660 ms after the first = ~10.6 steps at 240 BPM (the head start must not shift it)
+      ok(Math.abs(ws2[1] - gap * 16 / 1000) <= 1.01, `the second note is in time with the first (${ws2[1]} steps for ${gap.toFixed(0)} ms)`);
       btn('■ Stop')?.click();
       btn('● Rec')!.click();
       p.setBpm(120);

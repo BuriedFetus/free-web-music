@@ -711,6 +711,25 @@ export class Project {
       a?.clear();
     });
   }
+  /** Duplicate: the pattern plays twice as long, its notes and automation copied into the new half.
+   *  False when twice as long would pass MAX_LEN. One undo step. */
+  duplicatePattern(track: string, pat: string): boolean {
+    const p = this.patMap(track, pat);
+    const m = this.notesMap(track, pat);
+    const a = this.autoMap(track, pat);
+    const len = this.patternInfo(track, pat)?.len;
+    if (!p || !m || len == null || len * 2 > MAX_LEN) return false;
+    this.action(() => {
+      for (const n of [...m.values()]) if (n.s < len) m.set(uid('n'), clampNote({ ...n, s: n.s + len }));
+      if (a)
+        for (const [k, v] of [...a.entries()]) {
+          const [param, step] = k.split('@');
+          if (Number(step) < len) a.set(`${param}@${Number(step) + len}`, v);
+        }
+      p.set('len', clampLen(len * 2));
+    });
+    return true;
+  }
   /** Snap starts and lengths of all notes to a grid (in steps; 0 = leave as is). */
   quantize(track: string, pat: string, grid: number) {
     const m = this.notesMap(track, pat);

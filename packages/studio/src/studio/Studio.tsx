@@ -206,11 +206,11 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   }, []);
   // Play starts from the selected TRACK.
   const setPlaying = useCallback(
-    (p: boolean) => {
+    (p: boolean, since?: { t0: number; stepsPerMs: number }) => {
       if (p && status !== 'on') void start();
       if (p) {
         const row = selRowRef.current ?? rowsRef.current[0]?.id;
-        if (row) sync.play(row);
+        if (row) sync.play(row, since);
       } else sync.stop();
     },
     [status, start, sync],
@@ -276,7 +276,8 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
           } else if (recMode === 'replace') project.clearPattern(track.id, tp);
           take = { pat: tp, startPos: NaN, startFree: 0, startMs: now };
           recTake.current.set(track.id, take);
-          setPlaying(true);
+          // the song's step 0 is this note (it starts that far in after the head start, so later notes stay in time)
+          setPlaying(true, { t0: now, stepsPerMs: (project.bpm / 60) * 4 / 1000 });
         }
         const free = wallSteps(now - take.startMs);
         const s0 = Math.min(MAX_LEN - 0.01, q0 ? Math.round(free / q0) * q0 : free);
