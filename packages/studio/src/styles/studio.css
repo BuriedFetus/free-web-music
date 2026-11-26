@@ -121,7 +121,7 @@
 .fwm-perf { display: flex; gap: 10px; margin-top: 12px; align-items: stretch; }
 .fwm-oct { display: flex; flex-direction: column; gap: 6px; align-items: center; justify-content: center; padding: 0 4px; }
 .fwm-oct .fwm-lcd { font-size: 22px; padding: 4px 8px; }
-.fwm-keys { flex: 1; position: relative; height: 118px; display: flex; border-radius: calc(8px * var(--fwm-round)); overflow: hidden; background: var(--dev-keybed); padding: 3px; gap: 3px; touch-action: none; user-select: none; }
+.fwm-keys { flex: 1; position: relative; height: 180px; display: flex; border-radius: calc(8px * var(--fwm-round)); overflow: hidden; background: var(--dev-keybed); padding: 3px; gap: 3px; touch-action: none; user-select: none; }
 .fwm-keys__w { flex: 1; background: linear-gradient(var(--dev-keyhi), var(--dev-key)); border-radius: 0 0 6px 6px; position: relative; cursor: pointer; box-shadow: inset 0 -6px 0 rgba(0,0,0,.08); }
 .fwm-keys__w.is-on { background: linear-gradient(var(--dev-key), color-mix(in srgb, var(--dev-acc) 45%, var(--dev-key))); }
 .fwm-keys__w.is-out, .fwm-keys__b.is-out { opacity: .38; }
@@ -132,7 +132,7 @@
 .fwm-keys__w.is-peer, .fwm-keys__b.is-peer { box-shadow: inset 0 0 0 3px var(--fwm-who, var(--fwm-peer)); }
 
 @media (max-width: 1000px) { .fwm-secs { grid-template-columns: repeat(2, minmax(0, 1fr)); } }
-@media (max-width: 600px) { .fwm-secs { grid-template-columns: 1fr; } .fwm-preset { margin-left: 0; } .fwm-keys { height: 96px; } .fwm-plate b { font-size: 32px; } }
+@media (max-width: 600px) { .fwm-secs { grid-template-columns: 1fr; } .fwm-preset { margin-left: 0; } .fwm-keys { height: 140px; } .fwm-plate b { font-size: 32px; } }
 @media (prefers-reduced-motion: reduce) { .fwm-root * { transition: none !important; } }
 
 /* ---- Flint (drum machine) ---- */
