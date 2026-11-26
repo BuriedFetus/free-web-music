@@ -22,7 +22,8 @@
     { "id": "slide",   "label": "Slide",     "section": "play", "type": "float", "default": 0,    "unit": "ms", "map": "sq0", "min": 4, "max": 304 },
     { "id": "mute",    "label": "Palm mute", "section": "play", "type": "enum", "options": ["Off", "On"], "default": 0 },
     { "id": "ring",    "label": "Ring",      "section": "play", "type": "float", "default": 0.5,  "unit": "%",  "map": "lin", "min": 0, "max": 100 },
-    { "id": "dist",    "label": "Distortion","section": "amp",  "type": "float", "default": 0,    "unit": "%",  "map": "lin", "min": 0, "max": 100 }
+    { "id": "dist",    "label": "Distortion","section": "amp",  "type": "float", "default": 0,    "unit": "%",  "map": "lin", "min": 0, "max": 100 },
+    { "id": "wham",    "label": "Whammy",    "section": "play", "type": "float", "default": 0.5,  "unit": "st", "map": "lin", "min": -1, "max": 1 }
   ],
   "modSources": [],
   "notes": {
@@ -30,6 +31,7 @@
     "strings": "Standard tuning E A D G B E. A note ringing on a string is re-plucked there; otherwise the highest free string that can play it (frets 0-19) takes it, so a strum sent low to high lands on the strings a guitarist would use.",
     "ring": "How long a string keeps sounding after its note ends: 0 = damped at once (about 50 ms), 100% = rings out by Sustain.",
     "slide": "Off by default. When on, a legato note within an octave glides the held string instead of plucking another (for lead lines).",
+    "whammy": "A spring-loaded bar: 0.5 = rest; 0 dives 7 semitones, 1 raises 2 (the studio's ribbon springs back to 0.5 when let go). Held notes sustain much longer than released ones (up to ~8x Sustain at full).",
     "strum": "Used by the studio's neck (the gap between strings in a strum); the engine ignores it."
   }
 }

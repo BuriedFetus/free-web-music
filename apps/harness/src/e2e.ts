@@ -1118,6 +1118,16 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
     await sleep(100);
     ok(mineDots === 1 && ringing >= 1 && !$('.fwm-garnet__neck .is-mine'), `a computer key shows its place on the neck and rings the string (${mineDots}, ${ringing})`);
+    // whammy ribbon: drag to the left end dives, letting go springs back to rest
+    const rib = $('.fwm-garnet [role=slider][aria-label="Whammy"]')!;
+    const rr = rib.getBoundingClientRect();
+    const gslot = Number(Object.keys(engineRef.current!.last!.devices)[0]);
+    rib.dispatchEvent(new PointerEvent('pointerdown', { bubbles: true, clientX: rr.left + 1, clientY: rr.top + 5, pointerId: 7, buttons: 1 }));
+    await until('whammy dives in the engine', () => engineRef.current!.last!.devices[gslot].eff[17] < 0.05, 2000);
+    ok(true, 'whammy: pressing the left end dives (engine value ~0)');
+    rib.dispatchEvent(new PointerEvent('pointerup', { bubbles: true, clientX: rr.left + 1, clientY: rr.top + 5, pointerId: 7 }));
+    await until('whammy springs back', () => engineRef.current!.last!.devices[gslot].eff[17] === 0.5, 2000);
+    ok(true, 'whammy: letting go springs back to rest');
   } catch (e) {
     out.push(`FAIL garnet: ${String(e)}`);
   }

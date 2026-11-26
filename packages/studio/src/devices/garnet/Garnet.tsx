@@ -253,6 +253,7 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
         )}
         <P.Button variant="hw" label="Palm mute" pressed={state.params.mute >= 0.5} presence={host?.presenceFor('mute')}
           onPress={() => set('mute', state.params.mute >= 0.5 ? 0 : 1)}>Palm mute</P.Button>
+        <Whammy value={state.params.wham ?? 0.5} set={(v) => set('wham', v)} host={host} />
       </div>
 
       <Neck mode={view.mode} lock={view.lock} songKey={key} chords={chords} peerNotes={peerNotes} mine={mine} strings={strings}
@@ -447,6 +448,53 @@ function Neck({ mode, lock, songKey, chords, peerNotes, mine, strings, onPluck, 
               style={{ top: `${((5 - s + 0.5) / 6) * 100}%`, '--th': `${(3.8 - s * 0.5).toFixed(1)}px` } as CSSProperties} />
           ))}
         </div>
+      </div>
+    </div>
+  );
+}
+
+/** Whammy ribbon: press and drag (left dives up to 7 semitones, right raises up to 2); let go and it
+ *  springs back to rest, like a mod wheel. Arrow keys nudge it; it returns on key up. */
+function Whammy({ value, set, host }: { value: number; set(v: number): void; host?: DeviceHost }) {
+  const ref = useRef<HTMLDivElement>(null);
+  const [down, setDown] = useState(false);
+  const at = (x: number) => {
+    const r = ref.current!.getBoundingClientRect();
+    return Math.min(1, Math.max(0, (x - r.left) / r.width));
+  };
+  const release = () => {
+    setDown(false);
+    set(0.5);
+    host?.touch(null);
+  };
+  const st = value < 0.5 ? -(0.5 - value) * 14 : (value - 0.5) * 4;
+  return (
+    <div className="fwm-whammy">
+      <span className="fwm-silk">Whammy</span>
+      <div ref={ref} className={'fwm-whammy__rib' + (down ? ' is-down' : '')} role="slider" tabIndex={0} aria-label="Whammy"
+        aria-valuemin={-7} aria-valuemax={2} aria-valuenow={Math.round(st * 10) / 10} aria-valuetext={`${st >= 0 ? '+' : ''}${st.toFixed(1)} semitones`}
+        onPointerDown={(e) => {
+          try {
+            e.currentTarget.setPointerCapture(e.pointerId);
+          } catch {
+            /* synthetic events */
+          }
+          setDown(true);
+          host?.touch('wham');
+          set(at(e.clientX));
+        }}
+        onPointerMove={(e) => down && set(at(e.clientX))}
+        onPointerUp={release} onPointerCancel={release}
+        onKeyDown={(e) => {
+          if (e.key === 'ArrowLeft' || e.key === 'ArrowDown') set(Math.max(0, value - 0.1));
+          else if (e.key === 'ArrowRight' || e.key === 'ArrowUp') set(Math.min(1, value + 0.1));
+          else return;
+          e.preventDefault();
+        }}
+        onKeyUp={(e) => e.key.startsWith('Arrow') && set(0.5)}>
+        <i className="fwm-whammy__zero" />
+        <b className="fwm-whammy__thumb" style={{ left: `${value * 100}%` }} />
+        <small>{Math.abs(st) < 0.05 ? '0' : `${st > 0 ? '+' : ''}${st.toFixed(1)}`}</small>
       </div>
     </div>
   );

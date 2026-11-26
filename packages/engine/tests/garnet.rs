@@ -320,3 +320,37 @@ fn distortion_keeps_notes_in_tune() {
         }
     }
 }
+
+#[test]
+fn a_held_note_keeps_ringing_and_the_whammy_bends() {
+    let fs = 48_000.0;
+    let level_after = |hold: bool| {
+        let mut g = garnet(fs);
+        g.set_param(p::SUSTAIN, 1.0);
+        g.note_on(52, 1.0);
+        if !hold {
+            g.set_param(p::RING, 1.0);
+            g.note_off(52);
+        }
+        let (a, _) = render(&mut g, (fs * 6.0) as usize);
+        println!("first 0.1 s: {:.4}", rms(&a[..4800]));
+        let (l, _) = render(&mut g, 4800);
+        rms(&l)
+    };
+    let (held, let_go) = (level_after(true), level_after(false));
+    println!("6 s in: held {held:.4}, released {let_go:.4}");
+    assert!(held > let_go * 1.5 && held > 0.01, "held notes sustain");
+    // whammy: full dive = 7 semitones down
+    let mut g = garnet(fs);
+    for (i, v) in [(p::DRIVE, 0.0), (p::CAB, 0.0), (p::BODY, 3.0), (p::DIST, 0.0)] {
+        g.set_param(i, v);
+    }
+    g.note_on(57, 1.0);
+    g.set_param(p::WHAM, 0.0);
+    let (l, _) = render(&mut g, (fs * 0.6) as usize);
+    let f = pitch(&l[(fs * 0.2) as usize..], fs);
+    let want = hz(57) * 2f32.powf(-7.0 / 12.0);
+    let cents = 1200.0 * (f / want).log2();
+    println!("whammy dive: {f:.1} Hz vs {want:.1} ({cents:+.1} ct)");
+    assert!(cents.abs() < 15.0);
+}

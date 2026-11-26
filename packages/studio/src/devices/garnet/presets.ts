@@ -23,5 +23,6 @@ export const GARNET_FORMAT: Record<string, (v: number) => string> = {
   strum: (v) => Math.round(6 + v * v * 60) + ' ms',
   slide: (v) => (v <= 0 ? 'Off' : Math.round((0.004 + v * v * 0.3) * 1000) + ' ms'),
   ring: (v) => (v < 0.05 ? 'Damped' : v > 0.95 ? 'Let ring' : Math.round(v * 100) + '%'),
+  wham: (v) => { const st = v < 0.5 ? -(0.5 - v) * 14 : (v - 0.5) * 4; return (st >= 0 ? '+' : '') + st.toFixed(1) + ' st'; },
   dist: (v) => (v <= 0.005 ? 'Off' : `${v < 0.34 ? 'Warm' : v < 0.67 ? 'Crunch' : 'Metal'} ${Math.round(v * 100)}%`),
 };

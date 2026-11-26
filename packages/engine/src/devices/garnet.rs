@@ -50,16 +50,17 @@ pub mod p {
     pub const MUTE: usize = 14;
     pub const RING: usize = 15;
     pub const DIST: usize = 16;
-    pub const COUNT: usize = 17;
+    pub const WHAM: usize = 17;
+    pub const COUNT: usize = 18;
 }
 
 /// Parameter ids, in index order (they match `devices/garnet.json`).
 pub const IDS: [&str; p::COUNT] =
-    ["pick", "hard", "sustain", "bright", "body", "reso", "tone", "drive", "cab", "pres", "lvl", "strum", "vib", "slide", "mute", "ring", "dist"];
+    ["pick", "hard", "sustain", "bright", "body", "reso", "tone", "drive", "cab", "pres", "lvl", "strum", "vib", "slide", "mute", "ring", "dist", "wham"];
 
 /// "Clean Electric".
 pub fn defaults() -> [f32; p::COUNT] {
-    [0.2, 0.6, 0.55, 0.6, 3.0, 0.6, 0.55, 0.12, 1.0, 0.55, 0.75, 0.35, 0.0, 0.0, 0.0, 0.5, 0.0]
+    [0.2, 0.6, 0.55, 0.6, 3.0, 0.6, 0.55, 0.12, 1.0, 0.55, 0.75, 0.35, 0.0, 0.0, 0.0, 0.5, 0.0, 0.5]
 }
 
 fn discrete_max(i: usize) -> Option<f32> {
@@ -69,6 +70,12 @@ fn discrete_max(i: usize) -> Option<f32> {
         p::MUTE => Some(1.0),
         _ => None,
     }
+}
+
+/// Whammy bar → loop length multiplier. 0.5 = rest; down to 0 dives 7 semitones, up to 1 raises 2.
+pub fn whammy_ratio(v: f32) -> f32 {
+    let st = if v < 0.5 { -(0.5 - v) * 14.0 } else { (v - 0.5) * 4.0 };
+    powf(2.0, -st / 12.0)
 }
 
 /// Seconds a string rings at full Sustain for a note of `hz` (lower notes ring longer).
@@ -148,6 +155,8 @@ pub struct Garnet {
     rng: Rng,
     clock: u32,
     phase: f32,
+    /// Whammy: loop length multiplier now (1 = at rest).
+    wham: f32,
     dc: [f32; 4],
     hp: [Biquad; 2],
     bells: [[Biquad; 3]; 2],
@@ -193,6 +202,7 @@ impl Garnet {
             rng: Rng::new(0x6A_12E7),
             clock: 0,
             phase: 0.0,
+            wham: 1.0,
             dc: [0.0; 4],
             hp: [Biquad::new(); 2],
             bells: [[Biquad::new(); 3]; 2],
@@ -287,14 +297,21 @@ impl Garnet {
         let (fs, sus, bright, ring) = (self.fs, self.params[p::SUSTAIN], self.params[p::BRIGHT], self.params[p::RING]);
         let hz = fs / st.per;
         let full = sustain_seconds(sus, hz);
-        let mut t = if st.muted { 0.14 } else { full };
+        // a held note keeps ringing (an electric guitar sustains as long as it's held): much less loss while
+        // held, up to ~16× Sustain at full; the release (Ring) shapes the tail after
+        let mut t = if st.muted { 0.14 } else if st.held { full * (1.0 + 15.0 * sus * sus) } else { full };
         if st.released {
             t = t.min(0.05 + ring * ring * full);
         }
         if st.kill {
             t = 0.02;
         }
-        let c = if st.muted { 0.22 + bright * 0.2 } else { 0.2 + bright * 0.78 };
+        let mut c = if st.muted { 0.22 + bright * 0.2 } else { 0.2 + bright * 0.78 };
+        // held: the loop's tone filter takes almost nothing from the note (the string sings on, like a guitar
+        // into a hot amp); it darkens again when the note is let go
+        if st.held && !st.muted && !st.kill {
+            c += (1.0 - c) * 0.9 * sus;
+        }
         let pan = (i as f32 - 2.5) * 0.12;
         let a = (pan + 1.0) * core::f32::consts::FRAC_PI_4;
         Coef { g: powf(10.0, -3.0 * st.per / (fs * t)), c, comp: (1.0 - c) / c, gl: libm::cosf(a), gr: sinf(a) }
@@ -430,12 +447,16 @@ impl Device for Garnet {
         let zc = 1.0 - expf(-TAU * 6500.0 / (4.0 * fs));
         let lvl = self.sm[4] * self.sm[4] * 1.6;
         let quiet_after = (0.2 * fs) as usize;
+        // whammy: the loop length follows the bar (glides over ~12 ms, so a drag never clicks)
+        let wham_k = 1.0 - expf(-1.0 / (fs * 0.012));
+        let wham_to = whammy_ratio(self.params[p::WHAM]);
         for k in 0..n {
             self.phase += dphase;
             if self.phase >= 1.0 {
                 self.phase -= 1.0;
             }
-            let wob = 1.0 + vib * sinf(TAU * self.phase);
+            self.wham += (wham_to - self.wham) * wham_k;
+            let wob = (1.0 + vib * sinf(TAU * self.phase)) * self.wham;
             let (mut l, mut r) = (0.0, 0.0);
             for (i, st) in self.strs.iter_mut().enumerate() {
                 if !st.live {
@@ -444,7 +465,7 @@ impl Device for Garnet {
                 let c = &co[i];
                 let b = &mut self.mem[i * N..(i + 1) * N];
                 st.per += (st.tper - st.per) * gl;
-                let pos = (st.w + N) as f32 - (st.per * wob - c.comp);
+                let pos = (st.w + N) as f32 - ((st.per * wob).min((N - 8) as f32) - c.comp);
                 let i0 = pos as usize;
                 let fr = pos - i0 as f32;
                 let a = b[i0 & M];
