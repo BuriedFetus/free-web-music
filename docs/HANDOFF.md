@@ -1,13 +1,16 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-25, end of day): Opal approved + modulation; Quartz built; SEND knobs
-- **Opal** approved by the user ("perfect"), now with Basalt-style modulation (Assign LFO / Amp env / Swell env, then click a knob).
-- **Quartz** FM keys built and tested (`tests/quartz.rs`, `?e2e=quartz`, harness `?quartz`): waiting for the user's ears.
-- **SEND knobs** (Reverb / Delay) on every instrument's header = the Mixer strip's sends, both ways (`devices/Sends.tsx`, `DeviceHost.sends`).
-- **Play in key** (2026-11-26): with a song Key, computer keys play only scale notes (A = root, home row walks the scale, Q row an octave up); on-screen keys dim off-key notes and snap them.
-- **Geode** (beginner "grow a sound") planned in PLAN.md, draft mock-up `design/kit/geode.html` not reviewed.
-- The user is low on weekly budget: keep turns lean. Next: Quartz feedback (maybe modulation like Opal's), then Geode.
-- Device kit artifacts are stale (Opal's skin is now pearl; Quartz's panel is new): republish when the user asks.
+## START HERE (2026-11-26): instruments polished, recording takes, piano roll length
+Done today (all tested, pushed):
+- **Play in key**: with a song Key, computer keys play only scale notes (A = root, home row walks the scale, Q row an octave up); on-screen keys dim off-key notes and snap them. Computer keys light the panel's keys while held (`DeviceHost.myHeld`).
+- **On-screen keys** (taller, 180 px) with octave buttons on Opal and Quartz too (`devices/PanelKeys.tsx`); octave + on top, − below.
+- **Quartz** got Opal's modulation (shared `devices/ModRow.tsx`). Opal / Quartz approved-ish; Quartz still waits for the user's ears.
+- **Garnet**: held notes sustain (less loop loss while held); **Whammy ribbon** (param `wham`, springs back); computer keys light the note on the neck and ring its string; **chord guide** in Notes mode (root light blue, 2nd light red, 3rd light green, next chord purple, Roman numerals inside each note; notes are rectangles ≥ half a fret wide; legend above the neck). Rules in `garnet/music.ts` (`guideStep`, `guideRoles`, `chordLabel`), colours = tokens `--dev-guide-*`.
+- **Recording**: Shift+Space arms Rec and waits for the first note (it starts the song at step 0; the transport starts already that far in, `TransportSync.play(row, since)`, so later notes stay in time); clicking Rec arms and starts the song; right-click Rec = replace (the first note clears the pattern). A take runs past the loop: the pattern grows a bar ahead of the playhead, up to **MAX_LEN = 512 steps (128 beats)**, then wraps and overdubs (`recTake` in `Studio.tsx`).
+- **Piano roll**: length typed in bars + "bar ▾" presets dropdown; **Duplicate pattern** (green, doubles length + repeats notes/automation) and **Clear pattern** (red). New app token `--fwm-ok`.
+- Browser test roles cover all of it (`?e2e=opal` has the recording checks, `?e2e=garnet` the guide / whammy / neck lights).
+Open: Quartz listening review; Geode (planned in PLAN.md, draft mock-up `design/kit/geode.html`); device kit artifacts are stale (Opal pearl skin, Quartz, new tokens). The user is often low on weekly budget: keep turns lean.
+Screenshot trick for state after an e2e run: serve `apps/harness` with the scratch `srv.py` (has `/slow`) on another port and frame `dist/index.html?e2e=…` in a page whose chained `/slow` images delay the load event (~18 s), scrolling the iframe to the element first.
 
 ### Earlier today: Opal built
 ### Before that: Garnet + My look + arrangement drag and drop
