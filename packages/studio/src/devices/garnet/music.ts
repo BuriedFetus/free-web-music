@@ -106,6 +106,17 @@ export function triadOf(pc: number, key: SongKey): number[] {
   return [pc, pc + 4, pc + 7].map((x) => ((x % 12) + 12) % 12);
 }
 
+const CHROM_RN = ['I', '♭II', 'II', '♭III', 'III', 'IV', '♯IV', 'V', '♭VI', 'VI', '♭VII', 'VII'];
+/** The chord on `pc` named for a progression: Roman numeral (its degree in the key; lower case = minor)
+ *  and chord name. Off the key: the major chord, numbered by its distance from the key's root (♭VI…). */
+export function chordLabel(pc: number, key: SongKey): { roman: string; name: string } {
+  const k = neckKey(key);
+  pc = ((pc % 12) + 12) % 12;
+  const c = inScale(pc, k) ? chordsOfKey(k, 'triad').find((ch) => ch.root === pc) : undefined;
+  if (c) return { roman: c.roman, name: c.name };
+  return { roman: CHROM_RN[(pc - k.root + 12) % 12], name: noteName(pc, k) };
+}
+
 /** A note was pressed: the first note (or one outside both chords) starts a guide; a note of the main
  *  chord shows its own chord as the second; a note of the second chord's other notes makes the second
  *  chord the main one (and the pressed note shows its chord as the second). */

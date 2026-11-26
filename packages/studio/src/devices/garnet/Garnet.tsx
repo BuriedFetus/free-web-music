@@ -11,7 +11,7 @@ import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
 import type { DeviceHost, DeviceProps } from '../basalt/Basalt';
 import { Scope } from '../Scope';
 import { Sends } from '../Sends';
-import { CHORD_TYPES, FRETS, NO_GUIDE, TUNING, chordsOfKey, guideRoles, guideStep, inScale, neckKey, noteName, type ChordType, type Guide, type GuideRole } from './music';
+import { CHORD_TYPES, FRETS, NO_GUIDE, TUNING, chordLabel, chordsOfKey, guideRoles, guideStep, triadOf, inScale, neckKey, noteName, type ChordType, type Guide, type GuideRole } from './music';
 import { GARNET_FORMAT, GARNET_PRESETS } from './presets';
 
 type Mode = 'chords' | 'notes';
@@ -184,6 +184,12 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
   const keyRef = useRef(key);
   keyRef.current = key;
   const roles = guideOn ? guideRoles(guide, key) : new Map<number, GuideRole>();
+  // Roman numeral badges: on the main root, and on the next chord's root (purple)
+  const badges = new Map<number, { rn: string; next: boolean }>();
+  if (guideOn && guide.main != null) {
+    if (guide.second != null && guide.second !== guide.main) badges.set(guide.second, { rn: chordLabel(guide.second, key).roman, next: true });
+    badges.set(guide.main, { rn: chordLabel(guide.main, key).roman, next: false });
+  }
   const prevMine = useRef(new Set<string>());
   useEffect(() => {
     const now = new Set(mineKey ? mineKey.split(',') : []);
@@ -273,7 +279,8 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
         <Whammy value={state.params.wham ?? 0.5} set={(v) => set('wham', v)} host={host} />
       </div>
 
-      <Neck mode={view.mode} lock={view.lock} songKey={key} chords={chords} peerNotes={peerNotes} mine={mine} roles={roles} strings={strings}
+      {guideOn && <GuideLegend guide={guide} songKey={key} />}
+      <Neck mode={view.mode} lock={view.lock} songKey={key} chords={chords} peerNotes={peerNotes} mine={mine} roles={roles} badges={badges} strings={strings}
         onPluck={(st: number, m: number, v: number) => {
           if (view.mode === 'notes') press(m);
           pluck(st, m, v);
@@ -343,6 +350,8 @@ interface NeckProps {
   mine: Map<number, number>;
   /** Chord guide colours per pitch class. */
   roles: Map<number, GuideRole>;
+  /** Roman numeral badges per pitch class (the main root; the next chord's root). */
+  badges: Map<number, { rn: string; next: boolean }>;
   strings: React.MutableRefObject<(HTMLDivElement | null)[]>;
   onPluck(s: number, m: number, v: number): void;
   onSlide(s: number, m: number): void;
@@ -351,7 +360,7 @@ interface NeckProps {
 }
 
 /** Six strings, low E at the bottom. Chords: one strip per chord of the key. Notes: frets 0–12. */
-function Neck({ mode, lock, songKey, chords, peerNotes, mine, roles, strings, onPluck, onSlide, onDamp, onStrum }: NeckProps) {
+function Neck({ mode, lock, songKey, chords, peerNotes, mine, roles, badges, strings, onPluck, onSlide, onDamp, onStrum }: NeckProps) {
   const neck = useRef<HTMLDivElement>(null);
   const drag = useRef<{ s: number; c: number; y: number; t: number } | null>(null);
   const cols = mode === 'chords' ? chords.length : FRETS + 1;
@@ -454,8 +463,10 @@ function Neck({ mode, lock, songKey, chords, peerNotes, mine, roles, strings, on
               const ins = inScale(m, songKey);
               const peer = peerNotes.get(m);
               const role = roles.get(m % 12);
+              const badge = mine.get(s) === c ? undefined : badges.get(m % 12);
               return (
                 <div key={s} className="fwm-garnet__cell">
+                  {badge && <i className={'fwm-garnet__rn-badge' + (badge.next ? ' is-next' : '')}>{badge.rn}</i>}
                   <span className={'fwm-garnet__dot' + (mine.get(s) === c ? ' is-mine' : role ? ` is-g-${role}` : ins ? (m % 12 === songKey.root ? ' is-root' : '') : ' is-off')}
                     style={peer ? ({ boxShadow: `0 0 0 3px ${peer}` } as CSSProperties) : undefined}>
                     {ins || role || mine.get(s) === c ? noteName(m, songKey) : ''}
@@ -520,5 +531,24 @@ function Whammy({ value, set, host }: { value: number; set(v: number): void; hos
         <small>{Math.abs(st) < 0.05 ? '0' : `${st > 0 ? '+' : ''}${st.toFixed(1)}`}</small>
       </div>
     </div>
+  );
+}
+
+/** What the guide's colours mean right now: the main chord (root, 2nd and 3rd notes) and the next one. */
+function GuideLegend({ guide, songKey }: { guide: Guide; songKey: SongKey }) {
+  if (guide.main == null)
+    return <p className="fwm-garnet__legend fwm-silk">Chord guide: press a note to see its chord. Root, 2nd and 3rd notes get their own colour, with its Roman numeral (its place in the key).</p>;
+  const [r, a, b] = triadOf(guide.main, songKey);
+  const main = chordLabel(guide.main, songKey);
+  const next = guide.second != null && guide.second !== guide.main ? chordLabel(guide.second, songKey) : null;
+  const nextNotes = guide.second != null ? triadOf(guide.second, songKey).slice(1).filter((pc) => pc !== r) : [];
+  const n = (pc: number) => noteName(pc, songKey);
+  return (
+    <p className="fwm-garnet__legend" aria-live="polite">
+      <span><i className="is-g-root" />Root {n(r)} · chord <b>{main.name}</b> ({main.roman})</span>
+      <span><i className="is-g-second" />2nd note {n(a)}</span>
+      <span><i className="is-g-third" />3rd note {n(b)}</span>
+      {next && <span><i className="is-g-alt" />Next: <b>{next.name}</b> ({next.roman}): {nextNotes.map(n).join(', ')}, press one to make it the root</span>}
+    </p>
   );
 }

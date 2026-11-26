@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { NO_GUIDE, guideRoles, guideStep, triadOf } from '../src/devices/garnet/music';
+import { NO_GUIDE, chordLabel, guideRoles, guideStep, triadOf } from '../src/devices/garnet/music';
 
 const C = { root: 0, scale: 'major' };
 const roles = (g: ReturnType<typeof guideStep>) => Object.fromEntries([...guideRoles(g, C)].sort((a, b) => a[0] - b[0]));
@@ -23,5 +23,11 @@ describe('Garnet chord guide', () => {
   it('a note outside both chords starts again', () => {
     const g = guideStep({ main: 0, second: 4 }, 62, C); // D
     expect(g).toEqual({ main: 2, second: null });
+  });
+  it('Roman numerals: the degree in the key; off the key, by distance from the root', () => {
+    expect(chordLabel(0, C)).toEqual({ roman: 'I', name: 'C' });
+    expect(chordLabel(4, C)).toEqual({ roman: 'iii', name: 'Em' });
+    expect(chordLabel(11, C).roman).toBe('vii°');
+    expect(chordLabel(8, C).roman).toBe('♭VI');
   });
 });

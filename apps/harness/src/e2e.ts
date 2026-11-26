@@ -1139,6 +1139,10 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     ok(gRoles() === 'root:C second:E third:G', `guide after C: ${gRoles()}`);
     await tapKey('d'); // E
     ok(gRoles() === 'alt:BG root:C second:E', `guide after E: C stays the root, Em's G and B purple (${gRoles()})`);
+    const rns = [...new Set([...document.querySelectorAll('.fwm-garnet__rn-badge')].map((e) => e.textContent))].sort().join(' ');
+    ok(rns === 'I iii', `Roman numerals on the roots: C = I, Em = iii (${rns})`);
+    const legend = $('.fwm-garnet__legend')?.textContent ?? '';
+    ok(legend.includes('Root C') && legend.includes('Next: Em (iii)'), `the legend says what the colours mean (${legend})`);
     await tapKey('g'); // G: one of the purple notes → E becomes the root
     ok(gRoles().includes('root:E'), `a purple note makes E the root (${gRoles()})`);
     // whammy ribbon: drag to the left end dives, letting go springs back to rest
