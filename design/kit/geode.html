@@ -35,7 +35,7 @@ h1{font-weight:300;font-size:30px;margin:0 0 2px;letter-spacing:.04em}
 .dock button:hover,.dock button[aria-expanded=true]{background:#102030;color:var(--ink)}
 .dock button:focus-visible,button:focus-visible,input:focus-visible,select:focus-visible{outline:2px solid var(--acc);outline-offset:2px}
 .dock button.is-rec{color:var(--rec)}
-.pop{position:absolute;left:50%;bottom:86px;transform:translateX(-50%);min-width:300px;max-width:calc(100% - 24px);padding:14px 16px;border-radius:14px;background:#060913f2;box-shadow:0 0 0 1px #24405a,0 10px 40px #000a;color:var(--ink)}
+.pop{position:absolute;left:14px;bottom:86px;width:min(420px,calc(100% - 28px));max-height:calc(100% - 110px);overflow:auto;padding:14px 16px;border-radius:14px;background:#060913f2;box-shadow:0 0 0 1px #24405a,0 10px 40px #000a;color:var(--ink)}
 .pop[hidden],.menu[hidden],.trim[hidden]{display:none}
 .pop h3{margin:0 0 8px;font-weight:300;font-size:13px;letter-spacing:.18em;color:var(--line);text-transform:uppercase}
 .row{display:grid;grid-template-columns:90px minmax(0,1fr) 54px;gap:10px;align-items:center;margin:8px 0}
@@ -66,14 +66,14 @@ input[type=range]{width:100%;accent-color:var(--line);height:28px}
 table{border-collapse:collapse;width:100%;font-size:13px}
 td,th{padding:3px 6px;border-bottom:1px solid #18222e;text-align:left}
 td.n{text-align:right;color:var(--acc);font-variant-numeric:tabular-nums}
-@media(max-width:700px){.dock button{width:42px;height:46px;font-size:0}.dock button svg{width:26px;height:26px}.pop{bottom:66px;min-width:0;width:calc(100% - 16px)}.hud b{font-size:22px}}
+@media(max-width:700px){.dock button{width:42px;height:46px;font-size:0}.dock button svg{width:26px;height:26px}.pop{bottom:66px;left:8px;width:calc(100% - 16px)}.hud b{font-size:22px}}
 @media (prefers-reduced-motion:reduce){.card{transition:none}}
 </style>
 </head>
 <body>
 <main>
   <h1>Geode</h1>
-  <p class="lead">A sampler with a little room in it. Mica makes the sound: play <kbd>A</kbd>–<kbd>K</kbd> (or the keys below), or press ▶ Demo, then use the icons at the bottom. Click Mica's face to record a new sound into her memory.</p>
+  <p class="lead">A sampler with a little room in it. Mica makes the sound: play <kbd>A</kbd>–<kbd>K</kbd> (or the keys below), or press ▶ Demo, then use the icons at the bottom. Click Mica's face to record into her memory, change how the tape plays (Classic, Reverse, Slices), its speed and position. Motion moves things in time with the song.</p>
   <div class="flip"><div class="card" id="card">
     <div class="face">
       <div class="screen" id="screen">
@@ -87,6 +87,11 @@ td.n{text-align:right;color:var(--acc);font-variant-numeric:tabular-nums}
             <button id="mRec" aria-label="Rec: wait for sound, then record"><svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="8" fill="currentColor"/></svg>REC</button>
           </div>
           <label class="note">Record from <select id="inSel"><option value="pad">Opal (pad)</option><option value="bass">Basalt (bass)</option></select> · <span id="recMsg">Rec waits for sound, then records up to 30 s. While armed, your keys play the instrument you record.</span></label>
+          <div class="seg" role="group" aria-label="How the tape plays"><button data-pm="0" aria-pressed="true">Classic</button><button data-pm="1" aria-pressed="false">Reverse</button><button data-pm="2" aria-pressed="false">Slices</button></div>
+          <div class="trim" id="speedBox">
+            <div class="row"><span>Speed</span><input id="mSpd" type="range" min="0.25" max="2" step="0.01" value="1" aria-label="Tape speed"><output id="mSpdO">1.00×</output></div>
+            <div class="row"><span>Position</span><input id="mPos" type="range" min="0" max="1" step="0.001" value="0" aria-label="Where in the tape"><output id="mPosO">0%</output></div>
+          </div>
           <div class="trim" id="trim" hidden>
             <canvas id="trimCv" aria-hidden="true"></canvas>
             <div class="row"><span>Start</span><input id="tStart" type="range" min="0" max="1" step="0.001" value="0" aria-label="Trim start"><output id="tStartO"></output></div>
@@ -101,6 +106,12 @@ td.n{text-align:right;color:var(--acc);font-variant-numeric:tabular-nums}
     <div class="rear" id="rear" aria-label="The back of Geode (debug)">
       <h3 style="margin:0 0 6px;font-weight:300;letter-spacing:.16em;color:var(--line)">THE BACK OF GEODE · every knob, what the macros make of it, and each link's scale</h3>
       <p class="small">Base = the knob itself. Result = after the macros (a weighted blend of their wishes, never a plain sum). Scale = how far that macro may pull that knob.</p>
+      <div style="display:grid;grid-template-columns:repeat(auto-fit,minmax(220px,1fr));gap:4px 18px;margin:6px 0 10px">
+        <div class="row"><span>Comp threshold</span><input type="range" min="-40" max="0" step="1" value="-20" data-d="th" aria-label="Compressor threshold"><output data-do="th">-20 dB</output></div>
+        <div class="row"><span>Comp ratio</span><input type="range" min="1" max="12" step="0.5" value="4" data-d="ratio" aria-label="Compressor ratio"><output data-do="ratio">4:1</output></div>
+        <div class="row"><span>Make-up</span><input type="range" min="0" max="12" step="0.5" value="5" data-d="make" aria-label="Make-up gain"><output data-do="make">+5 dB</output></div>
+        <div class="row"><span>Squash now</span><span id="grMeter" class="small">0 dB</span><span></span></div>
+      </div>
       <table id="rearT"></table>
       <p><button class="btn" id="toFront">Back to the room</button></p>
     </div>
@@ -121,8 +132,8 @@ td.n{text-align:right;color:var(--acc);font-variant-numeric:tabular-nums}
 const WORKLET = `
 const hann=(x)=>0.5-0.5*Math.cos(2*Math.PI*x);
 class Geode extends AudioWorkletProcessor{
-  constructor(){super();this.ch=[new Float32Array(2),new Float32Array(2)];this.len=2;this.ssr=sampleRate;this.v=[];this.g=[];this.p={gw:0.8,size:0.1,dens:24,spray:0.15,gp:0,gsp:1,jit:0.15,a:0.05,d:0.4,s:0.8,r:0.6,st:0,en:1,crush:0};this.hold=[0,0];this.hc=0;this.ev=[];this.evT=0;
-    this.port.onmessage=(e)=>{const d=e.data;if(d.t==='smp'){this.ch=d.ch;this.len=d.ch[0].length;this.ssr=d.sr;}else if(d.t==='p')Object.assign(this.p,d.p);else if(d.t==='on'){let v=this.v.find(x=>x.n===d.n&&x.st<3);if(!v){if(this.v.length>=8){this.v.sort((a,b)=>a.age-b.age);this.v.shift();}v={n:d.n,age:currentTime};this.v.push(v);}Object.assign(v,{vel:d.vel,st:0,e:v.e||0,pos:0,head:0,gt:0,age:currentTime});}else if(d.t==='off'){for(const v of this.v)if(v.n===d.n&&v.st<3)v.st=3;}};}
+  constructor(){super();this.ch=[new Float32Array(2),new Float32Array(2)];this.len=2;this.ssr=sampleRate;this.v=[];this.g=[];this.p={gw:0.8,size:0.1,dens:24,spray:0.15,gp:0,gsp:1,jit:0.15,a:0.05,d:0.4,s:0.8,r:0.6,st:0,en:1,crush:0,spd:1,pos:0,pm:0,bend:0};this.hold=[0,0];this.hc=0;this.ev=[];this.evT=0;
+    this.port.onmessage=(e)=>{const d=e.data;if(d.t==='smp'){this.ch=d.ch;this.len=d.ch[0].length;this.ssr=d.sr;}else if(d.t==='p')Object.assign(this.p,d.p);else if(d.t==='on'){let v=this.v.find(x=>x.n===d.n&&x.st<3);if(!v){if(this.v.length>=8){this.v.sort((a,b)=>a.age-b.age);this.v.shift();}v={n:d.n,age:currentTime};this.v.push(v);}Object.assign(v,{vel:d.vel,st:0,e:v.e||0,pos:0,head:0,gt:0,age:currentTime,sl:d.sl||0});}else if(d.t==='off'){for(const v of this.v)if(v.n===d.n&&v.st<3)v.st=3;}else if(d.t==='seek'){for(const v of this.v)v.head=0;}};}
   read(c,x){const L=this.len,i=Math.floor(x),f=x-i,a=((i%L)+L)%L,b=(a+1)%L;return c[a]+(c[b]-c[a])*f;}
   process(_,outs){const o=outs[0],L=o[0],R=o[1]||o[0],n=L.length,p=this.p,sr=sampleRate,k=this.ssr/sr;
     const A=1/Math.max(1,p.a*sr),D=1/Math.max(1,p.d*sr),Rl=1/Math.max(1,p.r*sr);
@@ -130,11 +141,11 @@ class Geode extends AudioWorkletProcessor{
     for(let i=0;i<n;i++){let l=0,r=0;
       for(const v of this.v){
         if(v.st===0){v.e+=A;if(v.e>=1){v.e=1;v.st=1;}}else if(v.st===1){v.e-=D;if(v.e<=p.s){v.e=p.s;v.st=2;}}else if(v.st===2)v.e=p.s;else{v.e-=Rl;if(v.e<=0){v.e=0;v.st=4;}}
-        const rate=Math.pow(2,(v.n-60)/12)*k,amp=v.e*v.vel;
-        if(p.gw<1){const x=s0+(v.pos%span);l+=this.read(this.ch[0],x)*amp*(1-p.gw);r+=this.read(this.ch[1],x)*amp*(1-p.gw);v.pos+=rate;}
-        if(p.gw>0){v.head=(v.head+p.gsp*k)%span;v.gt-=1;if(v.gt<=0){v.gt=sr/Math.max(1,p.dens);
-            const st=Math.random()*2-1,pr=Math.pow(2,(p.gp+(Math.random()*2-1)*p.jit*3)/12)*rate;
-            const at=s0+((v.head+st*p.spray*span)%span+span)%span;this.g.push({x:at,r:pr,t:0,L:Math.max(64,p.size*sr),a:amp,pan:Math.random()*0.8+0.1});
+        const rate=(p.pm===2?1:Math.pow(2,(v.n-60)/12))*Math.pow(2,p.bend/12)*k*p.spd,amp=v.e*v.vel;
+        if(p.gw<1){let x;if(p.pm===1)x=s0+(((p.pos*span-v.pos)%span)+span)%span;else if(p.pm===2){const w=span/8,o=v.sl*w;x=s0+o+Math.min(w-1,v.pos);if(v.pos>=w-1&&v.st<3)v.st=3;}else x=s0+((p.pos*span+v.pos)%span);l+=this.read(this.ch[0],x)*amp*(1-p.gw);r+=this.read(this.ch[1],x)*amp*(1-p.gw);v.pos+=rate;}
+        if(p.gw>0){v.head=(v.head+p.gsp*k*p.spd)%span;v.gt-=1;if(v.gt<=0){v.gt=sr/Math.max(1,p.dens);
+            const st=Math.random()*2-1,pr=Math.pow(2,(p.gp+(Math.random()*2-1)*p.jit*3)/12)*rate/p.spd;
+            const at=s0+((p.pos*span+v.head+st*p.spray*span)%span+span)%span;this.g.push({x:at,r:pr,t:0,L:Math.max(64,p.size*sr),a:amp,pan:Math.random()*0.8+0.1});
             if(this.ev.length<48)this.ev.push([(at-s0)/span,v.n+p.gp]);}}
       }
       if(this.g.length){const gw=p.gw*0.55;for(let j=this.g.length-1;j>=0;j--){const gr=this.g[j];const w=hann(gr.t/gr.L)*gw;
@@ -169,7 +180,7 @@ const K = {
 const NAMES = { drive: 'Drive', lp: 'Tone (low-pass)', body: 'Body (low shelf)', hp: 'Thin (high-pass)', gp: 'Grain pitch', gsp: 'Grain speed', spread: 'Grain spread', chorus: 'Chorus', damp: 'Reverb tail colour', cut: 'Window filter', res: 'Window whistle', sway: 'Blind sway (LFO)', air: 'Air noise', atk: 'Attack', dec: 'Decay', sus: 'Sustain', rel: 'Release', decay: 'Reverb decay', pre: 'Pre-delay', er: 'Early reflections' };
 const base = { ...K };
 // macro positions (front controls)
-const M = { temp: 0.62, airM: 0.15, room: 0.35, breath: 0.4, light: 1, wet: 0.35, echoWet: 0.3, fb: 0.45, div: 2, grains: 0.8, crunch: 0 };
+const M = { pm: 0, spd: 1, pos: 0, gsize: 0.35, gdens: 0.5, temp: 0.62, airM: 0.15, room: 0.35, breath: 0.4, light: 1, wet: 0.35, echoWet: 0.3, fb: 0.45, div: 2, grains: 0.8, crunch: 0 };
 // the thermometer's wishes along its range: FREEZING 0 … CHILL .33 … WARM .66 … HOT 1 (knob values 0..1)
 const TEMP = {
   drive:  [0, 0, 0.3, 0.75], lp: [0.95, 0.85, 0.55, 0.8], body: [0.2, 0.42, 0.75, 0.6], hp: [0.55, 0.25, 0.02, 0],
@@ -184,7 +195,7 @@ function macroMix() {
   for (const k in base) {
     const wishes = [];
     if (TEMP[k]) wishes.push([tw * scale[k], curve(TEMP[k], S.temp)]);
-    if (k === 'cut') wishes.push([aw, lerp(0.35, 1, S.air)]);
+    if (k === 'cut') wishes.push([aw, lerp(0.1, 1, S.air)]);
     if (k === 'res') wishes.push([aw, lerp(0.15, 0.55, S.air)]);
     if (k === 'sway') wishes.push([aw, S.air]);
     if (k === 'air') wishes.push([aw, S.air * 0.7]);
@@ -206,6 +217,7 @@ function macroMix() {
 
 /* ================= audio graph ================= */
 let ac, gNode, cap, nodes = {}, R = { ...K }, sample = null, sampleBackup = null, input = null;
+const DYN = { th: -20, ratio: 4, make: 5 };
 const BPM = 100, DIVS = [[1 / 16, '1/16'], [1 / 8, '1/8'], [3 / 16, '3/16'], [1 / 4, '1/4'], [1 / 2, '1/2']];
 const echoSec = () => DIVS[M.div][0] * 4 * 60 / BPM;
 function demoSample(sr) {
@@ -245,8 +257,15 @@ async function audio() {
   N.win = ac.createBiquadFilter(); N.win.type = 'lowpass';
   N.lfo = ac.createOscillator(); N.lfoG = ac.createGain(); N.lfo.connect(N.lfoG).connect(N.win.detune); N.lfo.start();
   const nb = ac.createBuffer(1, ac.sampleRate * 2, ac.sampleRate); const nd = nb.getChannelData(0); for (let i = 0; i < nd.length; i++) nd[i] = Math.random() * 2 - 1;
-  N.noise = ac.createBufferSource(); N.noise.buffer = nb; N.noise.loop = true; N.noiseF = ac.createBiquadFilter(); N.noiseF.type = 'bandpass'; N.noiseF.frequency.value = 1800; N.noiseF.Q.value = 0.6; N.noiseG = ac.createGain(); N.noiseG.gain.value = 0;
-  N.noise.connect(N.noiseF).connect(N.noiseG).connect(N.win); N.noise.start();
+  N.noiseG = ac.createGain(); N.noiseG.gain.value = 0; N.noiseG.connect(N.win);
+  const colour = (kind) => { const b = ac.createBuffer(1, ac.sampleRate * 3, ac.sampleRate), d = b.getChannelData(0); let b0 = 0, b1 = 0, b2 = 0, br = 0;
+    for (let i = 0; i < d.length; i++) { const w = Math.random() * 2 - 1;
+      if (kind === 'pink') { b0 = 0.99765 * b0 + w * 0.099046; b1 = 0.963 * b1 + w * 0.2965164; b2 = 0.57 * b2 + w * 1.0526913; d[i] = (b0 + b1 + b2 + w * 0.1848) * 0.2; }
+      else if (kind === 'brown') { br = (br + w * 0.02) / 1.02; d[i] = br * 3.2; } else d[i] = w * 0.5; }
+    return b; };
+  N.noises = ['white', 'grey', 'pink', 'brown'].map((kind) => { const src = ac.createBufferSource(); src.buffer = colour(kind); src.loop = true; const g = ac.createGain(); g.gain.value = 0;
+    let head = src; if (kind === 'grey') { const dip = ac.createBiquadFilter(); dip.type = 'peaking'; dip.frequency.value = 3200; dip.Q.value = 0.7; dip.gain.value = -9; const lo = ac.createBiquadFilter(); lo.type = 'lowshelf'; lo.frequency.value = 250; lo.gain.value = 6; src.connect(dip).connect(lo); head = lo; }
+    head.connect(g).connect(N.noiseG); src.start(); return g; });
   // chorus: two short modulated delays
   N.chIn = ac.createGain(); N.chOut = ac.createGain(); N.chIn.connect(N.chOut);
   N.chW = ac.createGain(); N.cd = [0, 1].map((j) => { const d = ac.createDelay(0.05); d.delayTime.value = 0.012 + j * 0.006; const o = ac.createOscillator(); o.frequency.value = 0.35 + j * 0.27; const g = ac.createGain(); g.gain.value = 0.003; o.connect(g).connect(d.delayTime); o.start(); N.chIn.connect(d).connect(N.chW); return g; });
@@ -261,9 +280,14 @@ async function audio() {
   N.rIn.connect(N.pre).connect(N.conv).connect(N.rDamp).connect(N.rW).connect(N.rOut);
   // lamp (master low-pass) and out
   N.lamp = ac.createBiquadFilter(); N.lamp.type = 'lowpass'; N.lamp.Q.value = 0.5;
+  // dynamics: a glue compressor, make-up gain, then a fast safety limiter (nothing piles up or clips)
+  N.comp = ac.createDynamicsCompressor(); N.comp.knee.value = 10; N.comp.attack.value = 0.008; N.comp.release.value = 0.22;
+  N.make = ac.createGain();
+  N.lim = ac.createDynamicsCompressor(); N.lim.threshold.value = -2; N.lim.knee.value = 0; N.lim.ratio.value = 20; N.lim.attack.value = 0.001; N.lim.release.value = 0.08;
   N.out = ac.createGain(); N.out.gain.value = 0.8; N.an = ac.createAnalyser(); N.an.fftSize = 1024;
   gNode.connect(N.drvIn).connect(N.drv).connect(N.drvOut).connect(N.body).connect(N.hp).connect(N.lp).connect(N.win).connect(N.chIn);
-  N.chOut.connect(N.eIn); N.eOut.connect(N.rIn); N.rOut.connect(N.lamp).connect(N.out).connect(N.an); N.out.connect(ac.destination);
+  N.chOut.connect(N.eIn); N.eOut.connect(N.rIn); N.pan = ac.createStereoPanner();
+  N.rOut.connect(N.comp).connect(N.make).connect(N.lim).connect(N.pan).connect(N.lamp).connect(N.out).connect(N.an); N.out.connect(ac.destination);
   // recording input instruments (pretend Opal / Basalt) and the capture tap
   cap = new AudioWorkletNode(ac, 'cap', { numberOfInputs: 1, numberOfOutputs: 0 });
   cap.port.onmessage = (e) => onCap(e.data);
@@ -287,45 +311,60 @@ function push(force) {
   set(N.drvIn.gain, 1); set(N.drvOut.gain, 1 / (1 + R.drive * 0.8));
   set(N.body.gain, lerp(-6, 6, R.body)); set(N.hp.frequency, lerp(20, 1200, R.hp ** 2));
   set(N.lp.frequency, lerp(900, 18000, R.lp ** 1.6));
-  set(N.win.frequency, 180 * 2 ** (R.cut * 6.6)); set(N.win.Q, lerp(0.7, 9, R.res ** 1.5));
-  set(N.lfo.frequency, lerp(0.15, 0.9, S.air)); set(N.lfoG.gain, R.sway * 1400);
-  set(N.noiseG.gain, R.air * 0.05);
+  const warmth = clamp(1 - Math.abs(S.temp - 0.66) / 0.34);
+  set(N.win.frequency, lerp(160, 70, warmth) * 2 ** (R.cut * lerp(6.6, 7.6, warmth))); set(N.win.Q, lerp(0.7, 9, R.res ** 1.5) * (1 + warmth * 0.9));
+  set(N.lfo.frequency, lerp(0.15, 0.9, S.air)); set(N.lfoG.gain, R.sway * 1400 * (1 + warmth * 0.8));
+  set(N.noiseG.gain, R.air * 0.09);
+  N.noises.forEach((g, i) => set(g.gain, Math.max(0, 1 - Math.abs(S.temp * 3 - i)), 0.2));
   N.cd.forEach((g, j) => set(g.gain, lerp(0.0004, 0.006, R.chorus))); set(N.chW.gain, lerp(0.1, 0.75, R.chorus));
   set(N.eD.delayTime, echoSec(), 0.08); set(N.eFb.gain, M.fb * 0.92); set(N.eW.gain, M.echoWet); set(N.eTone.frequency, lerp(2500, 9000, 1 - S.temp));
-  set(N.pre.delayTime, R.pre * 0.06); set(N.rDamp.frequency, lerp(1800, 14000, R.damp)); set(N.rW.gain, M.wet * 1.2);
+  set(N.pre.delayTime, R.pre * 0.06); set(N.rDamp.frequency, lerp(1800, 14000, R.damp)); set(N.rW.gain, M.wet * 0.8);
+  set(N.comp.threshold, DYN.th); set(N.comp.ratio, DYN.ratio); set(N.make.gain, 10 ** (DYN.make / 20));
   set(N.lamp.frequency, 120 * 2 ** (M.light * 7.4)); set(N.out.gain, lerp(0.55, 0.8, M.light));
   const irKey = `${R.decay.toFixed(2)}|${R.er.toFixed(1)}`;
   if (irKey !== lastIR) { lastIR = irKey; clearTimeout(push._ir); push._ir = setTimeout(() => (N.conv.buffer = makeIR(lerp(0.3, 8, R.decay ** 1.3), R.er)), force ? 0 : 160); }
   gNode.port.postMessage({ t: 'p', p: {
-    gw: M.grains, size: lerp(0.03, 0.25, 0.4), dens: lerp(10, 40, 0.5 + M.grains * 0.3), spray: lerp(0.01, 0.5, R.spread), gp: lerp(-7, 9, R.gp), gsp: lerp(0, 2, R.gsp),
+    gw: M.grains, size: lerp(0.02, 0.3, M.gsize ** 1.3), dens: lerp(4, 60, M.gdens), spd: M.spd, pos: M.pos, spray: lerp(0.01, 0.5, R.spread), gp: lerp(-7, 9, R.gp), gsp: lerp(0, 2, R.gsp),
     jit: lerp(0.02, 0.4, R.spread), a: lerp(0.003, 3, R.atk ** 2), d: lerp(0.05, 3, R.dec ** 2), s: R.sus, r: lerp(0.03, 5, R.rel ** 2),
-    st: trimS, en: trimE, crush: M.crunch } });
+    st: trimS, en: trimE, crush: M.crunch, pm: M.pm } });
   updateRear();
 }
 
 /* ================= notes, demo, keys ================= */
-const held = new Set();
+const held = new Set(), want = new Set();
 function noteOn(n, vel = 0.85) {
+  want.add(n);
   void audio().then(() => {
+    if (!want.has(n)) return; // let go before the sound was ready: don't start it at all
     if (recState !== 'idle') { playInput(n, vel); return; }
-    gNode.port.postMessage({ t: 'on', n, vel }); held.add(n); vis.notes.push({ n, t: performance.now() });
+    const deg = [0, 0, 1, 1, 2, 3, 3, 4, 4, 5, 5, 6][((n % 12) + 12) % 12] + 7 * Math.floor(n / 12);
+    gNode.port.postMessage({ t: 'on', n, vel, sl: ((deg % 8) + 8) % 8 }); held.add(n); vis.notes.push({ n, t: performance.now() });
   });
 }
 function noteOff(n) {
+  want.delete(n);
   if (!ac) return;
   if (inputVoices.has(n)) { stopInput(n); return; }
   gNode.port.postMessage({ t: 'off', n }); held.delete(n);
 }
+function allOff() {
+  // panic: every note stops (Escape, stopping the demo, leaving the page)
+  want.clear(); if (!gNode) return;
+  for (let n = 0; n < 128; n++) gNode.port.postMessage({ t: 'off', n });
+  held.clear(); for (const n of [...inputVoices.keys()]) stopInput(n);
+}
+addEventListener('keydown', (e) => { if (e.key === 'Escape') { allOff(); closePop(); } });
+addEventListener('blur', () => { for (const i of kdown) { $('keys').children[i].classList.remove('down'); } kdown.clear(); allOff(); });
 const KEYS = 'asdfghjk', SC = [60, 62, 64, 65, 67, 69, 71, 72];
 $('keys').innerHTML = SC.map((m, i) => `<button data-i="${i}" aria-label="Note ${i + 1}">${KEYS[i].toUpperCase()}</button>`).join('');
-$('keys').addEventListener('pointerdown', (e) => { const b = e.target.closest('button'); if (!b) return; const n = SC[+b.dataset.i]; b.classList.add('down'); noteOn(n); const up = () => { b.classList.remove('down'); noteOff(n); removeEventListener('pointerup', up); }; addEventListener('pointerup', up); });
+$('keys').addEventListener('pointerdown', (e) => { const b = e.target.closest('button'); if (!b) return; const n = SC[+b.dataset.i]; b.classList.add('down'); noteOn(n); const up = () => { b.classList.remove('down'); noteOff(n); removeEventListener('pointerup', up); removeEventListener('pointercancel', up); }; addEventListener('pointerup', up); addEventListener('pointercancel', up); });
 const kdown = new Set();
 addEventListener('keydown', (e) => { const i = KEYS.indexOf(e.key.toLowerCase()); if (i < 0 || e.repeat || e.ctrlKey || e.metaKey || /INPUT|SELECT/.test(e.target.tagName)) return; kdown.add(i); $('keys').children[i].classList.add('down'); noteOn(SC[i]); });
 addEventListener('keyup', (e) => { const i = KEYS.indexOf(e.key.toLowerCase()); if (i < 0 || !kdown.has(i)) return; kdown.delete(i); $('keys').children[i].classList.remove('down'); noteOff(SC[i]); });
 let demoT = null;
 $('demo').onclick = async () => {
   await audio();
-  if (demoT) { clearInterval(demoT); demoT = null; $('demo').textContent = '▶ Demo'; return; }
+  if (demoT) { clearInterval(demoT); demoT = null; $('demo').textContent = '▶ Demo'; allOff(); return; }
   $('demo').textContent = '■ Stop demo';
   const seq = [[48, 55, 64], [67], [45, 52, 60], [69], [41, 53, 57], [65], [43, 50, 59], [62, 71]]; let i = 0;
   const step = () => { const ch = seq[i++ % seq.length]; ch.forEach((n) => noteOn(n, 0.7)); setTimeout(() => ch.forEach(noteOff), ch.length > 1 ? 1100 : 380); };
@@ -367,6 +406,9 @@ $('mTrash').onclick = () => {
   setSample({ l: new Float32Array(n / 10), r: new Float32Array(n / 10), sr: n, name: 'Empty' });
   toast('Tape removed', () => { setSample(sampleBackup); });
 };
+$('menu').addEventListener('click', (e) => { const b = e.target.closest('[data-pm]'); if (!b) return; M.pm = +b.dataset.pm; $('menu').querySelectorAll('[data-pm]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.pm === M.pm))); push(); });
+$('mSpd').oninput = () => { M.spd = +$('mSpd').value; $('mSpdO').textContent = M.spd.toFixed(2) + '×'; push(); };
+$('mPos').oninput = () => { M.pos = +$('mPos').value; $('mPosO').textContent = pct(M.pos); push(); gNode?.port.postMessage({ t: 'seek' }); };
 $('mCut').onclick = () => { $('trim').hidden = !$('trim').hidden; drawTrim(); };
 for (const id of ['tStart', 'tEnd']) $(id).oninput = () => { trimS = Math.min(+$('tStart').value, +$('tEnd').value - 0.02); trimE = Math.max(+$('tEnd').value, trimS + 0.02); drawTrim(); push(); };
 function drawTrim() {
@@ -391,15 +433,18 @@ const ICONS = {
   lamp: '<svg viewBox="0 0 32 32"><path d="M16 3v6M9 16l3-7h8l3 7z"/><path d="M13 19q3 3 6 0"/><path d="M8 25l3-3M24 25l-3-3M16 28v-4"/></svg>',
   grains: '<svg viewBox="0 0 32 32"><path d="M16 5l2 7 7 2-7 2-2 7-2-7-7-2 7-2z"/><circle cx="25" cy="25" r="1.4" fill="currentColor"/><circle cx="7" cy="25" r="1" fill="currentColor"/><circle cx="25" cy="6" r="1" fill="currentColor"/></svg>',
   crunch: '<svg viewBox="0 0 32 32"><path d="M6 22h5v-5h5v-5h5v-5h5M6 26h20"/></svg>',
+  motion: '<svg viewBox="0 0 32 32"><path d="M4 16q4-9 8 0t8 0t8 0"/><path d="M24 7l4 3-4 3M8 25l-4-3 4-3"/></svg>',
 };
-const DOCK = [['mica', 'Mica'], ['temp', 'Temp'], ['fan', 'Air'], ['room', 'Room'], ['echo', 'Echo'], ['breath', 'Breath'], ['lamp', 'Light'], ['grains', 'Grains'], ['crunch', 'Crunch']];
+const DOCK = [['mica', 'Mica'], ['motion', 'Motion'], ['temp', 'Temp'], ['fan', 'Air'], ['room', 'Room'], ['echo', 'Echo'], ['breath', 'Breath'], ['lamp', 'Light'], ['grains', 'Grains'], ['crunch', 'Crunch']];
 $('dock').innerHTML = DOCK.map(([id, l]) => `<button data-id="${id}" aria-label="${l}" aria-expanded="false">${ICONS[id]}${l.toUpperCase()}</button>`).join('');
 const sl = (key, label, min, max, step, fmt, obj = M) =>
-  `<div class="row"><span>${label}</span><input type="range" data-k="${key}" min="${min}" max="${max}" step="${step}" value="${obj[key]}" aria-label="${label}"><output data-o="${key}">${fmt(obj[key])}</output></div>`;
+  `<div class="row"><span>${label}</span><input type="range" data-k="${key}"${obj === base ? ' data-ob="base"' : ''} min="${min}" max="${max}" step="${step}" value="${obj[key]}" aria-label="${label}"><output data-o="${key}">${fmt(obj[key])}</output></div>`;
 const pct = (v) => Math.round(v * 100) + '%';
+const secs = (x) => (x < 1 ? Math.round(x * 1000) + ' ms' : x.toFixed(2) + ' s');
 const FMT = {
   airT: (v) => (v < 0.03 ? 'Shut' : pct(v)), room: (v) => Math.round(lerp(3, 60, v * v)) + ' m', wet: pct, fb: (v) => Math.max(0, Math.round(Math.log(0.01) / Math.log(Math.max(0.01, v * 0.92)))) + ' bounces',
-  echoWet: pct, breath: (v) => (v < 0.2 ? 'Pluck' : v > 0.8 ? 'Swell' : pct(v)), light: (v) => (v < 0.03 ? 'Off' : pct(v)), grains: (v) => (v < 0.02 ? 'Plain' : pct(v)), crunch: (v) => (v < 0.02 ? 'Clean' : pct(v)),
+  echoWet: pct, atk: () => secs(lerp(0.003, 3, R.atk ** 2)), dec: () => secs(lerp(0.05, 3, R.dec ** 2)), sus: () => pct(R.sus), rel: () => secs(lerp(0.03, 5, R.rel ** 2)),
+  gsize: (v) => Math.round(lerp(20, 300, v ** 1.3)) + ' ms', gdens: (v) => Math.round(lerp(4, 60, v)) + ' /s', spread: () => pct(R.spread), spd: (v) => v.toFixed(2) + '×', breath: (v) => (v < 0.2 ? 'Pluck' : v > 0.8 ? 'Swell' : pct(v)), light: (v) => (v < 0.03 ? 'Off' : pct(v)), grains: (v) => (v < 0.02 ? 'Plain' : pct(v)), crunch: (v) => (v < 0.02 ? 'Clean' : pct(v)),
 };
 const POPS = {
   temp: () => `<h3>Temperature</h3><div class="thermo"><svg id="th" viewBox="0 0 110 230" role="slider" tabindex="0" aria-label="Temperature" aria-valuemin="0" aria-valuemax="100">
@@ -411,12 +456,20 @@ const POPS = {
   fan: () => `<h3>Air · the window</h3>${sl('airT', 'Window', 0, 1, 0.01, FMT.airT, T)}<p class="small">More open: a brighter filter, a whistle, and the blinds (and the sound) sway more.</p>`,
   room: () => `<h3>Room</h3>${sl('room', 'Size', 0, 1, 0.01, FMT.room)}${sl('wet', 'Wet', 0, 1, 0.01, FMT.wet)}<p class="small">Geode's own reverb. The room stretches into the distance as it grows.</p>`,
   echo: () => `<h3>Echo</h3><div class="row"><span>Time</span><span class="seg">${DIVS.map(([, l], i) => `<button data-div="${i}" aria-pressed="${M.div === i}">${l}</button>`).join('')}</span><span></span></div>${sl('fb', 'Bounces', 0, 1, 0.01, FMT.fb)}${sl('echoWet', 'Wet', 0, 1, 0.01, FMT.echoWet)}<p class="small">Mica's voice bounces off the back wall: one round trip per repeat.</p>`,
-  breath: () => `<h3>Breath</h3>${sl('breath', 'Pluck … Swell', 0, 1, 0.01, FMT.breath)}<p class="small">How Mica starts and ends each note (attack, decay, sustain, release).</p>`,
+  breath: () => `<h3>Breath</h3>${sl('breath', 'Pluck … Swell', 0, 1, 0.01, FMT.breath)}${sl('atk', 'Attack', 0, 1, 0.01, FMT.atk, base)}${sl('dec', 'Decay', 0, 1, 0.01, FMT.dec, base)}${sl('sus', 'Sustain', 0, 1, 0.01, FMT.sus, base)}${sl('rel', 'Release', 0, 1, 0.01, FMT.rel, base)}<p class="small">The big slider moves all four; the four set your own shape (the numbers show what you hear, after the slider). Mica's mouth follows it.</p>`,
+  motion: () => `<h3>Motion</h3><div class="row"><span>Shape</span><span class="seg">${['Sine', 'Triangle', 'Square', 'Random'].map((l, i) => `<button data-msh="${i}" aria-pressed="${MOT.shape === i}">${l}</button>`).join('')}</span><span></span></div>
+    <div class="row"><span>Speed</span><span class="seg">${MRATES.map(([, l], i) => `<button data-mr="${i}" aria-pressed="${MOT.rate === i}">${l}</button>`).join('')}</span><span></span></div>
+    ${sl('depth', 'Depth', 0, 1, 0.01, pct, MOT)}
+    <div class="row"><span>Moves</span><span class="seg">${MTARGETS.map(([k, l]) => `<button data-mt="${k}" aria-pressed="${MOT.on.has(k)}">${l}</button>`).join('')}</span><span></span></div>
+    <p class="small">One movement, in time with the song, on everything you switch on. Mica sways with it.</p>`,
   lamp: () => `<h3>Light</h3>${sl('light', 'Dimmer', 0, 1, 0.01, FMT.light)}<p class="small">Dim the room to calm the whole sound (a master low-pass).</p>`,
-  grains: () => `<h3>Grains</h3>${sl('grains', 'Dry / wet', 0, 1, 0.01, FMT.grains)}<p class="small">Plain playback … a cloud of tiny slices from all over the tape (see the memory wall).</p>`,
+  grains: () => `<h3>Grains</h3>${sl('grains', 'Dry / wet', 0, 1, 0.01, FMT.grains)}${sl('gsize', 'Size', 0, 1, 0.01, FMT.gsize)}${sl('gdens', 'Density', 0, 1, 0.01, FMT.gdens)}${sl('spread', 'Spread', 0, 1, 0.01, FMT.spread, base)}<p class="small">Tiny slices of the tape. Drag on the film strip (right wall) to choose where they come from.</p>`,
   crunch: () => `<h3>Crunch</h3>${sl('crunch', 'Dry / wet', 0, 1, 0.01, FMT.crunch)}<p class="small">Bitcrush. The waves turn into steps.</p>`,
 };
-const T = { temp: M.temp, airT: M.airM }; // targets the springs chase
+const T = { temp: M.temp, airT: M.airM };
+const MRATES = [[0.5, '1/8'], [1, '1/4'], [2, '1/2'], [4, '1 bar'], [8, '2 bars'], [16, '4 bars']]; // beats per cycle
+const MTARGETS = [['win', 'Window'], ['pitch', 'Pitch'], ['pan', 'Pan'], ['pos', 'Grain position'], ['echo', 'Echo'], ['room', 'Room'], ['crunch', 'Crunch']];
+const MOT = { shape: 0, rate: 3, depth: 0, on: new Set(['win']), v: 0, held: 0, ph: 0 }; // targets the springs chase
 let openId = null;
 $('dock').addEventListener('click', (e) => {
   const b = e.target.closest('button'); if (!b) return; void audio(); const id = b.dataset.id;
@@ -425,13 +478,20 @@ $('dock').addEventListener('click', (e) => {
   openId = id; document.querySelectorAll('.dock button').forEach((x) => x.setAttribute('aria-expanded', String(x === b)));
   $('pop').innerHTML = POPS[id](); $('pop').hidden = false; if (id === 'temp') bindThermo();
 });
+function refreshOutputs() { $('pop').querySelectorAll('[data-o]').forEach((o) => { const k = o.dataset.o, inp = $('pop').querySelector(`[data-k="${k}"]`); o.textContent = (FMT[k] || pct)(k === 'depth' ? MOT.depth : inp?.dataset.ob === 'base' ? base[k] : k === 'airT' ? T.airT : M[k]); }); }
 function closePop() { openId = null; $('pop').hidden = true; document.querySelectorAll('.dock button').forEach((x) => x.setAttribute('aria-expanded', 'false')); }
 $('pop').addEventListener('input', (e) => {
   const k = e.target.dataset.k; if (!k) return; const v = +e.target.value;
-  if (k === 'airT') T.airT = v; else M[k] = v;
-  const o = $('pop').querySelector(`[data-o="${k}"]`); if (o) o.textContent = (FMT[k] || pct)(v); push();
+  if (k === 'depth') MOT.depth = v; else if (e.target.dataset.ob === 'base') base[k] = v; else if (k === 'airT') T.airT = v; else M[k] = v;
+  push(); refreshOutputs();
 });
-$('pop').addEventListener('click', (e) => { const d = e.target.closest('[data-div]'); if (!d) return; M.div = +d.dataset.div; $('pop').querySelectorAll('[data-div]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.div === M.div))); push(); });
+$('pop').addEventListener('click', (e) => {
+  const sh = e.target.closest('[data-msh]'), mr = e.target.closest('[data-mr]'), mt = e.target.closest('[data-mt]');
+  if (sh) { MOT.shape = +sh.dataset.msh; $('pop').querySelectorAll('[data-msh]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.msh === MOT.shape))); }
+  if (mr) { MOT.rate = +mr.dataset.mr; $('pop').querySelectorAll('[data-mr]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.mr === MOT.rate))); }
+  if (mt) { const k = mt.dataset.mt; MOT.on.has(k) ? MOT.on.delete(k) : MOT.on.add(k); mt.setAttribute('aria-pressed', String(MOT.on.has(k))); if (MOT.depth < 0.05) { MOT.depth = 0.5; refreshOutputs(); const d = $('pop').querySelector('[data-k="depth"]'); if (d) d.value = 0.5; } }
+  if (sh || mr || mt) return;
+  const d = e.target.closest('[data-div]'); if (!d) return; M.div = +d.dataset.div; $('pop').querySelectorAll('[data-div]').forEach((x) => x.setAttribute('aria-pressed', String(+x.dataset.div === M.div))); push(); });
 $('screen').addEventListener('pointerdown', (e) => { if (e.target === $('cv') && openId) closePop(); });
 function bindThermo() {
   const th = $('th');
@@ -442,6 +502,8 @@ function bindThermo() {
 
 /* ================= the back (debug) ================= */
 $('flip').onclick = () => $('card').classList.toggle('back');
+$('rear').addEventListener('input', (e) => { const d = e.target.dataset.d; if (!d) return; DYN[d] = +e.target.value; $('rear').querySelector(`[data-do="${d}"]`).textContent = d === 'ratio' ? DYN.ratio + ':1' : d === 'make' ? '+' + DYN.make + ' dB' : DYN.th + ' dB'; push(); });
+setInterval(() => { if (nodes.comp && $('card').classList.contains('back')) $('grMeter').textContent = nodes.comp.reduction.toFixed(1) + ' dB'; }, 200);
 $('toFront').onclick = () => $('card').classList.remove('back');
 function updateRear() {
   if (!$('card').classList.contains('back')) return;
@@ -468,7 +530,9 @@ function size() { DPR = Math.min(2, devicePixelRatio || 1); W = cv.clientWidth; 
 new ResizeObserver(size).observe(cv);
 const hue = (m) => `hsl(${((m % 12) * 30 + 190) % 360} 90% 66%)`;
 // perspective: x -1..1 across, y -1 ceiling … 1 floor, Z = depth in room units (0 = front)
-let G = {};
+let G = {}, NC = '95,212,255', NB = 6;
+const NEON = [[[190, 238, 255], 1.5], [[110, 205, 255], 5], [[255, 196, 140], 11], [[255, 150, 110], 15]];
+function neon(t) { const x = clamp(t) * 3, i = Math.min(2, Math.floor(x)), f = sstep(0, 1, x - i), a = NEON[i], b = NEON[i + 1]; NC = a[0].map((v, j) => Math.round(lerp(v, b[0][j], f))).join(','); NB = lerp(a[1], b[1], f); }
 function geom() {
   const zoom = lerp(1, 0.86, S.room), mx = W * 0.05, top = H * 0.05, bot = H - Math.max(84, H * 0.16);
   const fw = (W - 2 * mx) * zoom, fh = (bot - top) * zoom, vx = W / 2, vy = top + (bot - top) * 0.44;
@@ -479,7 +543,16 @@ const sc = (Z) => G.D / (G.D + Z);
 const P = (x, y, Z) => { const s = sc(Z); return [G.vx + x * G.hw * s, G.vy + (y < 0 ? -y * G.top : y * G.bot) * s]; };
 const line = (pts, close) => { cx2.beginPath(); pts.forEach(([x, y], i) => (i ? cx2.lineTo(x, y) : cx2.moveTo(x, y))); if (close) cx2.closePath(); cx2.stroke(); };
 const MICA_Z = 0.55;
-function spawnGrain(x, m) { if (vis.grains.length < 24) vis.grains.push({ x, t: 0 }); if (vis.sparks.length < 140) { const a = -Math.PI / 2 + (Math.random() - 0.5) * lerp(0.6, 2.6, R.spread), s = 0.5 + Math.random() * 0.8; vis.sparks.push({ x: 0, y: 0, vx: Math.cos(a) * s, vy: Math.sin(a) * s, t: 0, m }); } }
+const MICA_SHAPE = [[0, -1.25], [0.42, -1.05], [0.48, -0.45], [0.3, -0.18], [-0.3, -0.18], [-0.48, -0.45], [-0.42, -1.05]];
+function spawnGrain(x, m) {
+  // a grain = a small fractal crack of light leaving Mica's crystal edge, splitting twice
+  if (vis.grains.length < 24) vis.grains.push({ x, t: 0 });
+  if (vis.sparks.length > 60) return;
+  const i = Math.floor(Math.random() * MICA_SHAPE.length), a = MICA_SHAPE[i], b = MICA_SHAPE[(i + 1) % MICA_SHAPE.length], f = Math.random();
+  const px = lerp(a[0], b[0], f), py = lerp(a[1], b[1], f), ang = Math.atan2(py + 0.7, px) + (Math.random() - 0.5) * lerp(0.2, 1.4, R.spread), len = lerp(0.12, 0.5, M.gsize);
+  const segs = []; const grow = (x0, y0, an, l, d) => { const x1 = x0 + Math.cos(an) * l, y1 = y0 + Math.sin(an) * l; segs.push([x0, y0, x1, y1, d]); if (d < 2) { grow(x1, y1, an + 0.4 + Math.random() * 0.3, l * 0.62, d + 1); grow(x1, y1, an - 0.4 - Math.random() * 0.3, l * 0.62, d + 1); } };
+  grow(px, py, ang, len, 0); vis.sparks.push({ segs, t: 0, m });
+}
 let last = performance.now();
 function frame(now) {
   const dt = Math.min(0.05, (now - last) / 1000); last = now;
@@ -493,8 +566,23 @@ function frame(now) {
   const fan = document.querySelector('[data-id="fan"] .blades'); if (fan) { fan.style.transformOrigin = '16px 16px'; fan.style.transform = `rotate(${(now / 1000) * 360 * S.air * 2}deg)`; }
   $('hudV').textContent = ['FREEZING', 'CHILL', 'WARM', 'HOT'][Math.min(3, Math.floor(S.temp * 3.999))]; $('hudV').style.color = tempColor(S.temp);
   $('hudR').textContent = FMT.room(M.room);
+  motion(dt);
   draw(now / 1000, dt);
   requestAnimationFrame(frame);
+}
+function motion(dt) {
+  const cyc = MRATES[MOT.rate][0] * 60 / BPM, ph = MOT.ph + dt / cyc, wrap = ph >= 1; MOT.ph = ph % 1;
+  if (wrap) MOT.held = Math.random() * 2 - 1;
+  const x = MOT.ph, v = [Math.sin(x * Math.PI * 2), 1 - 4 * Math.abs(x - 0.5), x < 0.5 ? 1 : -1, MOT.held][MOT.shape];
+  MOT.v = v * MOT.depth;
+  if (!ac || !gNode) return;
+  const on = (k) => MOT.on.has(k) && MOT.depth > 0.01, m = MOT.v, N = nodes, t = ac.currentTime;
+  N.win.detune.setTargetAtTime(on('win') ? m * 2400 : 0, t, 0.02);
+  N.pan.pan.setTargetAtTime(on('pan') ? m * 0.9 : 0, t, 0.02);
+  N.eW.gain.setTargetAtTime(on('echo') ? clamp(M.echoWet * (1 + m)) : M.echoWet, t, 0.03);
+  N.rW.gain.setTargetAtTime((on('room') ? clamp(M.wet * (1 + m)) : M.wet) * 0.8, t, 0.03);
+  MOT.tick = (MOT.tick || 0) + dt; if (MOT.tick < 0.03) return; MOT.tick = 0;
+  gNode.port.postMessage({ t: 'p', p: { bend: on('pitch') ? m * 2 : 0, pos: on('pos') ? (((M.pos + m * 0.25) % 1) + 1) % 1 : M.pos, crush: on('crunch') ? clamp(M.crunch + (m * 0.5 + 0.5) * MOT.depth * 0.7) : M.crunch } });
 }
 function tempColor(t) { const c = [[205, 238, 255], [127, 184, 255], [255, 162, 74], [255, 90, 74]]; const x = clamp(t) * 3, i = Math.min(2, Math.floor(x)), f = x - i; return `rgb(${c[i].map((v, j) => Math.round(lerp(v, c[i + 1][j], f))).join(',')})`; }
 function draw(t, dt) {
@@ -505,26 +593,26 @@ function draw(t, dt) {
   const mh = P(0, 1, MICA_Z), msz = Math.min(W, H) * 0.2 * sc(MICA_Z) * G.zoom, head = [mh[0], mh[1] - msz * 1.05];
   const z = sstep(0, 1, S.z), zs = lerp(1, 5.2, z);
   c.save(); c.translate(lerp(W / 2, W / 2, z), lerp(H / 2, H * 0.5, z)); c.scale(zs, zs); c.translate(-lerp(W / 2, head[0], z), -lerp(H / 2, head[1], z));
-  const lit = lerp(0.3, 1, M.light);
-  c.lineWidth = 1 / zs + 0.4; c.strokeStyle = `rgba(95,212,255,${0.85 * lit})`; c.shadowColor = '#5fd4ff'; c.shadowBlur = 6 * lit;
+  const lit = lerp(0.3, 1, M.light); neon(S.temp);
+  c.lineWidth = (1 / zs + 0.4) * lerp(0.85, 1.35, S.temp); c.strokeStyle = `rgba(${NC},${0.85 * lit})`; c.shadowColor = `rgb(${NC})`; c.shadowBlur = NB * lit;
   // room box
   const L = G.L, fade = 1 - sstep(0.72, 1, S.room);
   const corners = (Z) => [P(-1, -1, Z), P(1, -1, Z), P(1, 1, Z), P(-1, 1, Z)];
   line(corners(0), true);
   c.globalAlpha = fade; line(corners(L), true); c.globalAlpha = 1;
-  for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const g = c.createLinearGradient(...P(a, b, 0), ...P(a, b, L)); g.addColorStop(0, `rgba(95,212,255,${0.85 * lit})`); g.addColorStop(1, `rgba(95,212,255,${0.85 * lit * fade})`); c.strokeStyle = g; line([P(a, b, 0), P(a, b, L)]); }
+  for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) { const g = c.createLinearGradient(...P(a, b, 0), ...P(a, b, L)); g.addColorStop(0, `rgba(${NC},${0.85 * lit})`); g.addColorStop(1, `rgba(${NC},${0.85 * lit * fade})`); c.strokeStyle = g; line([P(a, b, 0), P(a, b, L)]); }
   // floor and ceiling grid, fading into the dark
-  for (let i = 1; i < 40; i++) { const Z = i * 0.35; if (Z >= L) break; const a = (1 - Z / L * (1 - fade)) * 0.35 * lit * (1 - sstep(L * 0.6, L, Z) * (1 - fade)); c.strokeStyle = `rgba(95,212,255,${a})`; line([P(-1, 1, Z), P(1, 1, Z)]); line([P(-1, -1, Z), P(1, -1, Z)]); }
-  for (let i = -4; i <= 4; i++) { const g = c.createLinearGradient(...P(i / 5, 1, 0), ...P(i / 5, 1, L)); g.addColorStop(0, `rgba(95,212,255,${0.3 * lit})`); g.addColorStop(1, `rgba(95,212,255,${0.3 * lit * fade})`); c.strokeStyle = g; line([P(i / 5, 1, 0), P(i / 5, 1, L)]); }
+  for (let i = 1; i < 40; i++) { const Z = i * 0.35; if (Z >= L) break; const a = (1 - Z / L * (1 - fade)) * 0.35 * lit * (1 - sstep(L * 0.6, L, Z) * (1 - fade)); c.strokeStyle = `rgba(${NC},${a})`; line([P(-1, 1, Z), P(1, 1, Z)]); line([P(-1, -1, Z), P(1, -1, Z)]); }
+  for (let i = -4; i <= 4; i++) { const g = c.createLinearGradient(...P(i / 5, 1, 0), ...P(i / 5, 1, L)); g.addColorStop(0, `rgba(${NC},${0.3 * lit})`); g.addColorStop(1, `rgba(${NC},${0.3 * lit * fade})`); c.strokeStyle = g; line([P(i / 5, 1, 0), P(i / 5, 1, L)]); }
   // back darkness
   const bk = P(0, 0, L); const rg = c.createRadialGradient(bk[0], G.vy, 0, bk[0], G.vy, G.hw * 0.7); rg.addColorStop(0, `rgba(4,5,10,${sstep(0.4, 1, S.room)})`); rg.addColorStop(1, 'rgba(4,5,10,0)'); c.fillStyle = rg; c.fillRect(0, 0, W, H);
-  c.shadowBlur = 4 * lit;
+  c.shadowBlur = NB * 0.7 * lit;
   drawWindow(c, t, lit); drawMemoryWall(c, t, lit); drawLamp(c, t);
   c.save(); { const f = [P(-1, -1, 0), P(1, -1, 0), P(1, 1, 0), P(-1, 1, 0)]; c.beginPath(); f.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.clip(); }
   drawWaves(c, t, dt, lit);
   c.restore();
   drawMica(c, t, dt, msz, mh, lit);
-  drawSparks(c, dt, lit, [mh[0], mh[1] - msz * 0.84], msz);
+  drawSparks(c, dt, lit);
   // lamp darkness over everything
   c.restore();
   c.fillStyle = `rgba(0,0,6,${(1 - M.light) * 0.55})`; c.fillRect(0, 0, W, H);
@@ -534,9 +622,9 @@ function drawWindow(c, t, lit) {
   // a window on the left wall, Z 0.12..0.75 (always inside even the smallest room); the lower sash opens with Air
   const z0 = 0.12, z1 = Math.min(0.75, G.L - 0.1), y0 = -0.62, y1 = 0.02, open = S.air;
   const q = (y, Z) => P(-1, y, Z);
-  c.strokeStyle = `rgba(95,212,255,${0.9 * lit})`; line([q(y0, z0), q(y0, z1), q(y1, z1), q(y1, z0)], true);
+  c.strokeStyle = `rgba(${NC},${0.9 * lit})`; line([q(y0, z0), q(y0, z1), q(y1, z1), q(y1, z0)], true);
   const ym = lerp(y0, y1, 0.5), so = lerp(y1, y0 + 0.08, open * 0.85);
-  c.strokeStyle = `rgba(95,212,255,${0.55 * lit})`; line([q(ym, z0), q(ym, z1)]); line([q(so, z0), q(so, z1)]);
+  c.strokeStyle = `rgba(${NC},${0.55 * lit})`; line([q(ym, z0), q(ym, z1)]); line([q(so, z0), q(so, z1)]);
   // the night outside the gap
   c.fillStyle = `rgba(40,70,110,${0.25 * open})`; c.beginPath(); [q(so, z0), q(so, z1), q(y1, z1), q(y1, z0)].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.fill();
   // blinds: slats that sway with the air (the LFO on the filter)
@@ -550,22 +638,36 @@ function drawWindow(c, t, lit) {
   c.strokeStyle = `rgba(205,238,255,${0.35 * lit})`;
   vis.wind = vis.wind.filter((w) => { w.t += 0.016; w.x += 0.02 * (0.4 + open); w.z += Math.sin(w.t * 3) * 0.003; const a = P(w.x, w.y, w.z), b = P(w.x + 0.07, w.y, w.z); c.globalAlpha = 1 - w.t / 1.6; line([a, b]); c.globalAlpha = 1; return w.t < 1.6; });
 }
+function wallU(px, py) {
+  const w = vis.wall; if (!w || zoomOn) return null;
+  const xs = w.poly.map((p) => p[0]), ys = w.poly.map((p) => p[1]);
+  if (px < Math.min(...xs) - 8 || px > Math.max(...xs) + 8 || py < Math.min(...ys) - 14 || py > Math.max(...ys) + 14) return null;
+  const s2 = (px - G.vx) / G.hw; if (s2 <= 0.01) return null; const Z = G.D / s2 - G.D; return clamp((Z - w.z0) / (w.z1 - w.z0));
+}
+cv.addEventListener('pointerdown', (e) => {
+  const r = cv.getBoundingClientRect(), at = (ev) => wallU(ev.clientX - r.left, ev.clientY - r.top); const u = at(e); if (u == null) return;
+  e.preventDefault(); cv.setPointerCapture(e.pointerId); void audio();
+  const set = (uu) => { M.pos = clamp((uu - trimS) / Math.max(0.02, trimE - trimS)); $('mPos').value = M.pos; $('mPosO').textContent = pct(M.pos); push(); gNode?.port.postMessage({ t: 'seek' }); };
+  set(u); const mv = (ev) => { const uu = at(ev); if (uu != null) set(uu); }; cv.addEventListener('pointermove', mv); cv.addEventListener('pointerup', () => cv.removeEventListener('pointermove', mv), { once: true });
+});
 function drawMemoryWall(c, t, lit) {
   // the tape hangs on the right wall as a film strip; lit windows show where grains are read
   if (!sample) return;
   const z0 = 0.2, z1 = Math.min(G.L - 0.1, 2.4), y0 = -0.5, y1 = -0.2, L = sample.l, n = L.length;
   const q = (u, y) => P(1, y, lerp(z0, z1, u));
-  c.strokeStyle = `rgba(95,212,255,${0.6 * lit})`; line([q(0, y0), q(1, y0), q(1, y1), q(0, y1)], true);
-  c.strokeStyle = `rgba(95,212,255,${0.45 * lit})`; c.beginPath();
+  vis.wall = { z0, z1, poly: [q(0, y0), q(1, y0), q(1, y1), q(0, y1)] };
+  c.strokeStyle = `rgba(${NC},${0.6 * lit})`; line([q(0, y0), q(1, y0), q(1, y1), q(0, y1)], true);
+  c.strokeStyle = `rgba(${NC},${0.45 * lit})`; c.beginPath();
   for (let i = 0; i <= 80; i++) { const u = i / 80; let pk = 0; const a = Math.floor(u * n), b = Math.min(n, a + n / 80); for (let j = a; j < b; j += 16) pk = Math.max(pk, Math.abs(L[j])); const [x, ya] = q(u, lerp(y0, y1, 0.5 - pk * 0.45)), [, yb] = q(u, lerp(y0, y1, 0.5 + pk * 0.45)); c.moveTo(x, ya); c.lineTo(x, yb); }
   c.stroke();
   // trim shading
   c.fillStyle = 'rgba(4,5,10,.6)'; for (const [a, b] of [[0, trimS], [trimE, 1]]) { if (b - a < 0.002) continue; c.beginPath(); [q(a, y0), q(b, y0), q(b, y1), q(a, y1)].forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.fill(); }
+  { const u = trimS + M.pos * (trimE - trimS); c.strokeStyle = `rgba(255,209,102,${lit})`; c.lineWidth = 2; line([q(u, y0 - 0.06), q(u, y1 + 0.06)]); c.lineWidth = 1.3; }
   vis.grains = vis.grains.filter((g) => { g.t += 0.016; const u = trimS + g.x * (trimE - trimS), w = 0.008; c.strokeStyle = `rgba(255,209,102,${(1 - g.t / 0.3) * 0.8 * lit})`; line([q(u - w, y0 - 0.01), q(u + w, y0 - 0.01), q(u + w, y1 + 0.01), q(u - w, y1 + 0.01)], true); return g.t < 0.3; });
 }
 function drawLamp(c, t) {
   const top = P(0, -1, 0.75), shade = P(0, -0.72, 0.75), s = sc(0.75) * G.hw * 0.12, on = M.light;
-  c.strokeStyle = 'rgba(95,212,255,.8)'; line([top, shade]);
+  c.strokeStyle = `rgba(${NC},.8)`; line([top, shade]);
   line([[shade[0] - s * 0.5, shade[1]], [shade[0] + s * 0.5, shade[1]], [shade[0] + s, shade[1] + s * 0.55], [shade[0] - s, shade[1] + s * 0.55]], true);
   if (on > 0.02) { const g = c.createRadialGradient(shade[0], shade[1] + s * 0.6, 0, shade[0], shade[1] + s * 0.6, G.hw * 0.9); g.addColorStop(0, `rgba(255,220,150,${0.16 * on})`); g.addColorStop(1, 'rgba(255,220,150,0)'); c.fillStyle = g; c.fillRect(0, 0, W, H); c.fillStyle = `rgba(255,230,170,${0.9 * on})`; c.beginPath(); c.arc(shade[0], shade[1] + s * 0.6, s * 0.18, 0, 7); c.fill(); }
 }
@@ -603,12 +705,16 @@ function drawWaves(c, t, dt, lit) {
   });
   c.setLineDash([]);
 }
-function drawSparks(c, dt, lit, mouth, u) {
-  // grains fly out of Mica's mouth: size = grain size, how many = density, scatter = spray, colour = pitch
-  const sz = u * 0.035;
+function drawSparks(c, dt, lit) {
+  // each grain cracks out of Mica's edge and splits: length = grain size, how many = density, scatter = spread, colour = pitch
+  const mg = vis.mg; if (!mg) return;
+  c.lineWidth = 1.2;
   vis.sparks = vis.sparks.filter((s) => {
-    s.t += dt; s.x += s.vx * dt * u * 1.4; s.y += s.vy * dt * u * 1.4; s.vy += 0.9 * dt;
-    c.fillStyle = hue(s.m); c.globalAlpha = (1 - s.t / 1.2) * lit; c.beginPath(); c.arc(mouth[0] + s.x, mouth[1] + s.y, sz, 0, 7); c.fill(); c.globalAlpha = 1; return s.t < 1.2;
+    s.t += dt; const life = 0.55;
+    c.strokeStyle = hue(s.m);
+    for (const [x0, y0, x1, y1, d] of s.segs) { const show = clamp((s.t - d * 0.05) / 0.05); if (show <= 0) continue; c.globalAlpha = clamp(1 - s.t / life) * lit * (1 - d * 0.2);
+      c.beginPath(); c.moveTo(mg.x + x0 * mg.u, mg.y + y0 * mg.u); c.lineTo(mg.x + lerp(x0, x1, show) * mg.u, mg.y + lerp(y0, y1, show) * mg.u); c.stroke(); }
+    c.globalAlpha = 1; return s.t < life;
   });
 }
 function drawMica(c, t, dt, u, foot, lit) {
@@ -616,9 +722,11 @@ function drawMica(c, t, dt, u, foot, lit) {
   const tt = S.temp, lvl = Math.min(1, vis.voices.reduce((m, [, e]) => Math.max(m, e), 0));
   const shiver = (1 - sstep(0, 0.2, tt)) * Math.sin(t * 40) * u * 0.012;
   const bob = Math.sin(t * 2) * u * 0.01 + lvl * u * 0.03 * Math.sin(t * 9);
-  const x = foot[0] + shiver, y = foot[1] - bob;
+  const sway = MOT.on.size ? MOT.v * u * 0.14 : 0;
+  const x = foot[0] + shiver + sway, y = foot[1] - bob;
+  vis.mg = { x, y, u };
   const col = `rgba(214,200,255,${lit})`;
-  c.save(); c.translate(x, y); c.lineWidth = 1.6; c.strokeStyle = col; c.shadowColor = '#c9b8ff'; c.shadowBlur = 6 * lit;
+  c.save(); c.translate(x, y); c.rotate(MOT.on.size ? MOT.v * 0.12 : 0); c.lineWidth = 1.6; c.strokeStyle = col; c.shadowColor = '#c9b8ff'; c.shadowBlur = 6 * lit;
   // legs and feet
   line([[-u * 0.18, -u * 0.2], [-u * 0.2, 0], [-u * 0.32, 0]]); line([[u * 0.18, -u * 0.2], [u * 0.2, 0], [u * 0.32, 0]]);
   // body: a faceted crystal
@@ -678,6 +786,8 @@ size(); push.lt = null;
   if (num('echo') != null) { M.echoWet = num('echo'); M.fb = 0.7; }
   if (num('room') != null) S.room = M.room;
   if (q.has('play')) setTimeout(() => $('demo').click(), 300);
+  if (q.has('motion')) { MOT.depth = 0.7; MOT.on = new Set(['win', 'pan', 'pos']); MOT.rate = 1; }
+  if (q.has('pop')) setTimeout(() => document.querySelector(`[data-id="${q.get('pop')}"]`)?.click(), 400);
   if (q.has('rec')) setTimeout(() => setZoom(true), 300); }
 
 /* ================= self-test (?selftest): offline render at 44.1 and 48 kHz ================= */
