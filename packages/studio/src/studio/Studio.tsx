@@ -238,7 +238,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   const setAlone = useCallback((a: boolean) => sync.setAlone(a), [sync]);
 
   // ---- live recording ----
-  const recHeld = useRef(new Map<string, { id: string; track: string; pat: string; s: number; startPos: number }>());
+  const recHeld = useRef(new Map<string, { id: string; track: string; pat: string; s: number; startPos: number; startMs?: number }>());
   // What the player heard is late by the output latency: record where they heard it.
   const latSteps = useCallback(() => {
     const lat = live?.latency();
@@ -252,12 +252,38 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   const strumRec = useRef<{ track: string; pat: string; free: number; s: number; t: number } | null>(null);
   // A recording take, per instrument: from its first note, time runs on from there (it never wraps when
   // the song loops); the pattern grows ahead of it, bar by bar, up to MAX_LEN, then the take wraps and overdubs.
-  const recTake = useRef(new Map<string, { pat: string; startPos: number; startFree: number }>());
+  // (startPos NaN = the take began before the song was playing: it is pinned on the next note)
+  const recTake = useRef(new Map<string, { pat: string; startPos: number; startFree: number; startMs: number }>());
   useEffect(() => {
     if (!rec || !playing) recTake.current.clear();
   }, [rec, playing]);
   const recordOn = useCallback(
     (track: TrackInfo, note: number, vel: number) => {
+      const q0 = QUANT[ws.recQuant] ?? 0;
+      const wallSteps = (ms: number) => (ms / 1000) * (project.bpm / 60) * 4 * track.seq.rate;
+      if (!playing) {
+        // Rec armed, song stopped: the first note starts the song and lands at the very start of the pattern
+        const now = performance.now();
+        let take = recTake.current.get(track.id);
+        if (!take) {
+          let row = selRowRef.current ?? rowsRef.current[0]?.id;
+          if (!row) row = project.addRow();
+          let tp = project.cell(row, track.id);
+          if (!tp) {
+            tp = project.addPattern(track.id);
+            if (!tp) return;
+            project.setCell(row, track.id, tp);
+          } else if (recMode === 'replace') project.clearPattern(track.id, tp);
+          take = { pat: tp, startPos: NaN, startFree: 0, startMs: now };
+          recTake.current.set(track.id, take);
+          setPlaying(true);
+        }
+        const free = wallSteps(now - take.startMs);
+        const s0 = Math.min(MAX_LEN - 0.01, q0 ? Math.round(free / q0) * q0 : free);
+        const id = project.addNote(track.id, take.pat, { s: s0, l: q0 || 0.25, m: note, v: vel });
+        if (id) recHeld.current.set(`${track.id}:${note}`, { id, track: track.id, pat: take.pat, s: s0, startPos: NaN, startMs: now });
+        return;
+      }
       const pos = recPos();
       const rp = live?.rowPosition();
       if (pos == null || !rp) return;
@@ -272,14 +298,19 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
       const q = QUANT[ws.recQuant] ?? 0;
       let free: number;
       const take = recTake.current.get(track.id);
-      if (take && take.pat === pat) {
+      if (take && take.pat === pat && !Number.isNaN(take.startPos)) {
         free = (take.startFree + (pos - take.startPos) * track.seq.rate) % MAX_LEN;
+      } else if (take && take.pat === pat) {
+        // the take began with the song: pin it to the song's position now
+        const raw = Math.max(0, rp.pos - latSteps()) * track.seq.rate;
+        free = raw;
+        take.startPos = pos - raw / track.seq.rate;
       } else {
         const raw = Math.max(0, rp.pos - latSteps()) * track.seq.rate;
         const n = Math.floor(raw);
         const idx = stepOf(n, len, track.seq.dir, (slots.current.get(track.id) ?? 0) + 1);
         free = idx + (raw - n);
-        recTake.current.set(track.id, { pat, startPos: pos, startFree: free });
+        recTake.current.set(track.id, { pat, startPos: pos, startFree: free, startMs: performance.now() });
         // replace: the take's first note clears the pattern
         if (recMode === 'replace') project.clearPattern(track.id, pat);
       }
@@ -301,7 +332,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
       const id = project.addNote(track.id, pat, { s, l: q || 0.25, m: note, v: vel });
       if (id) recHeld.current.set(`${track.id}:${note}`, { id, track: track.id, pat, s, startPos: pos });
     },
-    [recPos, latSteps, live, ws.recQuant, project, recMode],
+    [recPos, latSteps, live, ws.recQuant, project, recMode, playing, setPlaying],
   );
   // keep each take's pattern a bar ahead of the playhead, so the song never loops back mid-take
   useEffect(() => {
@@ -313,12 +344,20 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
         const t = project.track(track);
         const len = project.patternInfo(track, take.pat)?.len;
         if (!t || len == null) continue;
+        if (Number.isNaN(take.startPos)) {
+          // a take that started the song: pin it to the song's clock now that it plays
+          const rp = live?.rowPosition();
+          if (!rp) continue;
+          take.startPos = pos - Math.max(0, rp.pos - latSteps());
+          take.startFree = 0;
+          continue;
+        }
         const cur = take.startFree + (pos - take.startPos) * t.seq.rate;
         if (cur < MAX_LEN && cur > len - BAR) project.setPatternLen(track, take.pat, Math.min(MAX_LEN, (Math.floor(cur / BAR) + 2) * BAR));
       }
     }, 200);
     return () => clearInterval(id);
-  }, [rec, playing, recPos, project]);
+  }, [rec, playing, recPos, project, live, latSteps]);
   const recordOff = useCallback(
     (trackId: string, note: number) => {
       const h = recHeld.current.get(`${trackId}:${note}`);
@@ -326,9 +365,12 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
       recHeld.current.delete(`${trackId}:${note}`);
       const t = project.track(trackId);
       const pos = recPos();
-      if (!t || pos == null) return;
+      if (!t) return;
       const q = QUANT[ws.recQuant] ?? 0;
-      const el = (pos - h.startPos) * t.seq.rate;
+      let el: number;
+      if (h.startMs != null) el = ((performance.now() - h.startMs) / 1000) * (project.bpm / 60) * 4 * t.seq.rate;
+      else if (pos == null) return;
+      else el = (pos - h.startPos) * t.seq.rate;
       const l = q ? Math.max(q, Math.round(el / q) * q) : Math.max(1 / 16, el);
       const len = project.patternInfo(h.track, h.pat)?.len ?? MAX_LEN;
       project.updateNote(h.track, h.pat, h.id, { l: Math.min(len - h.s, l) });
@@ -348,9 +390,9 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
       if (live && slot != null) live.noteOn(slot, note, vel);
       channel?.send({ t: 'on', track, note, vel, user: user.id, from: sync.session, at: heardAt() });
       const t = project.track(track);
-      if (rec && playing && t) recordOn(t, note, vel);
+      if (rec && t) recordOn(t, note, vel);
     },
-    [status, start, live, channel, user.id, project, rec, playing, recordOn, sync, heardAt],
+    [status, start, live, channel, user.id, project, rec, recordOn, sync, heardAt],
   );
   const releaseNote = useCallback(
     (track: string, note: number) => {

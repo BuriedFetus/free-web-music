@@ -1391,6 +1391,22 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
       ok(p.notes(tid, pat).length === 1, `replace: the take's first note cleared the pattern (${p.notes(tid, pat).length} note)`);
       btn('■ Stop')!.click();
       btn('● Rec')!.click();
+      // wait for a note: song stopped + Rec armed → the first note starts the song at the pattern's start
+      await sleep(300);
+      p.clearPattern(tid, pat);
+      btn('● Rec')!.click();
+      await sleep(100);
+      ok((btn('● Rec')?.textContent ?? '').includes('waiting'), 'Rec armed while stopped: waiting');
+      await sleep(500);
+      await tap('a');
+      await sleep(600);
+      const playingNow = !!btn('■ Stop');
+      await tap('s');
+      await sleep(100);
+      const ws2 = p.notes(tid, pat).map(([, n]) => n.s).sort((x, y) => x - y);
+      ok(playingNow && ws2.length === 2 && ws2[0] < 0.5 && ws2[1] > 1, `the first note started the song at step 0 (notes at ${ws2.map((x) => x.toFixed(2)).join(', ')})`);
+      btn('■ Stop')?.click();
+      btn('● Rec')!.click();
       p.setBpm(120);
     }
     // SEND knobs = the Mixer strip's sends, both ways

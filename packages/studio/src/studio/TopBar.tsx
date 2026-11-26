@@ -76,8 +76,8 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
             e.preventDefault();
             setRec(!rec || recMode !== 'replace', 'replace');
           }}
-          title={'Record (Shift+Space): while playing, notes you play (and knob moves) are written into the pattern. Click = overdub (adds to the notes there); right-click = replace (your first note clears the pattern). A recording keeps going past the loop, the pattern grows up to 32 bars (128 beats), then wraps and overdubs.'}>
-          ● Rec{rec && recMode === 'replace' ? ' · replace' : ''}
+          title={'Record (Shift+Space). Song stopped: Rec waits, and your first note starts the song and lands at the start of the pattern. While playing, notes you play (and knob moves) are written into the pattern. Click = overdub (adds to the notes there); right-click = replace (your first note clears the pattern). A recording keeps going past the loop, the pattern grows up to 32 bars (128 beats), then wraps and overdubs.'}>
+          ● Rec{rec && recMode === 'replace' ? ' · replace' : ''}{rec && !playing ? ' · waiting' : ''}
         </button>
         <span className="fwm-lcdt" aria-label="Position">
           {rowName(playRow || ws.row)} {pos ?? '1.1.1'}

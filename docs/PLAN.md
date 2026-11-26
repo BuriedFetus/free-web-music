@@ -191,6 +191,7 @@ User's asks (2026-11-25): fake strings you can strum; the scale's notes lit; Cho
 ### Recording takes (user, 2026-11-26)
 - [x] **Shift+Space** arms / disarms Rec (Space stays Play). Rec still records while playing.
 - [x] A take runs past the loop: from its first note, time counts on from there (`recTake` in `Studio.tsx`), and the pattern grows a bar ahead of the playhead (so the song doesn't loop back mid-take), up to **MAX_LEN = 512 steps = 128 beats = 32 bars** (was 128 steps); past that the take wraps to the start and overdubs. Piano roll length buttons go to 32 bars.
+- [x] Wait for a note (user: "WAIT till something is played to start if the song isn't already started"): Rec armed while stopped shows "· waiting"; the first note played starts the song (from the selected TRACK) and lands at step 0 of that instrument's pattern (a new one if the cell is empty); the take is pinned to the song's clock once it plays. Browser `?e2e=opal`
 - [x] Click Rec = overdub (adds notes); **right-click Rec = replace** (the take's first note clears that pattern). Tests: project test (512 max), browser `?e2e=opal` (Shift+Space, a take past the loop point, replace)
 
 ### Geode: grow a sound (planned; user, 2026-11-25: "something similar to Synplant 2 … intuitive for people that never make music and are intimidated by even seeing the BASALT synth")
