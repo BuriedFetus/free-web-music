@@ -1108,6 +1108,16 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     btn('Palm mute')!.click();
     await sleep(100);
     ok(btn('Palm mute')!.getAttribute('aria-pressed') === 'true', 'Palm mute is on (a shared setting of the instrument)');
+    // computer keys: the note's place on the neck lights up and its string rings
+    btn('Notes')?.click();
+    await sleep(100);
+    document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
+    await sleep(100);
+    const mineDots = document.querySelectorAll('.fwm-garnet__neck .is-mine').length;
+    const ringing = document.querySelectorAll('.fwm-garnet__str.is-ringing').length;
+    document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
+    await sleep(100);
+    ok(mineDots === 1 && ringing >= 1 && !$('.fwm-garnet__neck .is-mine'), `a computer key shows its place on the neck and rings the string (${mineDots}, ${ringing})`);
   } catch (e) {
     out.push(`FAIL garnet: ${String(e)}`);
   }

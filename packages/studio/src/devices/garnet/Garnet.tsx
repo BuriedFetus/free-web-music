@@ -161,6 +161,26 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
   const people = host?.people ?? [{ userId: 'me', name: user.name, color: user.color }];
   const knob = (id: string, size?: 'lg') => <GKnob key={id} store={store} host={host} id={id} set={set} size={size} />;
   const peerNotes = new Map((host?.peerHeld ?? []).map((h) => [h.note, h.color]));
+  // computer keys: show where each held note is on the neck (the string a guitarist would use, as the
+  // engine does: the highest free string that reaches it) and make that string ring
+  const myHeld = host?.myHeld ?? [];
+  const mine = new Map<number, number>(); // string → fret
+  for (const n of myHeld) {
+    for (let st = 5; st >= 0; st--) {
+      const f = n - TUNING[st];
+      if (f >= 0 && f <= FRETS && !mine.has(st)) {
+        mine.set(st, f);
+        break;
+      }
+    }
+  }
+  const mineKey = [...mine].map(([st, f]) => `${st}:${f}`).join(',');
+  const prevMine = useRef(new Set<string>());
+  useEffect(() => {
+    const now = new Set(mineKey ? mineKey.split(',') : []);
+    for (const k of now) if (!prevMine.current.has(k)) shake(Number(k.split(':')[0]));
+    prevMine.current = now;
+  }, [mineKey]); // eslint-disable-line react-hooks/exhaustive-deps
 
   return (
     <div className="fwm-dev fwm-garnet" data-device="garnet" style={tokens as CSSProperties}>
@@ -235,7 +255,7 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
           onPress={() => set('mute', state.params.mute >= 0.5 ? 0 : 1)}>Palm mute</P.Button>
       </div>
 
-      <Neck mode={view.mode} lock={view.lock} songKey={key} chords={chords} peerNotes={peerNotes} strings={strings}
+      <Neck mode={view.mode} lock={view.lock} songKey={key} chords={chords} peerNotes={peerNotes} mine={mine} strings={strings}
         onPluck={pluck} onSlide={slideTo} onDamp={damp} onStrum={strum} />
       <p className="fwm-silk fwm-garnet__hint">
         {view.mode === 'chords'
@@ -298,6 +318,8 @@ interface NeckProps {
   songKey: SongKey;
   chords: ReturnType<typeof chordsOfKey>;
   peerNotes: Map<number, string>;
+  /** Notes this person holds on the computer keyboard: string → fret. */
+  mine: Map<number, number>;
   strings: React.MutableRefObject<(HTMLDivElement | null)[]>;
   onPluck(s: number, m: number, v: number): void;
   onSlide(s: number, m: number): void;
@@ -306,7 +328,7 @@ interface NeckProps {
 }
 
 /** Six strings, low E at the bottom. Chords: one strip per chord of the key. Notes: frets 0–12. */
-function Neck({ mode, lock, songKey, chords, peerNotes, strings, onPluck, onSlide, onDamp, onStrum }: NeckProps) {
+function Neck({ mode, lock, songKey, chords, peerNotes, mine, strings, onPluck, onSlide, onDamp, onStrum }: NeckProps) {
   const neck = useRef<HTMLDivElement>(null);
   const drag = useRef<{ s: number; c: number; y: number; t: number } | null>(null);
   const cols = mode === 'chords' ? chords.length : FRETS + 1;
@@ -401,7 +423,7 @@ function Neck({ mode, lock, songKey, chords, peerNotes, strings, onPluck, onSlid
                 const m = TUNING[s] + f;
                 return (
                   <div key={s} className="fwm-garnet__cell">
-                    <span className={'fwm-garnet__cn' + (m % 12 === chords[c].root ? ' is-root' : '')}>{noteName(m, songKey)}</span>
+                    <span className={'fwm-garnet__cn' + (m % 12 === chords[c].root ? ' is-root' : '') + (mine.get(s) === f ? ' is-mine' : '')}>{noteName(m, songKey)}</span>
                   </div>
                 );
               }
@@ -410,9 +432,9 @@ function Neck({ mode, lock, songKey, chords, peerNotes, strings, onPluck, onSlid
               const peer = peerNotes.get(m);
               return (
                 <div key={s} className="fwm-garnet__cell">
-                  <span className={'fwm-garnet__dot' + (ins ? (m % 12 === songKey.root ? ' is-root' : '') : ' is-off')}
+                  <span className={'fwm-garnet__dot' + (mine.get(s) === c ? ' is-mine' : ins ? (m % 12 === songKey.root ? ' is-root' : '') : ' is-off')}
                     style={peer ? ({ boxShadow: `0 0 0 3px ${peer}` } as CSSProperties) : undefined}>
-                    {ins ? noteName(m, songKey) : ''}
+                    {ins || mine.get(s) === c ? noteName(m, songKey) : ''}
                   </span>
                 </div>
               );

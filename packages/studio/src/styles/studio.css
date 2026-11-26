@@ -224,6 +224,8 @@
 .fwm-garnet__dot { min-width: 28px; height: 28px; padding: 0 5px; border-radius: 99px; display: grid; place-items: center; font: 800 12px/1 var(--fwm-font-ui);
   background: color-mix(in srgb, var(--dev-acc) 70%, var(--dev-lcd)); color: var(--dev-btnink); }
 .fwm-garnet__dot.is-root { background: var(--dev-acc); box-shadow: 0 0 0 2px var(--dev-cap), 0 0 calc(10px * var(--fwm-glow)) var(--dev-acc); }
+.fwm-garnet__dot.is-mine, .fwm-garnet__cn.is-mine { background: var(--dev-lcdink); color: var(--dev-lcd); transform: scale(1.25); z-index: 3;
+  box-shadow: 0 0 0 2px var(--dev-acc), 0 0 calc(14px * var(--fwm-glow)) var(--dev-lcdink); transition: transform .08s; }
 .fwm-garnet__dot.is-off { min-width: 8px; width: 8px; height: 8px; padding: 0; background: color-mix(in srgb, var(--dev-silk) 22%, transparent); }
 .fwm-garnet__neck.is-lock .fwm-garnet__dot.is-off { opacity: .25; }
 .fwm-garnet__cn { font: 700 12px var(--fwm-font-ui); color: var(--dev-silk); background: color-mix(in srgb, var(--dev-lcd) 80%, transparent); padding: 1px 6px; border-radius: 6px; }
