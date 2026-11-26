@@ -1351,6 +1351,48 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
     }
     document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
     ok(seen.size > 4, `the engine's cutoff moves with the LFO (${seen.size} values)`);
+    // Rec: Shift+Space arms; a take runs past the loop (the pattern grows instead of wrapping)
+    {
+      const tid = p.trackIds()[0];
+      const pat = p.patternList(tid)[0].id;
+      p.setCell(p.rows()[0].id, tid, pat);
+      p.setPatternLen(tid, pat, 16);
+      p.clearPattern(tid, pat);
+      p.setBpm(240); // 1 bar = 1 s
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', shiftKey: true, bubbles: true }));
+      await sleep(100);
+      ok(btn('● Rec')?.getAttribute('aria-pressed') === 'true', 'Shift+Space arms Rec');
+      btn('▶ Play')!.click();
+      await sleep(400);
+      const tap = async (k: string) => {
+        document.body.dispatchEvent(new KeyboardEvent('keydown', { key: k, bubbles: true }));
+        await sleep(60);
+        document.body.dispatchEvent(new KeyboardEvent('keyup', { key: k, bubbles: true }));
+      };
+      await tap('a');
+      await sleep(1400); // past the 1-bar loop point
+      await tap('s');
+      await sleep(100);
+      const ss = p.notes(tid, pat).map(([, n]) => n.s).sort((x, y) => x - y);
+      const len = p.patternInfo(tid, pat)!.len;
+      ok(ss.length === 2 && ss[1] > 16 && len >= 32, `a take runs past the loop: notes at ${ss.map((x) => x.toFixed(1)).join(', ')}, pattern ${len} steps`);
+      btn('■ Stop')!.click();
+      document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', shiftKey: true, bubbles: true }));
+      await sleep(100);
+      ok(btn('● Rec')?.getAttribute('aria-pressed') === 'false', 'Shift+Space disarms Rec');
+      // right-click = replace: the first note clears the pattern
+      btn('● Rec')!.dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
+      await sleep(100);
+      ok((btn('● Rec')?.textContent ?? '').includes('replace'), 'right-click arms Rec in replace mode');
+      btn('▶ Play')!.click();
+      await sleep(300);
+      await tap('d');
+      await sleep(100);
+      ok(p.notes(tid, pat).length === 1, `replace: the take's first note cleared the pattern (${p.notes(tid, pat).length} note)`);
+      btn('■ Stop')!.click();
+      btn('● Rec')!.click();
+      p.setBpm(120);
+    }
     // SEND knobs = the Mixer strip's sends, both ways
     const tid = p.trackIds()[0];
     const rev = $('.fwm-opal .fwm-sends [role=slider][aria-label="Reverb"]')!;

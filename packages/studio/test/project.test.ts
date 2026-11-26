@@ -130,8 +130,8 @@ describe('Project (shared)', () => {
     const [you] = pair();
     const id = you.addTrack(m);
     const P = you.patternList(id)[0].id;
-    const n = you.addNote(id, P, { s: 3.37, l: 400, m: 200, v: 2 })!;
-    expect(you.notes(id, P)[0][1]).toEqual({ s: 3.37, l: 124.63, m: 127, v: 1 }); // 8 bars max
+    const n = you.addNote(id, P, { s: 3.37, l: 600, m: 200, v: 2 })!;
+    expect(you.notes(id, P)[0][1]).toEqual({ s: 3.37, l: 508.63, m: 127, v: 1 }); // 32 bars (128 beats) max
     you.quantize(id, P, 0.25);
     expect(you.notes(id, P)[0][1].s).toBe(3.25);
     you.deleteNote(id, P, n);
@@ -154,8 +154,8 @@ describe('Project (shared)', () => {
     const P = you.patternList(id)[0].id;
     mira.setSeq(id, { dir: 'pp', rate: 2 });
     expect(you.track(id)!.seq).toMatchObject({ dir: 'pp', rate: 2 });
-    mira.setPatternLen(id, P, 300);
-    expect(you.patternInfo(id, P)!.len).toBe(128);
+    mira.setPatternLen(id, P, 900);
+    expect(you.patternInfo(id, P)!.len).toBe(512);
     you.setBpm(132);
     mira.setSwing(0.9);
     expect([mira.bpm, you.swing]).toEqual([132, 0.6]);

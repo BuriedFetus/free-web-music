@@ -44,7 +44,9 @@ export interface StudioCtx {
   transport: import('../collab/transport').TransportSync;
   liveTiming: import('../collab/liveTiming').LiveTiming;
   rec: boolean;
-  setRec(r: boolean): void;
+  /** Overdub (add notes) or replace (the first note clears the pattern). */
+  recMode: 'over' | 'replace';
+  setRec(r: boolean, mode?: 'over' | 'replace'): void;
   slotOf(track: string): number | undefined;
   /** Jump playback to a song row now (when playing), keeping the beat. */
   cueRow(row: string): void;

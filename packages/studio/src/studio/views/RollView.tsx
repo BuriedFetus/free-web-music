@@ -1,5 +1,5 @@
 // Piano roll for the pattern in the selected cell (instrument × TRACK): pick, name and size the pattern,
-// edit notes with micro-timing, velocity and automation lanes. Patterns run from 1 step to 8 bars.
+// edit notes with micro-timing, velocity and automation lanes. Patterns run from 1 step to 32 bars (128 beats).
 // Edits go straight into the shared doc; other people's in-progress edits are outlined in their colour.
 import type { Direction } from '@fwm/engine';
 import { useEffect, useRef, useState, type KeyboardEvent, type PointerEvent } from 'react';
@@ -282,7 +282,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
           <button type="button" className="fwm-tb fwm-tb--xs" aria-label="One step shorter" disabled={L <= 1} onClick={() => lenBtn(L - 1)}>−</button>
           <span className="fwm-lcdt fwm-lcdt--sm" aria-label="Pattern length">{lenLabel(L)}</span>
           <button type="button" className="fwm-tb fwm-tb--xs" aria-label="One step longer" disabled={L >= MAX_LEN} onClick={() => lenBtn(L + 1)}>+</button>
-          {[1, 2, 4, 8].map((b) => (
+          {[1, 2, 4, 8, 16, 32].map((b) => (
             <button key={b} type="button" className="fwm-tb fwm-tb--xs" aria-pressed={L === b * BAR} onClick={() => lenBtn(b * BAR)}>
               {b} bar{b > 1 ? 's' : ''}
             </button>

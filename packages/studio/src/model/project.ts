@@ -31,7 +31,8 @@ export const SCHEMA = 2;
 /** Steps (16th notes) in a bar. */
 export const BAR = 16;
 /** Longest pattern: 8 bars. */
-export const MAX_LEN = 128;
+/** Longest pattern, in steps: 512 = 128 beats = 32 bars of 4/4 (recording stops growing a pattern here). */
+export const MAX_LEN = 512;
 
 /** A note. Drum hits may also carry an accent (`a: 1`) and a roll (`r`: 2–4 quick hits). */
 export interface Note extends SeqNote {

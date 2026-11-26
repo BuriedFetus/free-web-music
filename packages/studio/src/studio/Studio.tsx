@@ -15,7 +15,7 @@ import { EngineProvider, useEngine } from '../engine/EngineProvider';
 import { HeldParams, useDeviceSync } from '../engine/useDeviceSync';
 import { useComputerKeys } from '../hooks/useComputerKeys';
 import { engineFx } from '../model/fx';
-import { MAX_LEN, Project, type TrackInfo } from '../model/project';
+import { BAR, MAX_LEN, Project, type TrackInfo } from '../model/project';
 import { ThemeRoot, type StudioTheme } from '../theme/Theme';
 import { QUANT, StudioContext, type StudioCtx, type Workspace } from './context';
 import { TopBar } from './TopBar';
@@ -198,7 +198,12 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     sync.setTarget(target);
     return () => sync.setTarget(null);
   }, [live, sync]);
-  const [rec, setRec] = useState(false);
+  const [rec, setRecOn] = useState(false);
+  const [recMode, setRecMode] = useState<'over' | 'replace'>('over');
+  const setRec = useCallback((r: boolean, mode: 'over' | 'replace' = 'over') => {
+    setRecOn(r);
+    setRecMode(mode);
+  }, []);
   // Play starts from the selected TRACK.
   const setPlaying = useCallback(
     (p: boolean) => {
@@ -245,6 +250,12 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   }, [live, latSteps]);
 
   const strumRec = useRef<{ track: string; pat: string; free: number; s: number; t: number } | null>(null);
+  // A recording take, per instrument: from its first note, time runs on from there (it never wraps when
+  // the song loops); the pattern grows ahead of it, bar by bar, up to MAX_LEN, then the take wraps and overdubs.
+  const recTake = useRef(new Map<string, { pat: string; startPos: number; startFree: number }>());
+  useEffect(() => {
+    if (!rec || !playing) recTake.current.clear();
+  }, [rec, playing]);
   const recordOn = useCallback(
     (track: TrackInfo, note: number, vel: number) => {
       const pos = recPos();
@@ -257,12 +268,21 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
         if (!pat) return;
         project.setCell(rp.row, track.id, pat);
       }
-      const len = project.patternInfo(track.id, pat)?.len ?? 16;
-      const raw = Math.max(0, rp.pos - latSteps()) * track.seq.rate;
-      const n = Math.floor(raw);
-      const idx = stepOf(n, len, track.seq.dir, (slots.current.get(track.id) ?? 0) + 1);
+      let len = project.patternInfo(track.id, pat)?.len ?? 16;
       const q = QUANT[ws.recQuant] ?? 0;
-      const free = idx + (raw - n);
+      let free: number;
+      const take = recTake.current.get(track.id);
+      if (take && take.pat === pat) {
+        free = (take.startFree + (pos - take.startPos) * track.seq.rate) % MAX_LEN;
+      } else {
+        const raw = Math.max(0, rp.pos - latSteps()) * track.seq.rate;
+        const n = Math.floor(raw);
+        const idx = stepOf(n, len, track.seq.dir, (slots.current.get(track.id) ?? 0) + 1);
+        free = idx + (raw - n);
+        recTake.current.set(track.id, { pat, startPos: pos, startFree: free });
+        // replace: the take's first note clears the pattern
+        if (recMode === 'replace') project.clearPattern(track.id, pat);
+      }
       let s = q ? Math.round(free / q) * q : free;
       // A strum (Garnet: notes a few ms apart) stays a strum: the first note snaps to the grid, the rest
       // keep their distance from it, so quantize never splits a chord across two steps.
@@ -273,12 +293,32 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
         s = g!.s + (free - g!.free);
         g!.t = now;
       } else strumRec.current = { track: track.id, pat, free, s, t: now };
-      if (s >= len) s = 0;
+      if (s >= MAX_LEN) s -= MAX_LEN;
+      if (s >= len) {
+        len = Math.min(MAX_LEN, Math.ceil((s + 0.001) / BAR) * BAR);
+        project.setPatternLen(track.id, pat, len);
+      }
       const id = project.addNote(track.id, pat, { s, l: q || 0.25, m: note, v: vel });
       if (id) recHeld.current.set(`${track.id}:${note}`, { id, track: track.id, pat, s, startPos: pos });
     },
-    [recPos, latSteps, live, ws.recQuant, project],
+    [recPos, latSteps, live, ws.recQuant, project, recMode],
   );
+  // keep each take's pattern a bar ahead of the playhead, so the song never loops back mid-take
+  useEffect(() => {
+    if (!rec || !playing) return;
+    const id = setInterval(() => {
+      const pos = recPos();
+      if (pos == null) return;
+      for (const [track, take] of recTake.current) {
+        const t = project.track(track);
+        const len = project.patternInfo(track, take.pat)?.len;
+        if (!t || len == null) continue;
+        const cur = take.startFree + (pos - take.startPos) * t.seq.rate;
+        if (cur < MAX_LEN && cur > len - BAR) project.setPatternLen(track, take.pat, Math.min(MAX_LEN, (Math.floor(cur / BAR) + 2) * BAR));
+      }
+    }, 200);
+    return () => clearInterval(id);
+  }, [rec, playing, recPos, project]);
   const recordOff = useCallback(
     (trackId: string, note: number) => {
       const h = recHeld.current.get(`${trackId}:${note}`);
@@ -448,7 +488,10 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
         project.redo();
       } else if (e.code === 'Space') {
         e.preventDefault();
-        if (!e.repeat) setPlaying(!playing);
+        if (e.repeat) return;
+        // Shift+Space arms / disarms Rec (overdub); Space plays / stops
+        if (e.shiftKey) setRec(!rec);
+        else setPlaying(!playing);
       }
     };
     addEventListener('keydown', kd, true);
@@ -457,11 +500,11 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
       removeEventListener('keydown', kd, true);
       removeEventListener('keyup', ku, true);
     };
-  }, [project, playing, setPlaying]);
+  }, [project, playing, setPlaying, rec, setRec]);
 
   const ctx: StudioCtx = {
     project, presence, user, channel, songs, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop,
-    transport: sync, liveTiming: timing, rec, setRec, slotOf, cueRow,
+    transport: sync, liveTiming: timing, rec, setRec, recMode, slotOf, cueRow,
     playNote, releaseNote, audition, peerHeld, myHeld, toast,
     look: { css: keptLook, set: setLook, preview: lookPreview, setPreview: setLookPreview, hostKeeps: hostLook !== undefined, off: lookOff },
   };

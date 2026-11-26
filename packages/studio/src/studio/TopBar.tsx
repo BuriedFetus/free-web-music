@@ -54,7 +54,7 @@ function useLinks() {
 }
 
 export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
-  const { project, ws, setWs, playing, setPlaying, alone, setAlone, setLoop, rec, setRec, user, look } = useStudio();
+  const { project, ws, setWs, playing, setPlaying, alone, setAlone, setLoop, rec, setRec, recMode, user, look } = useStudio();
   const [lookOpen, setLookOpen] = useState(false);
   const link = useLinks();
   const { status, start, stop } = useEngine();
@@ -71,9 +71,13 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
         <button type="button" className="fwm-tb fwm-tb--play" aria-pressed={playing} onClick={() => setPlaying(!playing)}>
           {playing ? '■ Stop' : '▶ Play'}
         </button>
-        <button type="button" className="fwm-tb fwm-tb--rec" aria-pressed={rec} onClick={() => setRec(!rec)}
-          title="Record: notes you play (and knob moves) are written into the selected pattern while playing">
-          ● Rec
+        <button type="button" className="fwm-tb fwm-tb--rec" aria-pressed={rec} onClick={() => setRec(!rec, 'over')}
+          onContextMenu={(e) => {
+            e.preventDefault();
+            setRec(!rec || recMode !== 'replace', 'replace');
+          }}
+          title={'Record (Shift+Space): while playing, notes you play (and knob moves) are written into the pattern. Click = overdub (adds to the notes there); right-click = replace (your first note clears the pattern). A recording keeps going past the loop, the pattern grows up to 32 bars (128 beats), then wraps and overdubs.'}>
+          ● Rec{rec && recMode === 'replace' ? ' · replace' : ''}
         </button>
         <span className="fwm-lcdt" aria-label="Position">
           {rowName(playRow || ws.row)} {pos ?? '1.1.1'}
@@ -153,8 +157,8 @@ export function TopBar({ peers, octave }: { peers: Peer[]; octave: number }) {
       <div className="fwm-grow" />
       <span className="fwm-hintline" title="Computer keyboard plays the selected instrument">
         {deviceEntry(ws.track ? project.track(ws.track)?.device ?? '' : '')?.layout === 'pads'
-          ? 'Pads A S D F G H J K · Space play'
-          : `Keys A–; · Z/X octave ${octave >= 0 ? '+' : ''}${octave} · Space play`}
+          ? 'Pads A S D F G H J K · Space play · Shift+Space rec'
+          : `Keys A–; · Z/X octave ${octave >= 0 ? '+' : ''}${octave} · Space play · Shift+Space rec`}
       </span>
       <button type="button" className="fwm-btn-ui fwm-lookbtn" aria-haspopup="dialog" aria-expanded={lookOpen}
         title="Restyle the studio for you only (others keep their own look)" onClick={() => setLookOpen(true)}>
