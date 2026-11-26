@@ -184,12 +184,11 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
   const keyRef = useRef(key);
   keyRef.current = key;
   const roles = guideOn ? guideRoles(guide, key) : new Map<number, GuideRole>();
-  // Roman numeral badges: on the main root, and on the next chord's root (purple)
-  const badges = new Map<number, { rn: string; next: boolean }>();
-  if (guideOn && guide.main != null) {
-    if (guide.second != null && guide.second !== guide.main) badges.set(guide.second, { rn: chordLabel(guide.second, key).roman, next: true });
-    badges.set(guide.main, { rn: chordLabel(guide.main, key).roman, next: false });
-  }
+  // Roman numeral badges on every guided note: the chord built on it (its place in the key), in its
+  // circle's colour; the next chord's root keeps a purple badge
+  const badges = new Map<number, { rn: string; role: GuideRole }>();
+  for (const [pc, role] of roles) badges.set(pc, { rn: chordLabel(pc, key).roman, role });
+  if (guideOn && guide.second != null && guide.second !== guide.main) badges.set(guide.second, { rn: chordLabel(guide.second, key).roman, role: 'alt' });
   const prevMine = useRef(new Set<string>());
   useEffect(() => {
     const now = new Set(mineKey ? mineKey.split(',') : []);
@@ -351,7 +350,7 @@ interface NeckProps {
   /** Chord guide colours per pitch class. */
   roles: Map<number, GuideRole>;
   /** Roman numeral badges per pitch class (the main root; the next chord's root). */
-  badges: Map<number, { rn: string; next: boolean }>;
+  badges: Map<number, { rn: string; role: GuideRole }>;
   strings: React.MutableRefObject<(HTMLDivElement | null)[]>;
   onPluck(s: number, m: number, v: number): void;
   onSlide(s: number, m: number): void;
@@ -466,7 +465,7 @@ function Neck({ mode, lock, songKey, chords, peerNotes, mine, roles, badges, str
               const badge = mine.get(s) === c ? undefined : badges.get(m % 12);
               return (
                 <div key={s} className="fwm-garnet__cell">
-                  {badge && <i className={'fwm-garnet__rn-badge' + (badge.next ? ' is-next' : '')}>{badge.rn}</i>}
+                  {badge && <i className={`fwm-garnet__rn-badge is-${badge.role}`}>{badge.rn}</i>}
                   <span className={'fwm-garnet__dot' + (mine.get(s) === c ? ' is-mine' : role ? ` is-g-${role}` : ins ? (m % 12 === songKey.root ? ' is-root' : '') : ' is-off')}
                     style={peer ? ({ boxShadow: `0 0 0 3px ${peer}` } as CSSProperties) : undefined}>
                     {ins || role || mine.get(s) === c ? noteName(m, songKey) : ''}

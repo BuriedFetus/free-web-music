@@ -236,7 +236,9 @@
 .fwm-garnet__dot.is-g-alt { background: var(--dev-guide-alt); }
 .fwm-garnet__rn-badge { position: absolute; top: 50%; left: calc(50% + 15px); transform: translateY(-110%); z-index: 4; pointer-events: none;
   font: 800 11px/1 var(--fwm-font-ui); font-style: normal; padding: 2px 4px; border-radius: 6px; background: var(--dev-guide-root); color: var(--dev-guide-ink); }
-.fwm-garnet__rn-badge.is-next { background: var(--dev-guide-alt); }
+.fwm-garnet__rn-badge.is-second { background: var(--dev-guide-2); }
+.fwm-garnet__rn-badge.is-third { background: var(--dev-guide-3); }
+.fwm-garnet__rn-badge.is-alt { background: var(--dev-guide-alt); }
 .fwm-garnet__legend { display: flex; flex-wrap: wrap; gap: 4px 16px; align-items: center; margin: 0 0 6px; font-size: 13px; color: var(--dev-silk); }
 .fwm-garnet__legend span { display: inline-flex; align-items: center; gap: 6px; }
 .fwm-garnet__legend i { width: 14px; height: 14px; border-radius: 50%; flex: none; }
