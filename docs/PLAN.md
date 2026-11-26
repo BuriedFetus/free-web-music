@@ -184,6 +184,9 @@ User's asks (2026-11-25): fake strings you can strum; the scale's notes lit; Cho
 - [x] `devices/Sends.tsx` in the header of Basalt, Garnet, Opal, Quartz and Flint: Reverb / Delay = the Mixer strip's sends (`DeviceHost.sends`, the song's `mix.rev` / `mix.dly`), so either side moves the other, for everyone; presence uses the same `mix.rev` / `mix.dly` controls as the Mixer. Shown only inside the studio (a host). Browser: `?e2e=opal` checks both directions
 
 
+### Play in the song's key (user, 2026-11-26: "When I choose a Key i'd like to have the keyboard note to match the scale … so that we never do wrong note")
+- [x] With a Key set (top bar), the computer keys play only notes of the key: A = the root, the home row A S D F G H J K L ; walks up the scale, the row above (Q W E R T Y U I O P) plays it an octave higher; Z / X still change octave; "No key" = the usual piano layout. `model/scales.ts` (`SCALE_ROW`, `scaleStep`, `snapToKey`), `useComputerKeys({ songKey })`. On-screen piano keys (Basalt): notes outside the key are dimmed and play the nearest key note (a tie goes up); the root is marked. Drum pads unchanged; Garnet's neck already follows the key. Tests `test/scales-keys.test.ts` (3)
+
 ### Geode: grow a sound (planned; user, 2026-11-25: "something similar to Synplant 2 … intuitive for people that never make music and are intimidated by even seeing the BASALT synth")
 Our own take on breeding sounds (no plant art, no names from it). Draft mock-up `design/kit/geode.html` (WebAudio, not yet reviewed).
 - Your sound is a stone in the middle; 8 crystals grow around it, each a variation. Longer crystal = more different; colour follows the sound (dull = deep violet, bright = gold); wobbly sounds shimmer. Each crystal is labelled in plain words from its biggest change ("brighter", "softer start", "echoey").

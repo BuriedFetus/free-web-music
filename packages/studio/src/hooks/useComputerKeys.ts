@@ -1,6 +1,7 @@
 // Play notes from the computer keyboard (two rows like a piano: A W S E D F T G Y H U J K O L P ;).
 // Z / X shift the octave. Ignored while typing in a field or adjusting a slider with the arrows.
 import { useEffect, useRef } from 'react';
+import { SCALE_ROW, SCALE_ROW_UP, SCALES, scaleStep, type SongKey } from '../model/scales';
 
 export const KEY_MAP = ['a', 'w', 's', 'e', 'd', 'f', 't', 'g', 'y', 'h', 'u', 'j', 'k', 'o', 'l', 'p', ';'];
 /** Pads (drum machines): one row, A S D F G H J K = pads 1–8 (base + 0…7). */
@@ -14,6 +15,8 @@ export function useComputerKeys(opts: {
   onOctave?(delta: number): void;
   /** 'pads': A S D F G H J K play base + 0…7 and Z/X do nothing. */
   layout?: 'piano' | 'pads';
+  /** The song's key: with one, the keys play only its notes (A = the root, see SCALE_ROW). */
+  songKey?: SongKey;
 }) {
   const ref = useRef(opts);
   ref.current = opts;
@@ -32,9 +35,19 @@ export function useComputerKeys(opts: {
         ref.current.onOctave?.(k === 'z' ? -1 : 1);
         return;
       }
-      const i = (pads ? PAD_MAP : KEY_MAP).indexOf(k);
-      if (i < 0 || down.has(k)) return;
-      const note = ref.current.base + i;
+      const key = ref.current.songKey;
+      let note: number;
+      if (!pads && key && key.scale !== 'chromatic') {
+        const lo = SCALE_ROW.indexOf(k);
+        const hi = SCALE_ROW_UP.indexOf(k);
+        if ((lo < 0 && hi < 0) || down.has(k)) return;
+        const n = (SCALES[key.scale] ?? SCALES.major).steps.length;
+        note = scaleStep(ref.current.base, lo >= 0 ? lo : hi + n, key);
+      } else {
+        const i = (pads ? PAD_MAP : KEY_MAP).indexOf(k);
+        if (i < 0 || down.has(k)) return;
+        note = ref.current.base + i;
+      }
       down.set(k, note);
       ref.current.onNoteOn(note, 0.85);
     };

@@ -1,6 +1,6 @@
 // Basalt: mono bass synth, front panel. Layout and behaviour follow the approved design kit
 // (design/kit/index.html). It only uses primitives from the theme, so hosts can restyle it.
-import type { SongKey } from '../../model/scales';
+import { inKey, isRoot, snapToKey, type SongKey } from '../../model/scales';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
 import type { ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
@@ -101,9 +101,12 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
     if (!host && engine && status === 'on') for (const n of heldRef.current) engine.noteOn(slot, n, 0.85);
   }, [engine, status, slot, host]);
   const low = 12 * (oct + 1);
+  const sk = host?.songKey;
+  const keyScale = sk && sk.scale !== 'chromatic' ? { has: (n: number) => inKey(n, sk), isRoot: (n: number) => isRoot(n, sk), snap: (n: number) => snapToKey(n, sk) } : undefined;
   useComputerKeys({
     enabled: computerKeys,
     base: low,
+    songKey: host?.songKey,
     onNoteOn: noteOn,
     onNoteOff: noteOff,
     onOctave: (d) => setOct((o) => Math.min(6, Math.max(0, o + d))),
@@ -269,7 +272,7 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
           <P.Screen variant="readout">C{oct}</P.Screen>
           <P.Button variant="hw" label="Octave up" onPress={() => setOct((o) => Math.min(6, o + 1))}>+</P.Button>
         </div>
-        <P.Keys low={low} high={low + 24} held={held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} />
+        <P.Keys low={low} high={low + 24} held={held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} scale={keyScale} />
       </div>
     </div>
   );

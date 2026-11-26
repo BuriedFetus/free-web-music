@@ -29,3 +29,25 @@ export function inKey(m: number, k: SongKey): boolean {
 }
 export const isRoot = (m: number, k: SongKey) => k.scale !== 'chromatic' && (((m - k.root) % 12) + 12) % 12 === 0;
 export const keyLabel = (k: SongKey) => (k.scale === 'chromatic' ? 'No key' : `${NOTE_NAMES[k.root]} ${SCALES[k.scale]?.label ?? k.scale}`);
+
+/** Computer keys when the song has a key: the home row walks up the scale from the root (A = root), the
+ *  row above plays the same notes an octave up. Every key is a note of the scale: no wrong notes. */
+export const SCALE_ROW = ['a', 's', 'd', 'f', 'g', 'h', 'j', 'k', 'l', ';'];
+export const SCALE_ROW_UP = ['q', 'w', 'e', 'r', 't', 'y', 'u', 'i', 'o', 'p'];
+
+/** The note for scale step `d` (0 = the root at or just above `base`). */
+export function scaleStep(base: number, d: number, k: SongKey): number {
+  const steps = (SCALES[k.scale] ?? SCALES.major).steps;
+  const r0 = base + ((((k.root - base) % 12) + 12) % 12);
+  return r0 + steps[d % steps.length] + 12 * Math.floor(d / steps.length);
+}
+
+/** The nearest note of the key (a tie goes up). Without a key, the note itself. */
+export function snapToKey(m: number, k: SongKey): number {
+  if (k.scale === 'chromatic' || inKey(m, k)) return m;
+  for (let d = 1; d < 12; d++) {
+    if (inKey(m + d, k)) return m + d;
+    if (inKey(m - d, k)) return m - d;
+  }
+  return m;
+}

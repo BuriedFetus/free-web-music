@@ -6,7 +6,7 @@ const NAMES = ['C', 'C#', 'D', 'D#', 'E', 'F', 'F#', 'G', 'G#', 'A', 'A#', 'B'];
 export const noteName = (n: number) => NAMES[n % 12] + (Math.floor(n / 12) - 1);
 
 /** Piano keys. Press and slide across keys to play; velocity from how low on the key you press. */
-export function Keys({ low, high, held, peerHeld = [], onNoteOn, onNoteOff }: KeysProps) {
+export function Keys({ low, high, held, peerHeld = [], onNoteOn, onNoteOff, scale }: KeysProps) {
   const notes: number[] = [];
   for (let n = low; n <= high; n++) notes.push(n);
   const whites = notes.filter((n) => !BLACK.has(n % 12));
@@ -19,7 +19,8 @@ export function Keys({ low, high, held, peerHeld = [], onNoteOn, onNoteOff }: Ke
     const el = (document.elementFromPoint(e.clientX, e.clientY) as HTMLElement | null)?.closest<HTMLElement>('[data-note]');
     if (!el) return null;
     const r = el.getBoundingClientRect();
-    return { note: Number(el.dataset.note), vel: Math.min(1, Math.max(0.35, 0.35 + 0.75 * ((e.clientY - r.top) / r.height))) };
+    const n = Number(el.dataset.note);
+    return { note: scale ? scale.snap(n) : n, vel: Math.min(1, Math.max(0.35, 0.35 + 0.75 * ((e.clientY - r.top) / r.height))) };
   };
   const press = (e: PointerEvent) => {
     const hit = noteAt(e);
@@ -47,7 +48,8 @@ export function Keys({ low, high, held, peerHeld = [], onNoteOn, onNoteOff }: Ke
         const black = BLACK.has(n % 12);
         if (!black) wi++;
         const peer = peerOf(n);
-        const cls = (black ? 'fwm-keys__b' : 'fwm-keys__w') + (heldSet.has(n) ? ' is-on' : '') + (peer ? ' is-peer' : '');
+        const cls = (black ? 'fwm-keys__b' : 'fwm-keys__w') + (heldSet.has(n) ? ' is-on' : '') + (peer ? ' is-peer' : '') +
+          (scale && !scale.has(n) ? ' is-out' : '') + (scale?.isRoot(n) ? ' is-root' : '');
         const style = { ...(black ? { left: `calc(${((wi + 1) / whites.length) * 100}% - ${bw / 2}%)`, width: bw + '%' } : {}), ...(peer ? { '--fwm-who': peer } : {}) } as React.CSSProperties;
         return (
           <div key={n} data-note={n} className={cls} style={style} aria-label={noteName(n)}>

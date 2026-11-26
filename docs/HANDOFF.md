@@ -4,6 +4,7 @@
 - **Opal** approved by the user ("perfect"), now with Basalt-style modulation (Assign LFO / Amp env / Swell env, then click a knob).
 - **Quartz** FM keys built and tested (`tests/quartz.rs`, `?e2e=quartz`, harness `?quartz`): waiting for the user's ears.
 - **SEND knobs** (Reverb / Delay) on every instrument's header = the Mixer strip's sends, both ways (`devices/Sends.tsx`, `DeviceHost.sends`).
+- **Play in key** (2026-11-26): with a song Key, computer keys play only scale notes (A = root, home row walks the scale, Q row an octave up); on-screen keys dim off-key notes and snap them.
 - **Geode** (beginner "grow a sound") planned in PLAN.md, draft mock-up `design/kit/geode.html` not reviewed.
 - The user is low on weekly budget: keep turns lean. Next: Quartz feedback (maybe modulation like Opal's), then Geode.
 - Device kit artifacts are stale (Opal's skin is now pearl; Quartz's panel is new): republish when the user asks.

@@ -407,6 +407,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     enabled: !!selTrack,
     base: padLayout ? entry!.rootNote : (entry?.rootNote ?? 48) + octave * 12,
     layout: padLayout ? 'pads' : 'piano',
+    songKey: project.key,
     // A key is released on the track it started on, even if you switched track while holding it.
     onNoteOn: (n, v) => {
       if (!selTrack) return;

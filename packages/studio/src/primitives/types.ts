@@ -55,6 +55,8 @@ export interface KeysProps {
   peerHeld?: { note: number; color: string }[];
   onNoteOn(note: number, velocity: number): void;
   onNoteOff(note: number): void;
+  /** The song's key: notes outside it are dimmed and play the nearest note of the key. */
+  scale?: { has(note: number): boolean; isRoot(note: number): boolean; snap(note: number): number };
 }
 
 export interface Primitives {

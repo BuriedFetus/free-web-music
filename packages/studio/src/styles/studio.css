@@ -124,6 +124,8 @@
 .fwm-keys { flex: 1; position: relative; height: 118px; display: flex; border-radius: calc(8px * var(--fwm-round)); overflow: hidden; background: var(--dev-keybed); padding: 3px; gap: 3px; touch-action: none; user-select: none; }
 .fwm-keys__w { flex: 1; background: linear-gradient(var(--dev-keyhi), var(--dev-key)); border-radius: 0 0 6px 6px; position: relative; cursor: pointer; box-shadow: inset 0 -6px 0 rgba(0,0,0,.08); }
 .fwm-keys__w.is-on { background: linear-gradient(var(--dev-key), color-mix(in srgb, var(--dev-acc) 45%, var(--dev-key))); }
+.fwm-keys__w.is-out, .fwm-keys__b.is-out { opacity: .38; }
+.fwm-keys__w.is-root { box-shadow: inset 0 -6px 0 color-mix(in srgb, var(--dev-acc) 70%, transparent); }
 .fwm-keys__w small { position: absolute; bottom: 6px; left: 0; right: 0; text-align: center; font: 13px var(--fwm-font-screen); color: var(--dev-keylabel); pointer-events: none; }
 .fwm-keys__b { position: absolute; top: 3px; height: 62%; background: linear-gradient(var(--dev-keyb2), var(--dev-keyb)); border-radius: 0 0 5px 5px; z-index: 2; cursor: pointer; box-shadow: 0 3px 3px rgba(0,0,0,.5); }
 .fwm-keys__b.is-on { background: var(--dev-acc); }
