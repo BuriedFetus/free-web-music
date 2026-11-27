@@ -1542,6 +1542,18 @@ async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { curre
       key('a', false);
       ok(pk > 0.02 && pk <= 1, `the Geode plays the tape (peak ${pk.toFixed(3)})`);
       ok(!!viz && viz[3] >= 0, `the panel sees the voice (note ${viz?.[3]})`);
+      {
+        // grains: their events reach the panel (sparks, the film strip)
+        key('a', true);
+        let ev = 0;
+        const t0 = performance.now();
+        while (performance.now() - t0 < 600) {
+          ev = Math.max(ev, engineRef.current!.last!.devices[slot].viz?.[19] ?? 0);
+          await sleep(20);
+        }
+        key('a', false);
+        ok(ev > 0, `grain events reach the panel (${ev} in one tick)`);
+      }
       // the thermometer eases in the engine (the same for everyone)
       const st = p.deviceStore(gid, deviceEntry('geode')!.manifest!)!;
       st.setParam('temp', 0);

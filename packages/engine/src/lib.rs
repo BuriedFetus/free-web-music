@@ -581,7 +581,7 @@ pub extern "C" fn fwm_viz(slot: u32) -> *const f32 {
 
 #[no_mangle]
 pub extern "C" fn fwm_viz_len(slot: u32) -> u32 {
-    rack().and_then(|r| r.device(slot as usize)).map_or(0, |d| d.viz().len() as u32)
+    rack().and_then(|r| r.device_ref(slot as usize)).map_or(0, |d| d.viz_len() as u32)
 }
 
 /// A device action that is not a param (Geode: 1 play the tape (value 1) / stop (0), 2 seek, 3 clear the tape).

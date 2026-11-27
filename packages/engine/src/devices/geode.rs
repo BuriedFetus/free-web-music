@@ -1172,6 +1172,9 @@ impl Device for Geode {
         self.ev_n = 0;
         &self.vz
     }
+    fn viz_len(&self) -> usize {
+        VIZ_LEN
+    }
     fn command(&mut self, cmd: u32, value: f32) {
         match cmd {
             // play the trimmed tape once (Mica's ▶), or stop it

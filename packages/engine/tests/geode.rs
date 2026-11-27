@@ -307,6 +307,7 @@ fn grains_and_tape_show_on_the_panel() {
     g.set_param(p::GRAINS, 1.0);
     g.note_on(60, 1.0);
     render(&mut g, 4800);
+    assert_eq!(g.viz_len(), VIZ_LEN, "asking the length drains nothing");
     let z = g.viz().to_vec();
     assert_eq!(z.len(), VIZ_LEN);
     assert_eq!(z[0], -1.0, "the tape is not playing on its own");
