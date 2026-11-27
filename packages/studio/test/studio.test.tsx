@@ -185,6 +185,36 @@ describe('<Studio>', () => {
     expect(roll.querySelector('.fwm-gr[data-m="38"]')).not.toBeNull();
   });
 
+  it('piano roll automation: only lanes that hold something show; clear one, clear all of the instrument (asks once, undo brings it back)', () => {
+    const p = mount();
+    addInst(screen, 'Basalt');
+    const roll = within(screen.getByRole('region', { name: 'Piano roll' }));
+    const lanes = () => roll.queryAllByLabelText(/^Automation lane for/).map((el) => el.getAttribute('aria-label'));
+    expect(lanes()).toEqual([]);
+    expect(roll.getByText(/No automation yet/)).toBeTruthy();
+    const tr = p.trackIds()[0];
+    const pat = p.patternList(tr)[0].id;
+    act(() => {
+      p.setAutomation(tr, pat, 'cut', 0, 0.5);
+      p.setAutomation(tr, pat, 'res', 3, 0.2);
+    });
+    expect(lanes()).toHaveLength(2);
+    // + Automate a knob opens an empty lane for it
+    fireEvent.change(roll.getByRole('combobox', { name: 'Automate a knob' }), { target: { value: 'drive' } });
+    expect(lanes()).toHaveLength(3);
+    fireEvent.click(roll.getByRole('button', { name: /^Clear .*Cutoff.* automation$/i }));
+    expect(p.automation(tr, pat, 'cut').every((v) => v == null)).toBe(true);
+    expect(lanes()).toHaveLength(2);
+    const all = () => roll.getByRole('button', { name: /Clear all automation|Sure\?/ });
+    fireEvent.click(all());
+    expect(p.automationCount(tr)).toBe(1); // asks first
+    fireEvent.click(all());
+    expect(p.automationCount(tr)).toBe(0);
+    expect(lanes()).toEqual([]);
+    fireEvent.keyDown(window, { key: 'z', ctrlKey: true }); // the studio's own undo
+    expect(p.automationCount(tr)).toBeGreaterThan(0);
+  });
+
   it('songs: save, new from INIT (asks first when not saved), open a saved song, undo', async () => {
     const { lib, files } = memorySongs();
     const p = mount(lib);

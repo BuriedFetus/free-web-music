@@ -227,6 +227,7 @@ Full approved plan (5 rounds with the user): sample-based synth, starts empty, r
 - [x] User feedback 2026-11-27: lighter drawing (no blur, no dust), darker room, the lamp a dimmable neon, the tape plays once unless Loop is on (each new pass fades in, Fade in 5–250 ms)
 - [x] User feedback 2026-11-27 (evening): a ring for every note, the Light dims only the lamp; live bars on every slider (what you hear), drag the back wall = room size, drag dock icons up / down = their amount (icons fill up), bare thermometer; Mica's walk and Motion no longer restart on a TRACK loop (`Sequencer.clock`); Pluck really plucks
 - [ ] The user's ideas for the other pop-up menus (they are thinking about them)
+- [x] Piano roll automation (2026-11-27): only lanes that hold something show (+ Automate a knob opens a new one), Clear per lane, Clear all automation of the instrument in every pattern (asks once, Ctrl+Z undoes)
 - [x] Tab zooms the panels (2026-11-27): mouse over the panels, Tab = full size / all four, and back into the same panel. Shift+Tab and typing untouched
 - [ ] Proposed, awaiting a yes: rings = Mica's voice only (real tape level, solid lines); grains shown on the memory wall (a flash per grain) and as sparks faded by the grains' real level; needs the engine to report each voice's real level instead of the envelope
 - [ ] The user plays it (the sound by ear, the feel of the springs, dragging Mica on a touch screen)

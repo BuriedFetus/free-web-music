@@ -42,7 +42,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const grid = useRef<HTMLDivElement>(null);
   const drag = useRef<Drag | null>(null);
   const [sel, setSel] = useState<string | null>(null);
-  const [autoParam, setAutoParam] = useState('cut');
+  const [adding, setAdding] = useState<string | null>(null); // a knob picked in + Automate, its lane still empty
+  const [sure, setSure] = useState(false); // Clear all asks once
   const prw = useRef<HTMLDivElement>(null);
   const lanesRef = useRef<HTMLDivElement>(null); // velocity + automation scroll sideways with the notes
   const rollSc = useRef<HTMLDivElement>(null);
@@ -118,8 +119,13 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const q = QUANT[ws.snap] ?? 1;
   const manifest = entry.manifest;
   const autoSpecs = manifest.params.filter((p) => p.type === 'float' && p.mod);
-  const autoSpec = autoSpecs.find((p) => p.id === autoParam) ?? autoSpecs[0]; // none for devices without knobs to automate
-  const auto = autoSpec ? project.automation(t.id, pat, autoSpec.id) : [];
+  // Only the lanes that hold something are shown (plus the one just picked in + Automate)
+  const autoLanes = autoSpecs
+    .map((p) => ({ p, v: project.automation(t.id, pat, p.id) }))
+    .filter(({ p, v }) => p.id === adding || v.some((x) => x != null));
+  const autoFree = autoSpecs.filter((p) => !autoLanes.some((l) => l.p.id === p.id));
+  const autoName = (p: { id: string; label: string }) => (p.id.includes('.') ? `${p.id.startsWith('amp') ? 'Amp' : 'Filter'} ${p.label}` : p.label);
+  const autoTotal = project.automationCount(t.id);
   const peerNote = (id: string) => peers.find((p) => p.touch?.track === t.id && p.touch.control === 'note:' + id);
 
   const at = (e: { clientX: number; clientY: number }) => {
@@ -242,7 +248,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
   };
 
   // Velocity + automation lanes: drag across steps to draw.
-  const lane = (kind: 'vel' | 'auto') => {
+  const lane = (kind: 'vel' | 'auto', autoSpec?: { id: string }) => {
     const set = (e: PointerEvent<HTMLDivElement>) => {
       const r = e.currentTarget.getBoundingClientRect();
       const i = Math.max(0, Math.min(L - 1, Math.floor(((e.clientX - r.left - 4) / (r.width - 8)) * L)));
@@ -401,28 +407,53 @@ export function RollView({ peers }: { peers: Peer[] }) {
           return <div key={i} className="fwm-ab is-vel"><i style={{ height: `${n ? Math.round(n.v * 100) : 0}%` }} /></div>;
         })}
       </div>
-{autoSpec && (<>
+{autoSpecs.length > 0 && (<>
       <div className="fwm-lanehead" style={{ marginLeft: KEYW }}>
-        <label>
-          Automation
-          <select value={autoSpec.id} aria-label="Automated parameter" onChange={(e) => { setAutoParam(e.target.value); e.target.blur(); }}>
-            {autoSpecs.map((p) => (
-              <option key={p.id} value={p.id}>
-                {p.id.includes('.') ? `${p.id.startsWith('amp') ? 'Amp' : 'Filter'} ${p.label}` : p.label}
-                {project.automation(t.id, pat, p.id).some((v) => v != null) ? ' •' : ''}
-              </option>
-            ))}
-          </select>
-        </label>
-        <button type="button" className="fwm-tb fwm-tb--xs" onClick={() => project.clearAutomation(t.id, pat, autoSpec.id)}>Clear lane</button>
+        <span>Automation</span>
+        <select value="" aria-label="Automate a knob" disabled={!autoFree.length} onChange={(e) => { setAdding(e.target.value || null); e.target.blur(); }}>
+          <option value="">+ Automate a knob…</option>
+          {autoFree.map((p) => <option key={p.id} value={p.id}>{autoName(p)}</option>)}
+        </select>
+        <button type="button" className={'fwm-tb fwm-tb--xs' + (sure ? ' is-warn' : '')} disabled={!autoTotal}
+          title={`Every automation lane of ${t.name}, in every pattern (Ctrl+Z brings it back)`}
+          onClick={() => {
+            if (!sure) {
+              setSure(true);
+              setTimeout(() => setSure(false), 4000);
+              return;
+            }
+            setSure(false);
+            setAdding(null);
+            project.clearAllAutomation(t.id);
+          }}
+          onBlur={() => setSure(false)}>
+          {sure ? `Sure? Clear all of ${t.name} (every pattern)` : 'Clear all automation'}
+        </button>
       </div>
-      <div className="fwm-abars" style={{ marginLeft: KEYW, gridTemplateColumns: `repeat(${L}, minmax(0, 1fr))` }} aria-label={`Automation lane for ${autoSpec.label}`} {...lane('auto')}>
-        {auto.map((v, i) => (
-          <div key={i} className={'fwm-ab' + (step === i ? ' is-now' : '')} title={v == null ? 'No automation' : formatParam(autoSpec, v)}>
-            {v != null && <i style={{ height: `${Math.round(v * 100)}%` }} />}
+      {!autoLanes.length && (
+        <p className="fwm-lanenone" style={{ marginLeft: KEYW }}>
+          {autoTotal ? 'No automation in this pattern' : 'No automation yet'}: pick a knob in <b>+ Automate a knob</b>, or turn knobs with Rec + Play.
+        </p>
+      )}
+      {autoLanes.map(({ p, v: auto }) => (
+        <div key={p.id} className="fwm-alane">
+          <div className="fwm-lanehead fwm-lanehead--lane" style={{ marginLeft: KEYW }}>
+            <span>{autoName(p)}</span>
+            <button type="button" className="fwm-tb fwm-tb--xs" aria-label={`Clear ${autoName(p)} automation`}
+              onClick={() => {
+                if (adding === p.id) setAdding(null);
+                project.clearAutomation(t.id, pat, p.id);
+              }}>Clear</button>
           </div>
-        ))}
-      </div>
+          <div className="fwm-abars" style={{ marginLeft: KEYW, gridTemplateColumns: `repeat(${L}, minmax(0, 1fr))` }} aria-label={`Automation lane for ${p.label}`} {...lane('auto', p)}>
+            {auto.map((x, i) => (
+              <div key={i} className={'fwm-ab' + (step === i ? ' is-now' : '')} title={x == null ? 'No automation' : formatParam(p, x)}>
+                {x != null && <i style={{ height: `${Math.round(x * 100)}%` }} />}
+              </div>
+            ))}
+          </div>
+        </div>
+      ))}
 </>)}
       </div>
       </div>

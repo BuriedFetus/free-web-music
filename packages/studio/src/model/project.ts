@@ -805,6 +805,16 @@ export class Project {
       else a.set(`${param}@${step}`, Math.max(0, Math.min(1, value)));
     });
   }
+  /** How many automation points this instrument has, in every pattern. */
+  automationCount(track: string): number {
+    return this.patternList(track).reduce((n, p) => n + (this.autoMap(track, p.id)?.size ?? 0), 0);
+  }
+  /** Clears every automation lane of this instrument, in every pattern (one undo step). */
+  clearAllAutomation(track: string) {
+    this.action(() => {
+      for (const p of this.patternList(track)) this.autoMap(track, p.id)?.clear();
+    });
+  }
   clearAutomation(track: string, pat: string, param: string) {
     const a = this.autoMap(track, pat);
     if (!a) return;

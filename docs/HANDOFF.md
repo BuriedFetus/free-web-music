@@ -9,6 +9,7 @@
 - Mica's walk and Motion no longer restart when a TRACK loops: devices get `Sequencer.clock` (steps since Play; a joiner starts at the row position), not the row position.
 - Breath: Pluck now really plucks (Sustain pulled to 0, shorter decay; the pull is near full in the Pluck / Swell zones, gentle in the middle). Test `pluck_dies_away_while_the_key_is_held`.
 - The user is thinking about ideas for the other pop-up menus: wait for them.
+- Piano roll automation: one lane per automated knob, only those with points; + Automate a knob; Clear / Clear all automation (Project.clearAllAutomation, automationCount).
 - Tab zooms the panels (Workspace.tsx): only while the mouse is over them. Proposed and awaiting the user: rings for the voice only, grains on the memory wall + sparks (see PLAN).
 
 ## Earlier (2026-11-27, later): Geode lighter, darker, plays once
