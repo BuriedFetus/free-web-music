@@ -47,8 +47,14 @@ export type TransportMessage =
       wait?: boolean;
     };
 
+/**
+ * Geode's tapes (recorded sound), sent live and never stored by the studio on a server: a piece of a tape
+ * ({t:'smp'}, ~32 KB of base64 each, a few per 40 ms while one is being sent) and "who has this tape?" ({t:'smp?'}).
+ */
+export type TapeMessage = import('../model/sampleStore').TapeChunk | import('../model/sampleStore').TapeAsk;
+
 /** Everything on the live channel. The host relays these as they are, to everyone in the session. */
-export type LiveMessage = NoteMessage | TransportMessage;
+export type LiveMessage = NoteMessage | TransportMessage | TapeMessage;
 
 /** A low-latency ephemeral message channel to everyone in the session (e.g. a WebRTC data channel). */
 export interface LiveChannel {

@@ -17,6 +17,8 @@ import { useComputerKeys } from '../hooks/useComputerKeys';
 import { engineFx } from '../model/fx';
 import { BAR, MAX_LEN, Project, type TrackInfo } from '../model/project';
 import { ThemeRoot, type StudioTheme } from '../theme/Theme';
+import { browserTapeStorage, fromPcm, resample, type TapeStorage } from '../model/sampleStore';
+import { useTapes, type TapesCtl } from './useTapes';
 import { QUANT, StudioContext, type StudioCtx, type Workspace } from './context';
 import { TopBar } from './TopBar';
 import { WorkspaceGrid } from './Workspace';
@@ -37,6 +39,9 @@ export interface StudioProps {
   look?: string | null;
   /** Called when the person keeps a new look (null = back to the default). */
   onLookChange?(css: string | null): void;
+  /** Where Geode's tapes (recorded sound) are kept between visits. Leave it out and the studio keeps
+   *  them in this browser (IndexedDB); null = only for this visit. They are never put in the song. */
+  tapes?: TapeStorage | null;
 }
 
 export function Studio(props: StudioProps) {
@@ -58,7 +63,7 @@ function loadWs(key: string): Workspace {
   }
 }
 
-function StudioInner({ doc, awareness = null, channel = null, songs = null, user, look: hostLook, onLookChange }: StudioProps) {
+function StudioInner({ doc, awareness = null, channel = null, songs = null, user, look: hostLook, onLookChange, tapes: tapeStorage }: StudioProps) {
   const project = useMemo(() => new Project(doc, { user: user.id }), [doc, user.id]);
   const presence = useMemo(() => new PresenceModel(awareness, user), [awareness, user]);
   useEffect(() => () => presence.destroy(), [presence]);
@@ -379,13 +384,29 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
     [recPos, ws.recQuant, project],
   );
 
+  // ---- Geode's tapes: recording, keeping, sharing (see useTapes.ts) ----
+  const tapes = useTapes({
+    project, channel, engine: live, session: sync.session, slotOf, toast, start,
+    storage: tapeStorage === undefined ? browserTapeStorage() : tapeStorage,
+    resetTrim: (geode) => {
+      const m = deviceEntry('geode')?.manifest;
+      const st = m ? project.deviceStore(geode, m) : null;
+      st?.setParam('start', 0);
+      st?.setParam('end', 1);
+    },
+  });
+  // While a Geode records, its keys play the instrument being recorded; a key is released where it was pressed.
+  const noteTo = useRef(new Map<string, string>());
+
   // ---- notes ----
   // When this key is heard here (page ms): others play it at this moment + their buffer.
   const lat = live?.latency();
   outLatency.current = lat ? (lat.base + lat.output) * 1000 : 0;
   const heardAt = heardNow;
   const playNote = useCallback(
-    (track: string, note: number, vel: number) => {
+    (to: string, note: number, vel: number) => {
+      const track = tapes.target(to);
+      noteTo.current.set(`${to}:${note}`, track);
       if (status !== 'on') void start();
       const slot = slots.current.get(track);
       if (live && slot != null) live.noteOn(slot, note, vel);
@@ -393,10 +414,12 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
       const t = project.track(track);
       if (rec && t) recordOn(t, note, vel);
     },
-    [status, start, live, channel, user.id, project, rec, recordOn, sync, heardAt],
+    [status, start, live, channel, user.id, project, rec, recordOn, sync, heardAt, tapes],
   );
   const releaseNote = useCallback(
-    (track: string, note: number) => {
+    (from: string, note: number) => {
+      const track = noteTo.current.get(`${from}:${note}`) ?? from;
+      noteTo.current.delete(`${from}:${note}`);
       const slot = slots.current.get(track);
       if (live && slot != null) live.noteOff(slot, note);
       channel?.send({ t: 'off', track, note, user: user.id, from: sync.session, at: heardAt() });
@@ -548,7 +571,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   const ctx: StudioCtx = {
     project, presence, user, channel, songs, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop,
     transport: sync, liveTiming: timing, rec, setRec, recMode, slotOf, cueRow,
-    playNote, releaseNote, audition, peerHeld, myHeld, toast,
+    playNote, releaseNote, audition, peerHeld, myHeld, toast, tapes,
     look: { css: keptLook, set: setLook, preview: lookPreview, setPreview: setLookPreview, hostKeeps: hostLook !== undefined, off: lookOff },
   };
 
@@ -558,7 +581,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
         const slot = slots.current.get(t.id);
         // Solo: when any instrument is soloed, only soloed ones are heard. Mute silences notes and live keys.
         const audible = !t.seq.mute && (!anySolo || project.mix(t.id).solo);
-        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} held={held} audible={audible} />;
+        return slot == null ? null : <TrackEngine key={t.id} project={project} track={t} slot={slot} held={held} audible={audible} tapes={tapes} />;
       })}
       {live && <SongEngine project={project} slotOf={slotOf} loop={ws.loop} />}
       {live && <FxEngine project={project} />}
@@ -582,7 +605,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
 }
 
 /** Keeps one instrument's device, sequencer settings and all its patterns mirrored in the engine. */
-function TrackEngine({ project, track, slot, held, audible }: { project: Project; track: TrackInfo; slot: number; held: HeldParams; audible: boolean }) {
+function TrackEngine({ project, track, slot, held, audible, tapes }: { project: Project; track: TrackInfo; slot: number; held: HeldParams; audible: boolean; tapes: TapesCtl }) {
   const { engine } = useEngine();
   const sent = useRef(new Map<string, string>()); // patternId → what the engine has
   const seqKey = useRef('');
@@ -590,6 +613,34 @@ function TrackEngine({ project, track, slot, held, audible }: { project: Project
   const manifest = deviceEntry(track.device)!.manifest!;
   const store = project.deviceStore(track.id, manifest)!;
   useDeviceSync(engine, store, slot, track.device, held);
+  // Geode: load its tape into the engine (after the device is made), or ask the session for it
+  const tape = track.device === 'geode' ? project.tape(track.id) : null;
+  const have = useSyncExternalStore(tapes.store.subscribe, () => (tape ? tapes.store.has(tape.hash) : false));
+  useEffect(() => {
+    if (!engine || track.device !== 'geode') return;
+    if (!tape) {
+      void engine.setSample(slot, new Float32Array(0));
+      return;
+    }
+    let dead = false;
+    let timer: ReturnType<typeof setInterval> | undefined;
+    void tapes.store.get(tape.hash).then((t) => {
+      if (dead) return;
+      if (!t) {
+        // nobody sent it yet: ask, and keep asking now and then until someone who has it is here
+        tapes.ask(tape.hash);
+        timer = setInterval(() => tapes.ask(tape.hash), 5000);
+        return;
+      }
+      const sr = engine.context.sampleRate;
+      const { l, r } = fromPcm(t);
+      void engine.setSample(slot, resample(l, t.sr, sr), t.ch === 2 ? resample(r, t.sr, sr) : undefined);
+    });
+    return () => {
+      dead = true;
+      clearInterval(timer);
+    };
+  }, [engine, store, slot, track.device, tape?.hash, have]); // eslint-disable-line react-hooks/exhaustive-deps
   // Re-send everything when the engine (re)starts or the device is re-created (removing a device
   // in the worklet also forgets its patterns).
   useEffect(() => {

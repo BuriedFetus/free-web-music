@@ -108,9 +108,28 @@ export interface SongFile {
     /** Missing in older files: defaults. */
     mix?: MixSettings;
     patterns: { id: string; name: string; len: number; notes: Note[]; auto: Record<string, number>; lens?: Record<string, number> }[];
+    /** Geode: which tape it plays (the sound itself is never in the song, see model/sampleStore.ts). */
+    tape?: TapeMeta;
   }[];
   rows: SongRow[];
 }
+
+/**
+ * A Geode's tape as the song knows it: a fingerprint and a few facts. The sound travels outside the
+ * song (live channel, kept in each browser), so a newcomer knows what to ask for.
+ */
+export interface TapeMeta {
+  hash: string;
+  name: string;
+  /** Frames per channel at `sr`. */
+  frames: number;
+  sr: number;
+  ch: 1 | 2;
+}
+const validTape = (t: unknown): t is TapeMeta => {
+  const m = t as TapeMeta;
+  return !!m && typeof m.hash === 'string' && m.hash.length > 0 && m.frames > 0 && m.sr > 0 && (m.ch === 1 || m.ch === 2);
+};
 
 /** FNV-1a hash of a string (to tell whether the song changed since it was saved, the same on every client). */
 function hash(s: string): string {
@@ -323,6 +342,7 @@ export class Project {
           params: (m.get('params') as Y.Map<number>).toJSON() as Record<string, number>,
           routes: (m.get('routes') as Y.Array<Route>).toArray(),
           mix: this.mix(t.id),
+          ...(this.tape(t.id) ? { tape: this.tape(t.id)! } : {}),
           patterns: this.patternList(t.id).map((p) => ({
             ...p,
             notes: this.notes(t.id, p.id).map(([, n]) => n),
@@ -403,6 +423,7 @@ export class Project {
         routes.push((ft.routes ?? []).filter((r) => canRoute(manifest, r.src, r.target)).slice(0, MAX_ROUTES));
         t.set('routes', routes);
         for (const k of MIX_KEYS) if (ft.mix?.[k] != null) t.set('mix.' + k, clampMix(k, ft.mix[k] as never));
+        if (validTape(ft.tape)) t.set('tape', { hash: ft.tape.hash, name: String(ft.tape.name || 'Tape'), frames: ft.tape.frames, sr: ft.tape.sr, ch: ft.tape.ch });
         const pats = new Y.Array<string>();
         t.set('pats', pats);
         this.tracksMap.set(ft.id, t);
@@ -460,6 +481,20 @@ export class Project {
   }
   tracks(): TrackInfo[] {
     return this.trackIds().map((id) => this.track(id)!);
+  }
+  /** Geode: the tape this track plays, or null (empty). */
+  tape(track: string): TapeMeta | null {
+    const t = this.tracksMap.get(track)?.get('tape');
+    return validTape(t) ? t : null;
+  }
+  /** Geode: play this tape (null = empty). One undo step, so removing a tape can be undone. */
+  setTape(track: string, meta: TapeMeta | null) {
+    const t = this.tracksMap.get(track);
+    if (!t) return;
+    this.action(() => {
+      if (meta && validTape(meta)) t.set('tape', { ...meta });
+      else t.delete('tape');
+    });
   }
 
   /**
