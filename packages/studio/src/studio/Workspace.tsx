@@ -77,7 +77,27 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
       }
     };
     addEventListener('keydown', kd, true);
-    return () => removeEventListener('keydown', kd, true);
+    // something asks for a view (double-click a pattern → the Piano roll): show it, bring it forward
+    const openView = (e: Event) => {
+      const v = (e as CustomEvent<ViewId>).detail;
+      if (!(v in VIEWS)) return;
+      const cur = live.current;
+      let i = cur.views.indexOf(v);
+      const views = cur.views.slice();
+      if (i < 0) {
+        // put it in a panel that is not the song or the device (the last such one)
+        i = [3, 2, 1, 0].find((k) => views[k] !== 'seq' && views[k] !== 'device') ?? 2;
+        views[i] = v;
+      }
+      const wide = (cur.wide ?? []).filter((k) => k !== (i ^ 1)); // a neighbour taking the whole row would hide it
+      if (cur.max >= 0 && cur.max !== i) back.current = cur.max; // Tab goes back to where you were
+      save({ ...cur, views, wide, max: cur.max >= 0 ? i : -1 });
+    };
+    addEventListener('fwm:open-view', openView);
+    return () => {
+      removeEventListener('keydown', kd, true);
+      removeEventListener('fwm:open-view', openView);
+    };
   }, [save]);
 
   const splitDown = (which: 'v' | 'h') => (e: PointerEvent<HTMLDivElement>) => {

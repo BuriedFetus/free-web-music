@@ -4,7 +4,8 @@
 // Drag a cell to another TRACK of the same instrument to play its pattern there too (hold Ctrl or Alt when
 // dropping for a separate copy), onto another instrument for a copy of it there (melodies to melodic
 // instruments, drum patterns to drum machines), or onto "+ Add TRACK" for a new TRACK that plays it.
-// Double-click a cell (or Delete) to empty it. Everything is undoable.
+// Double-click a cell to open its pattern in the Piano roll (an empty one gets a new pattern); right-click,
+// the ✕ on hover, or Delete empties it. Everything is undoable.
 import { createContext, useContext, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { Peer } from '../../collab/presence';
 import { deviceEntry, LIBRARY } from '../../devices/registry';
@@ -137,7 +138,7 @@ export function SeqView({ peers }: { peers: Peer[] }) {
             onChange={(e) => project.setSwing(Number(e.target.value) / 100)} />
         </label>
         <span>{Math.round(project.swing * 100)}%</span>
-        <span className="fwm-sqtip">Click a cell to edit its pattern in the Piano roll. Drag it to another TRACK or instrument (hold Ctrl for a separate copy), or onto + Add TRACK; double-click to empty it. A TRACK lasts as long as its longest pattern.</span>
+        <span className="fwm-sqtip">Click a cell to edit its pattern in the Piano roll. Drag it to another TRACK or instrument (hold Ctrl for a separate copy), or onto + Add TRACK. Double-click a cell to open its pattern (an empty one gets a new pattern); right-click or ✕ empties it. A TRACK lasts as long as its longest pattern.</span>
       </div>
       {tracks.length === 0 && <p className="fwm-empty">No instruments yet. Add Basalt from the Library, or with + Instrument.</p>}
       <DragCtx.Provider value={{ drag, verdict, start, justDragged }}>
@@ -263,25 +264,41 @@ function Cell({ row, rowName, rowLen, track: t, now }: { row: string; rowName: s
     project.setCell(row, t.id, null);
     toast(`${info.name} taken out of ${rowName} (it stays in ${t.name}'s patterns)`, { label: 'Undo', run: () => project.undo() });
   };
+  // double-click: into the pattern (the Piano roll shows it, and comes forward if it was hidden)
+  const open = () => {
+    setWs({ row, track: t.id });
+    dispatchEvent(new CustomEvent('fwm:open-view', { detail: 'roll' }));
+  };
   if (!info)
     return (
-      <button type="button" className={'fwm-cell' + (on ? ' is-on' : '') + dragCls} onClick={select} aria-label={`${rowName}, ${t.name}: silent`} {...cellAttrs}>
+      <button type="button" className={'fwm-cell' + (on ? ' is-on' : '') + dragCls} onClick={select} aria-label={`${rowName}, ${t.name}: silent`} {...cellAttrs}
+        title="Double-click: a new pattern here" onContextMenu={(e) => e.preventDefault()}
+        onDoubleClick={() => {
+          const id = project.addPattern(t.id);
+          project.setCell(row, t.id, id);
+          open();
+        }}>
         <span className="fwm-cell__empty">—</span>
       </button>
     );
   const reps = rowLen / project.playLen(t.id, info.id);
   const idx = project.patternList(t.id).findIndex((p) => p.id === info.id);
   return (
+    <div className="fwm-cellw">
     <button type="button" className={'fwm-cell has' + (on ? ' is-on' : '') + dragCls} onClick={select} {...cellAttrs}
-      onPointerDown={(e) => dnd.start(e, row, t.id, info.id, info.name)}
-      onDoubleClick={empty}
+      onPointerDown={(e) => e.button === 0 && dnd.start(e, row, t.id, info.id, info.name)}
+      onDoubleClick={open}
+      onContextMenu={(e) => {
+        e.preventDefault();
+        empty();
+      }}
       onKeyDown={(e) => {
         if (e.key === 'Delete' || e.key === 'Backspace') {
           e.preventDefault();
           empty();
         }
       }}
-      title={`${info.name}: drag to another TRACK or instrument (Ctrl: a separate copy), double-click to empty`}
+      title={`${info.name}: double-click to open, drag to another TRACK or instrument (Ctrl: a separate copy), right-click to empty`}
       style={{ '--k': idx % 4, '--tw': `${(project.playLen(t.id, info.id) / rowLen) * 100}%` } as React.CSSProperties}
       aria-label={`${rowName}, ${t.name}: ${info.name}`}>
       <span className="fwm-cell__top">
@@ -293,6 +310,8 @@ function Cell({ row, rowName, rowLen, track: t, now }: { row: string; rowName: s
       <span className="fwm-cell__ticks" />
       {now && <CellProgress slot={slotOf(t.id)} len={info.len} />}
     </button>
+    <button type="button" className="fwm-cell__x" aria-label={`Empty ${rowName}, ${t.name}`} title={`Take ${info.name} out of ${rowName}`} onClick={empty}>✕</button>
+    </div>
   );
 }
 

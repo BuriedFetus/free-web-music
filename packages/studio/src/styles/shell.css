@@ -137,6 +137,13 @@
 .fwm-cell__bar { fill: color-mix(in srgb, var(--fwm-roll-ink) 35%, transparent); }
 .fwm-cell__ph { position: absolute; bottom: 9px; height: 26px; width: 2px; margin-left: -1px; background: var(--fwm-roll-ink); box-shadow: 0 0 calc(6px * var(--fwm-glow)) var(--fwm-roll-ink); }
 .fwm-cell__empty { opacity: .55; font-size: 20px; }
+.fwm-cellw { position: relative; display: flex; min-width: 0; }
+.fwm-cellw > .fwm-cell { flex: 1; min-width: 0; }
+.fwm-cell__x { position: absolute; top: 4px; right: 4px; width: 26px; height: 26px; border-radius: 50%; border: 0; padding: 0; cursor: pointer; z-index: 2;
+  background: color-mix(in srgb, var(--fwm-roll-deep) 85%, transparent); color: var(--fwm-roll-ink); font-size: 13px; opacity: 0; transition: opacity .12s; }
+.fwm-cellw:hover .fwm-cell__x, .fwm-cell__x:focus-visible { opacity: 1; }
+.fwm-cell__x:hover { background: var(--fwm-rec); color: var(--fwm-on-rec); }
+@media (hover: none) { .fwm-cell__x { opacity: .8; } }
 /* drag a cell to another TRACK */
 .fwm-cell.has { touch-action: none; }
 .fwm-arrw.is-dragging, .fwm-arrw.is-dragging .fwm-cell { cursor: grabbing; }

@@ -300,6 +300,26 @@ describe('<Studio>', () => {
     expect(JSON.parse(localStorage.getItem('fwm.presets.u1.opal')!)[0].name).toBe('Pad of mine');
   });
 
+  it('song arrangement: double-click opens a pattern (an empty cell gets a new one), right-click or ✕ empties it', () => {
+    const p = mount();
+    addInst(screen, 'Basalt');
+    const tr = p.trackIds()[0];
+    const r1 = p.rows()[0].id;
+    const cell = () => screen.getByRole('button', { name: new RegExp(`^TRACK 1, Basalt`) });
+    const first = p.cell(r1, tr)!;
+    fireEvent.contextMenu(cell());
+    expect(p.cell(r1, tr)).toBeNull(); // right-click empties it (the pattern stays with Basalt)
+    expect(p.patternList(tr).some((x) => x.id === first)).toBe(true);
+    const n = p.patternList(tr).length;
+    fireEvent.doubleClick(cell());
+    expect(p.patternList(tr).length).toBe(n + 1); // an empty cell: a new pattern, in the Piano roll
+    const made = p.cell(r1, tr)!;
+    expect(made).toBeTruthy();
+    expect(within(screen.getByRole('region', { name: 'Piano roll' })).getByRole('button', { name: p.patternInfo(tr, made)!.name, pressed: true })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: /^Empty TRACK 1, Basalt/ }));
+    expect(p.cell(r1, tr)).toBeNull(); // the ✕ on hover
+  });
+
   it('songs: save, new from INIT (asks first when not saved), open a saved song, undo', async () => {
     const { lib, files } = memorySongs();
     const p = mount(lib);

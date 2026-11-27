@@ -249,9 +249,9 @@
 .fwm-garnet__dot.is-g-second { background: var(--dev-guide-2); }
 .fwm-garnet__dot.is-g-third { background: var(--dev-guide-3); }
 .fwm-garnet__dot.is-g-alt { background: var(--dev-guide-alt); }
-/* Notes mode: notes are rectangles half a fret wide (easy to read and to hit, never over the next string);
-   a guided note carries its Roman numeral inside */
-.fwm-garnet__neck:not(.is-chords) .fwm-garnet__dot:not(.is-off) { min-width: max(50%, 30px); max-width: 92%; padding: 0 6px; white-space: nowrap; height: 30px; border-radius: calc(6px * var(--fwm-round));
+/* With the chord guide: notes are rectangles half a fret wide (easy to read and to hit, never over the next
+   string); a guided note carries its Roman numeral inside. Without it they stay round, like a real neck's dots */
+.fwm-garnet__neck.is-guide .fwm-garnet__dot:not(.is-off) { min-width: max(50%, 30px); max-width: 92%; padding: 0 6px; white-space: nowrap; height: 30px; border-radius: calc(6px * var(--fwm-round));
   display: flex; justify-content: center; align-items: center; gap: 5px; font-size: 14px; }
 .fwm-garnet__rn-badge { font: 700 11px/1 var(--fwm-font-ui); opacity: .85; }
 .fwm-garnet__rn-badge.is-alt { opacity: 1; padding: 2px 3px; border-radius: 4px; background: var(--dev-guide-alt); }

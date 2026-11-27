@@ -1290,9 +1290,9 @@ async function runArrange(p: Project, ok: (c: boolean, l: string) => void, out: 
     await sleep(80);
     ok(!$('.fwm-dragghost'), 'Escape cancels the drag');
     fire(window, 'pointerup', 0, 0);
-    cellEl(r2, t).dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+    cellEl(r2, t).dispatchEvent(new MouseEvent('contextmenu', { bubbles: true, cancelable: true }));
     await sleep(100);
-    ok(p.cell(r2, t) === null && p.patternList(t).some((x) => x.id === groove), 'double-click empties the cell; the pattern stays with the instrument');
+    ok(p.cell(r2, t) === null && p.patternList(t).some((x) => x.id === groove), 'right-click empties the cell; the pattern stays with the instrument');
     btn('Undo')!.click();
     await sleep(100);
     ok(p.cell(r2, t) === groove, 'Undo puts it back');

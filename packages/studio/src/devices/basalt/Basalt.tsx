@@ -309,6 +309,10 @@ function useParam(ctx: ParamCtx, id: string) {
   const live = useEffectiveValue(status === 'on' ? engine : null, ctx.slot, index);
   const range = modRange(state, id);
   const target = !!ctx.assign && canRoute(m, ctx.assign, id);
+  // automation moves the knob: without modulation on it, it shows what the engine plays (unless you are turning it)
+  const [held, setHeld] = useState(false);
+  const stored = state.params[id];
+  const shown = !range && !held && live != null && Math.abs(live - stored) > 0.004 ? live : stored;
   const onTargetDown = (e: RPointerEvent) => {
     if (!target || !ctx.assign) return;
     e.stopPropagation();
@@ -318,14 +322,20 @@ function useParam(ctx: ParamCtx, id: string) {
   };
   return {
     spec,
-    value: state.params[id],
+    value: shown,
     onChange: (v: number) => {
       ctx.store.setParam(id, v);
       ctx.host?.paramChanged?.(id, v);
     },
     presence: ctx.host?.presenceFor(id) ?? [],
-    onGestureStart: () => ctx.host?.touch(id),
-    onGestureEnd: () => ctx.host?.touch(null),
+    onGestureStart: () => {
+      setHeld(true);
+      ctx.host?.touch(id);
+    },
+    onGestureEnd: () => {
+      setHeld(false);
+      ctx.host?.touch(null);
+    },
     format: (v: number) => formatParam(spec, v),
     modulation: range ? { ...range, current: live ?? undefined } : undefined,
     target,

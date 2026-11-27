@@ -4,7 +4,7 @@
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import { PresetBar } from '../PresetBar';
 import { useEngine } from '../../engine/EngineProvider';
-import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
+import { useDeviceState, useDeviceSync, useEffectiveValue } from '../../engine/useDeviceSync';
 import type { DeviceStore } from '../../model/deviceStore';
 import { formatParam } from '../../model/params';
 import { DEFAULT_KEY, SCALES, NOTE_NAMES, type SongKey } from '../../model/scales';
@@ -27,11 +27,12 @@ const VIEW_KEY = 'fwm.garnet.neck';
 function loadView(): NeckView {
   try {
     const v = JSON.parse(localStorage.getItem(VIEW_KEY) || 'null');
-    if (v && (v.mode === 'chords' || v.mode === 'notes') && CHORD_TYPES.some(([id]) => id === v.type)) return { mode: v.mode, type: v.type, lock: !!v.lock, guide: v.guide !== false };
+    // the neck always shows notes now (Chords mode is gone, user 2026-11-27)
+    if (v && CHORD_TYPES.some(([id]) => id === v.type)) return { mode: 'notes', type: v.type, lock: !!v.lock, guide: v.guide !== false };
   } catch {
     /* no storage */
   }
-  return { mode: 'chords', type: 'triad', lock: false, guide: true };
+  return { mode: 'notes', type: 'triad', lock: false, guide: true };
 }
 /** A plucked string rings until it is plucked again, a chord without it is strummed, or this long. */
 const RING_MS = 4000;
@@ -162,7 +163,7 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
     host?.paramChanged?.(id, v);
   };
   const people = host?.people ?? [{ userId: 'me', name: user.name, color: user.color }];
-  const knob = (id: string, size?: 'lg') => <GKnob key={id} store={store} host={host} id={id} set={set} size={size} />;
+  const knob = (id: string, size?: 'lg') => <GKnob key={id} store={store} host={host} id={id} set={set} size={size} slot={slot} />;
   const peerNotes = new Map((host?.peerHeld ?? []).map((h) => [h.note, h.color]));
   // computer keys: show where each held note is on the neck (the string a guitarist would use, as the
   // engine does: the highest free string that reaches it) and make that string ring
@@ -253,29 +254,15 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
       <div className="fwm-brk">Play</div>
       <div className="fwm-garnet__play">
         {['strum', 'vib', 'slide', 'ring'].map((id) => knob(id))}
-        <div className="fwm-seg fwm-garnet__mode" role="group" aria-label="What the neck plays">
-          <P.Button variant="seg" label="Chords" pressed={view.mode === 'chords'} onPress={() => setView({ mode: 'chords' })}>Chords</P.Button>
-          <P.Button variant="seg" label="Notes" pressed={view.mode === 'notes'} onPress={() => setView({ mode: 'notes' })}>Notes</P.Button>
-        </div>
-        {view.mode === 'chords' ? (
-          <div className="fwm-seg fwm-seg--wrap fwm-garnet__types" role="group" aria-label="Chord type">
-            {CHORD_TYPES.map(([id, l]) => (
-              <P.Button key={id} variant="seg" label={l} pressed={view.type === id} onPress={() => setView({ type: id })} />
-            ))}
-          </div>
-        ) : (
-          <>
-            <P.Button variant="hw" label="Only scale notes" pressed={view.lock} onPress={() => setView({ lock: !view.lock })}>Only scale notes</P.Button>
-            <P.Button variant="hw" label="Chord guide" pressed={view.guide} onPress={() => { setGuide(NO_GUIDE); setView({ guide: !view.guide }); }}>Chord guide</P.Button>
-          </>
-        )}
+        <P.Button variant="hw" label="Only scale notes" pressed={view.lock} onPress={() => setView({ lock: !view.lock })}>Only scale notes</P.Button>
+        <P.Button variant="hw" label="Chord guide" pressed={view.guide} onPress={() => { setGuide(NO_GUIDE); setView({ guide: !view.guide }); }}>Chord guide</P.Button>
         <P.Button variant="hw" label="Palm mute" pressed={state.params.mute >= 0.5} presence={host?.presenceFor('mute')}
           onPress={() => set('mute', state.params.mute >= 0.5 ? 0 : 1)}>Palm mute</P.Button>
         <Whammy value={state.params.wham ?? 0.5} set={(v) => set('wham', v)} host={host} />
       </div>
 
       {guideOn && <GuideLegend guide={guide} songKey={key} />}
-      <Neck mode={view.mode} lock={view.lock} songKey={key} chords={chords} peerNotes={peerNotes} mine={mine} roles={roles} badges={badges} strings={strings}
+      <Neck mode={view.mode} lock={view.lock} guide={guideOn} songKey={key} chords={chords} peerNotes={peerNotes} mine={mine} roles={roles} badges={badges} strings={strings}
         onPluck={(st: number, m: number, v: number) => {
           if (view.mode === 'notes') press(m);
           pluck(st, m, v);
@@ -293,15 +280,22 @@ export function defaultsOf(store: DeviceStore): Record<string, number> {
   return Object.fromEntries(store.manifest.params.map((p) => [p.id, p.default]));
 }
 
-export function GKnob({ store, host, id, set, size, fmt = GARNET_FORMAT }: { store: DeviceStore; host?: DeviceHost; id: string; set(id: string, v: number): void; size?: 'lg'; fmt?: Record<string, (v: number) => string> }) {
+export function GKnob({ store, host, id, set, size, slot = -1, fmt = GARNET_FORMAT }: { store: DeviceStore; host?: DeviceHost; id: string; set(id: string, v: number): void; size?: 'lg'; slot?: number; fmt?: Record<string, (v: number) => string> }) {
   const { Knob } = usePrimitives();
   const state = useDeviceState(store);
-  const spec = store.manifest.params.find((p) => p.id === id)!;
+  const { engine, status } = useEngine();
+  const index = store.manifest.params.findIndex((p) => p.id === id);
+  const spec = store.manifest.params[index];
+  // automation moves the knob: it shows what the engine plays (unless you are turning it)
+  const [held, setHeld] = useState(false);
+  const live = useEffectiveValue(status === 'on' && !host?.preview && slot >= 0 ? engine : null, slot, index);
+  const stored = state.params[id];
+  const shown = !held && live != null && Math.abs(live - stored) > 0.004 ? live : stored;
   return (
-    <Knob value={state.params[id]} onChange={(v) => set(id, v)} label={spec.label} size={size}
+    <Knob value={shown} onChange={(v) => set(id, v)} label={spec.label} size={size}
       format={(v) => (fmt[id] ?? ((x: number) => formatParam(spec, x)))(v)}
       defaultValue={spec.default} presence={host?.presenceFor(id) ?? []}
-      onGestureStart={() => host?.touch(id)} onGestureEnd={() => host?.touch(null)} />
+      onGestureStart={() => { setHeld(true); host?.touch(id); }} onGestureEnd={() => { setHeld(false); host?.touch(null); }} />
   );
 }
 
@@ -338,6 +332,8 @@ export function StepDial({ store, host, id, set }: { store: DeviceStore; host?: 
 interface NeckProps {
   mode: Mode;
   lock: boolean;
+  /** The chord guide is on: notes are labelled rectangles; off: round notes, more like a real neck. */
+  guide: boolean;
   songKey: SongKey;
   chords: ReturnType<typeof chordsOfKey>;
   peerNotes: Map<number, string>;
@@ -355,7 +351,7 @@ interface NeckProps {
 }
 
 /** Six strings, low E at the bottom. Chords: one strip per chord of the key. Notes: frets 0–12. */
-function Neck({ mode, lock, songKey, chords, peerNotes, mine, roles, badges, strings, onPluck, onSlide, onDamp, onStrum }: NeckProps) {
+function Neck({ mode, lock, guide, songKey, chords, peerNotes, mine, roles, badges, strings, onPluck, onSlide, onDamp, onStrum }: NeckProps) {
   const neck = useRef<HTMLDivElement>(null);
   const drag = useRef<{ s: number; c: number; y: number; t: number } | null>(null);
   const cols = mode === 'chords' ? chords.length : FRETS + 1;
@@ -438,7 +434,7 @@ function Neck({ mode, lock, songKey, chords, peerNotes, mine, roles, badges, str
               </div>
             ))}
       </div>
-      <div ref={neck} className={'fwm-garnet__neck is-' + mode + (lock ? ' is-lock' : '')} style={{ '--cols': cols } as CSSProperties}
+      <div ref={neck} className={'fwm-garnet__neck is-' + mode + (lock ? ' is-lock' : '') + (guide ? ' is-guide' : '')} style={{ '--cols': cols } as CSSProperties}
         role="group" aria-label="Guitar neck: click or drag across the strings"
         onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up}>
         {Array.from({ length: cols }, (_, c) => (
