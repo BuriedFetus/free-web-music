@@ -15,9 +15,17 @@ import { lenLabel } from './SeqView';
 import { DrumGrid } from './DrumGrid';
 import { NameInput } from './TrackName';
 
-const RH_MIN = 12, RH_MAX = 34; // row height (px): the rows grow to fill the panel, then scroll
-const KEYW = 44; // key column width (px)
-const SW = 14; // narrowest step (px): longer patterns scroll sideways
+// Sizes at zoom 1 (px); the Zoom buttons scale them all, and the text with them
+const RH_MIN = 14, RH_MAX = 34; // row height: the rows grow to fill the panel, then scroll
+const KEYW0 = 44; // key column width
+const SW0 = 14; // narrowest step: longer patterns scroll sideways
+const ZOOMS = [1, 1.25, 1.5, 2, 2.5, 3];
+const ZOOM0 = 1.5; // readable by default
+/** Row height: fill the roll's height, never below the zoomed minimum. */
+const rowH = (h: number, rows: number, z: number) => {
+  const lo = Math.round(RH_MIN * z), hi = Math.max(lo, Math.round(RH_MAX * z));
+  return h ? Math.max(lo, Math.min(hi, Math.floor(h / rows))) : lo;
+};
 const DIRS: [Direction, string, string][] = [['fwd', '→', 'Forward'], ['rev', '←', 'Reverse'], ['pp', '↔', 'Ping-pong'], ['rnd', '?', 'Random']];
 const RATES: [number, string][] = [[0.5, '½×'], [1, '1×'], [2, '2×']];
 const isBlack = (m: number) => [1, 3, 6, 8, 10].includes(m % 12);
@@ -51,6 +59,23 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const rollSc = useRef<HTMLDivElement>(null);
   const keyHeld = useRef<number | null>(null); // piano key being pressed
   const [fitH, setFitH] = useState(0); // the roll's height: rows are sized to fill it
+  const [zoom, setZoomState] = useState(() => {
+    try {
+      const z = Number(localStorage.getItem('fwm.roll.zoom'));
+      return ZOOMS.includes(z) ? z : ZOOM0;
+    } catch {
+      return ZOOM0;
+    }
+  });
+  const setZoom = (z: number) => {
+    setZoomState(z);
+    try {
+      localStorage.setItem('fwm.roll.zoom', String(z));
+    } catch {
+      /* ignore */
+    }
+  };
+  const KEYW = Math.round(KEYW0 * zoom), SW = Math.round(SW0 * zoom);
   const [lanes, setLanesState] = useState<'none' | 'vel' | 'auto'>(() => {
     try {
       const v = localStorage.getItem('fwm.roll.lanes');
@@ -84,10 +109,9 @@ export function RollView({ peers }: { peers: Peer[] }) {
     const fold = ws.fold && k.scale !== 'chromatic';
     let row = 0;
     for (let m = entry.roll.high; m > centre; m--) if (!fold || inKey(m, k)) row++;
-    const n = entry.roll.high - entry.roll.low + 1;
-    const rh = prw.current.clientHeight ? Math.max(RH_MIN, Math.min(RH_MAX, Math.floor(prw.current.clientHeight / n))) : 14;
+    const rh = rowH(prw.current.clientHeight, entry.roll.high - entry.roll.low + 1, zoom);
     prw.current.scrollTop = row * rh - prw.current.clientHeight / 2;
-  }, [t?.id, pat, ws.fold, fitH > 0]); // eslint-disable-line react-hooks/exhaustive-deps
+  }, [t?.id, pat, ws.fold, fitH > 0, zoom]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!t || !entry?.manifest) return <p className="fwm-empty">No instrument selected. Add one from the Library.</p>;
   const rowIds = project.rows().map((r) => r.id);
@@ -111,7 +135,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
   );
   if (!pat || !info)
     return (
-      <div className="fwm-rl">
+      <div className="fwm-rl" style={{ '--fwm-rz': zoom } as React.CSSProperties}>
         {patternBar}
         <p className="fwm-empty">{t.name} is silent in {rowName}. Pick a pattern above, or + New.</p>
       </div>
@@ -142,7 +166,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const pitches = Array.from({ length: high - low + 1 }, (_, r) => high - r).filter((m) => !folded || inKey(m, key));
   const rows = pitches.length;
   const rowOf = (m: number) => pitches.indexOf(m);
-  const RH = fitH ? Math.max(RH_MIN, Math.min(RH_MAX, Math.floor(fitH / rows))) : 14;
+  const RH = rowH(fitH, rows, zoom);
   const notes = project.notes(t.id, pat);
   const hidden = folded ? notes.filter(([, n]) => n.m >= low && n.m <= high && !inKey(n.m, key)).length : 0;
   const q = QUANT[ws.snap] ?? 1;
@@ -381,7 +405,14 @@ export function RollView({ peers }: { peers: Peer[] }) {
           }}>
           Clear pattern
         </button>
-        <label className="fwm-lanepick">
+        <span className="fwm-zoom fwm-lanepick" role="group" aria-label="Zoom the Piano roll">
+          <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom out" disabled={zoom <= ZOOMS[0]}
+            onClick={() => setZoom(ZOOMS[Math.max(0, ZOOMS.indexOf(zoom) - 1)])}>−</button>
+          <span className="fwm-zoom__v" title="Size of the notes and keys">{Math.round(zoom * 100)}%</span>
+          <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom in" disabled={zoom >= ZOOMS[ZOOMS.length - 1]}
+            onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + 1)])}>+</button>
+        </span>
+        <label>
           Lanes
           <select value={lanes} aria-label="Lanes under the Piano roll" onChange={(e) => { setLanes(e.target.value as 'none' | 'vel' | 'auto'); e.target.blur(); }}>
             <option value="none">Hidden</option>
@@ -428,7 +459,9 @@ export function RollView({ peers }: { peers: Peer[] }) {
                   left: `calc(${(n.s / L) * 100}% + 1px)`, width: `calc(${(n.l / L) * 100}% - 2px)`,
                   top: row * RH + 1, height: RH - 3, opacity: 0.45 + 0.55 * n.v,
                   ...(peer ? { '--fwm-who': peer.user.color } : {}),
-                } as React.CSSProperties} />
+                } as React.CSSProperties}>
+                {RH >= 18 && <span className="fwm-nt__n" style={{ fontSize: Math.round(RH * 0.62), lineHeight: RH - 3 + 'px' }}>{noteName(n.m)}</span>}
+              </div>
             );
           })}
           {Array.from({ length: Math.ceil(L / BAR) - 1 }, (_, b) => <div key={'b' + b} className="fwm-barl" style={{ left: `${(((b + 1) * BAR) / L) * 100}%` }} />)}
