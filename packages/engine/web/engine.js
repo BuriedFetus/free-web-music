@@ -10,7 +10,7 @@
 // The worklet and WASM files are found next to this module (`new URL(..., import.meta.url)`,
 // which Vite, webpack 5 and Rollup all understand), or under `base` if given.
 
-export const KINDS = { basalt: 1, flint: 2, garnet: 3, opal: 4, quartz: 5 };
+export const KINDS = { basalt: 1, flint: 2, garnet: 3, opal: 4, quartz: 5, geode: 6 };
 export const MOD_SOURCES = { lfo: 0, amp: 1, filt: 2 };
 /** Mixer strip settings. level: 0..1 (0.8 = 0 dB), pan: -1..1, mute: 0/1, sendA / sendB: 0..1. */
 export const MIX = { level: 0, pan: 1, mute: 2, sendA: 3, sendB: 4 };
@@ -33,20 +33,21 @@ const DEFAULT_URLS = () => ({
   garnet: new URL('./garnet.json', import.meta.url).href,
   opal: new URL('./opal.json', import.meta.url).href,
   quartz: new URL('./quartz.json', import.meta.url).href,
+  geode: new URL('./geode.json', import.meta.url).href,
 });
 
 export async function createEngine({ base, context, manifests } = {}) {
   const ctx = context || new AudioContext({ latencyHint: 'interactive' });
   const urls = base
     ? Object.fromEntries(
-        Object.entries({ wasm: 'fwm_engine.wasm', worklet: 'worklet.js', basalt: 'basalt.json', flint: 'flint.json', garnet: 'garnet.json', opal: 'opal.json', quartz: 'quartz.json' }).map(([k, f]) => [
+        Object.entries({ wasm: 'fwm_engine.wasm', worklet: 'worklet.js', basalt: 'basalt.json', flint: 'flint.json', garnet: 'garnet.json', opal: 'opal.json', quartz: 'quartz.json', geode: 'geode.json' }).map(([k, f]) => [
           k,
           new URL(f, new URL(base, location.href)).href,
         ]),
       )
     : DEFAULT_URLS();
   const loadManifest = async (m) => (typeof m === 'object' ? m : (await fetch(m)).json());
-  const [wasm, basalt, flint, garnet, opal, quartz] = await Promise.all([
+  const [wasm, basalt, flint, garnet, opal, quartz, geode] = await Promise.all([
     fetch(urls.wasm).then((r) => {
       if (!r.ok) throw new Error('engine wasm: HTTP ' + r.status);
       return r.arrayBuffer();
@@ -56,8 +57,9 @@ export async function createEngine({ base, context, manifests } = {}) {
     loadManifest(manifests?.garnet ?? urls.garnet),
     loadManifest(manifests?.opal ?? urls.opal),
     loadManifest(manifests?.quartz ?? urls.quartz),
+    loadManifest(manifests?.geode ?? urls.geode),
   ]);
-  const manifest = { basalt, flint, garnet, opal, quartz };
+  const manifest = { basalt, flint, garnet, opal, quartz, geode };
   await ctx.audioWorklet.addModule(urls.worklet);
   const node = new AudioWorkletNode(ctx, 'fwm-engine', {
     numberOfInputs: 0,
@@ -95,10 +97,18 @@ export async function createEngine({ base, context, manifests } = {}) {
         engine.last = m;
         engine.onTick?.(m);
         for (const fn of listeners) fn(m);
+      } else if (m.t === 'cap') {
+        capFn?.(m.l, m.r, !!m.end);
+      } else if (m.t === 'sampleSet') {
+        const w = sampleWait.get(m.slot);
+        sampleWait.delete(m.slot);
+        w?.(m.ok);
       } else if (m.t === 'routeRejected') console.warn('engine: route rejected', m);
     };
   });
   const send = (m) => node.port.postMessage(m);
+  let capFn = null;
+  const sampleWait = new Map();
   const index = (slot, id) => {
     const params = manifest[slots.get(slot)]?.params || [];
     const i = params.findIndex((p) => p.id === id);
@@ -236,6 +246,27 @@ export async function createEngine({ base, context, manifests } = {}) {
       const tr = engine.last?.transport;
       if (!tr || !tr.playing || tr.row == null) return null;
       return { row: tr.row, pos: tr.rowPos + (ctx.currentTime - tr.time) * (tr.bpm / 60) * 4 };
+    },
+    /** Geode: load a tape (Float32Arrays at this context's sample rate; `r` optional). Resolves false if it didn't fit. */
+    setSample(slot, l, r) {
+      return new Promise((res) => {
+        sampleWait.get(slot)?.(false);
+        sampleWait.set(slot, res);
+        send({ t: 'sample', slot, l, r });
+      });
+    },
+    /** A device action that is not a param (Geode: 1 play the tape (value 1) / stop (0), 2 seek, 3 clear the tape). */
+    command(slot, cmd, value = 0) {
+      send({ t: 'cmd', slot, c: cmd, v: value });
+    },
+    /**
+     * Recording tap: stream a slot's sound (after its fader) to `fn(l, r, end)` in pieces of ~2048 frames.
+     * One at a time; returns stop(), after which the last piece arrives with end = true.
+     */
+    capture(slot, fn) {
+      capFn = fn;
+      send({ t: 'capture', slot });
+      return () => send({ t: 'capture', slot: -1 });
     },
     resume() {
       return ctx.resume();

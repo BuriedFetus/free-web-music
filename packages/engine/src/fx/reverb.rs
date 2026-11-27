@@ -39,6 +39,8 @@ pub struct Reverb {
     pub tone: f32,
     pub ret: f32,
     pub on: bool,
+    /// Decay time in seconds instead of Size's (0 = use Size). Geode's room sets it directly.
+    pub t60: f32,
     decay: Smoother,
     pre_n: Smoother,
     gain: Smoother,
@@ -75,6 +77,7 @@ impl Reverb {
             tone: 0.6,
             ret: 0.7,
             on: true,
+            t60: 0.0,
             decay: Smoother::new(0.5),
             pre_n: Smoother::new(0.02 * fs),
             gain: Smoother::new(0.7),
@@ -98,7 +101,7 @@ impl Reverb {
 
     /// Apply the settings (call after changing them).
     pub fn update(&mut self) {
-        let t60 = Self::seconds(self.size);
+        let t60 = if self.t60 > 0.0 { self.t60.clamp(0.1, 12.0) } else { Self::seconds(self.size) };
         // The decay gain is applied twice per half loop (inside the half, and where it crosses to the
         // other half), so each half loop loses decay²: 60 dB over t60 seconds.
         self.decay.target = crate::dsp::powf(10.0, -1.5 * HALF_LOOP / t60).min(0.93);

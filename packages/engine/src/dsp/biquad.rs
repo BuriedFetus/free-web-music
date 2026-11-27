@@ -72,6 +72,22 @@ impl Biquad {
         );
     }
 
+    /// Raises or lowers everything below `f` by `db` (shelf slope 1).
+    pub fn lowshelf(&mut self, f: f32, db: f32, fs: f32) {
+        let (c, s, _) = Self::w(f, 0.707, fs);
+        let g = powf(10.0, db / 40.0);
+        let a = s / 2.0 * core::f32::consts::SQRT_2;
+        let sq = 2.0 * libm::sqrtf(g) * a;
+        self.set(
+            g * ((g + 1.0) - (g - 1.0) * c + sq),
+            2.0 * g * ((g - 1.0) - (g + 1.0) * c),
+            g * ((g + 1.0) - (g - 1.0) * c - sq),
+            (g + 1.0) + (g - 1.0) * c + sq,
+            -2.0 * ((g - 1.0) + (g + 1.0) * c),
+            (g + 1.0) + (g - 1.0) * c - sq,
+        );
+    }
+
     #[inline(always)]
     pub fn process(&mut self, x: f32) -> f32 {
         let y = self.b0 * x + self.z1;

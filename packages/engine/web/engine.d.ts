@@ -1,4 +1,4 @@
-export type DeviceId = 'basalt' | 'flint' | 'garnet' | 'opal' | 'quartz';
+export type DeviceId = 'basalt' | 'flint' | 'garnet' | 'opal' | 'quartz' | 'geode';
 export type ModSourceId = 'lfo' | 'amp' | 'filt';
 
 export interface ParamSpec {
@@ -38,7 +38,8 @@ export interface EngineTick {
   /** Last 2048 output samples, oldest first. */
   scope: Float32Array;
   /** Per slot: modulated param values (manifest order) and mod source values [lfo, amp, filt]. */
-  devices: Record<number, { eff: Float32Array; mods: [number, number, number]; step: number }>;
+  /** viz: a device's numbers for its panel's pictures (Geode: see devices/geode.json notes.viz). */
+  devices: Record<number, { eff: Float32Array; mods: [number, number, number]; step: number; viz?: Float32Array }>;
   /** row: id of the song row playing (song mode), rowPos: steps since that row started. */
   /** Peak |sample| since the last tick: [slot0 L, slot0 R, slot1 L, …, master L (index 32), master R]. */
   meters: Float32Array;
@@ -122,6 +123,12 @@ export interface Engine {
   setTrack(slot: number, settings: Partial<TrackSettings>): void;
   setPattern(slot: number, notes: SeqNote[], auto?: Record<string, (number | null)[]>): void;
   position(): number | null;
+  /** Geode: load a tape (at this context's sample rate; `r` optional). Resolves false if it did not fit. */
+  setSample(slot: number, l: Float32Array, r?: Float32Array | null): Promise<boolean>;
+  /** A device action that is not a param (Geode: 1 play the tape (value 1) / stop, 2 seek, 3 clear the tape). */
+  command(slot: number, cmd: number, value?: number): void;
+  /** Recording tap: a slot's sound after its fader, in pieces; returns stop() (the last piece has end = true). */
+  capture(slot: number, fn: (l: Float32Array, r: Float32Array, end: boolean) => void): () => void;
   resume(): Promise<void>;
   suspend(): Promise<void>;
   latency(): { base: number; output: number };
@@ -141,7 +148,7 @@ export const MIX: Record<'level' | 'pan' | 'mute' | 'sendA' | 'sendB', number>;
 export const MASTER_METER: number;
 
 export function createEngine(options?: {
-  /** Folder holding fwm_engine.wasm, worklet.js, basalt.json, flint.json, garnet.json, opal.json, quartz.json. Default: next to this module. */
+  /** Folder holding fwm_engine.wasm, worklet.js, basalt.json, flint.json, garnet.json, opal.json, quartz.json, geode.json. Default: next to this module. */
   base?: string;
   context?: BaseAudioContext;
   /** Manifests as objects or URLs. */

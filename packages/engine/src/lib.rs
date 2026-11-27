@@ -21,6 +21,7 @@ use device::{Device, ModSource, RouteError};
 use devices::basalt::Basalt;
 use devices::flint::Flint;
 use devices::garnet::Garnet;
+use devices::geode::Geode;
 use devices::opal::Opal;
 use devices::quartz::Quartz;
 use events::{Event, Kind, Queue};
@@ -50,6 +51,7 @@ pub enum DeviceKind {
     Garnet = 3,
     Opal = 4,
     Quartz = 5,
+    Geode = 6,
 }
 
 impl DeviceKind {
@@ -60,6 +62,7 @@ impl DeviceKind {
             3 => Some(DeviceKind::Garnet),
             4 => Some(DeviceKind::Opal),
             5 => Some(DeviceKind::Quartz),
+            6 => Some(DeviceKind::Geode),
             _ => None,
         }
     }
@@ -72,6 +75,7 @@ pub enum Slot {
     Garnet(Garnet),
     Opal(Opal),
     Quartz(Quartz),
+    Geode(Geode),
 }
 
 impl Slot {
@@ -83,6 +87,7 @@ impl Slot {
             Slot::Garnet(d) => Some(d),
             Slot::Opal(d) => Some(d),
             Slot::Quartz(d) => Some(d),
+            Slot::Geode(d) => Some(d),
         }
     }
 
@@ -94,6 +99,7 @@ impl Slot {
             Slot::Garnet(d) => Some(d),
             Slot::Opal(d) => Some(d),
             Slot::Quartz(d) => Some(d),
+            Slot::Geode(d) => Some(d),
         }
     }
 }
@@ -119,6 +125,17 @@ pub struct Rack {
     pub meters: [f32; (MAX_SLOTS + 1) * 2],
     /// Each slot's Garnet string memory, taken from the pool the first time and reused after.
     garnet_mem: [Option<(*mut f32, usize)>; MAX_SLOTS],
+    /// Each slot's Geode block (its room, echo and chorus lines) and tape, made the first time and reused.
+    geode_mem: [Option<(*mut f32, usize)>; MAX_SLOTS],
+    geode_bank: [Option<(*mut f32, usize)>; MAX_SLOTS],
+    /// Recording tap: which slot (after its fader) is copied into `cap_l` / `cap_r` each block (-1 = none).
+    pub cap_src: i32,
+    pub cap_l: [f32; BLOCK],
+    pub cap_r: [f32; BLOCK],
+    /// The song's tempo and place, given to the devices before each block.
+    pub bpm: f32,
+    pub song_pos: f64,
+    pub playing: bool,
 }
 
 impl Rack {
@@ -141,6 +158,14 @@ impl Rack {
             probe_src: PROBE_OFF,
             meters: [0.0; (MAX_SLOTS + 1) * 2],
             garnet_mem: [None; MAX_SLOTS],
+            geode_mem: [None; MAX_SLOTS],
+            geode_bank: [None; MAX_SLOTS],
+            cap_src: -1,
+            cap_l: [0.0; BLOCK],
+            cap_r: [0.0; BLOCK],
+            bpm: 120.0,
+            song_pos: 0.0,
+            playing: false,
         }
     }
 
@@ -163,6 +188,16 @@ impl Rack {
                 // Safety: the block belongs to this slot only, and the device that used it was just dropped.
                 Slot::Garnet(Garnet::with_memory(unsafe { core::slice::from_raw_parts_mut(ptr, len) }))
             }
+            DeviceKind::Geode => {
+                self.slots[slot] = Slot::Empty;
+                let fs = self.sample_rate;
+                let (ptr, len) = *self.geode_mem[slot].get_or_insert_with(|| {
+                    let m = fx::line::take_big(devices::geode::mem_size(fs));
+                    (m.as_mut_ptr(), m.len())
+                });
+                // Safety: as for Garnet, the block is this slot's alone.
+                Slot::Geode(Geode::with_memory(unsafe { core::slice::from_raw_parts_mut(ptr, len) }, fs))
+            }
         };
         if let Some(d) = s.device() {
             d.prepare(self.sample_rate);
@@ -180,6 +215,28 @@ impl Rack {
 
     pub fn device(&mut self, slot: usize) -> Option<&mut dyn Device> {
         self.slots.get_mut(slot).and_then(|s| s.device())
+    }
+
+    /// Geode: where to write a tape of `frames` × `chans` (planar) for the device in `slot`, or null
+    /// (not a Geode, too long, or no memory). Stops the old tape; call `sample_set` once it is written.
+    pub fn sample_alloc(&mut self, slot: usize, frames: usize, chans: usize) -> *mut f32 {
+        let fs = self.sample_rate;
+        let Some(Slot::Geode(g)) = self.slots.get_mut(slot) else { return core::ptr::null_mut() };
+        if g.capacity(2) == 0 {
+            let (ptr, len) = *self.geode_bank[slot].get_or_insert_with(|| {
+                let m = fx::line::take_big(devices::geode::bank_size(fs));
+                (m.as_mut_ptr(), m.len())
+            });
+            // Safety: the tape block belongs to this slot; a new Geode here takes it over.
+            g.attach_bank(unsafe { core::slice::from_raw_parts_mut(ptr, len) });
+        }
+        g.bank_ptr(frames, chans).unwrap_or(core::ptr::null_mut())
+    }
+
+    pub fn sample_set(&mut self, slot: usize, frames: usize, chans: usize) {
+        if let Some(Slot::Geode(g)) = self.slots.get_mut(slot) {
+            g.set_sample(frames, chans);
+        }
     }
 
     pub fn device_ref(&self, slot: usize) -> Option<&dyn Device> {
@@ -211,6 +268,10 @@ impl Rack {
             if let Some(d) = self.slots[i].device() {
                 d.render(l, r);
                 self.mixer.strip(i, l, r, Some((&mut self.fx.sends, from)));
+                if self.cap_src == i as i32 {
+                    self.cap_l[from..to].copy_from_slice(l);
+                    self.cap_r[from..to].copy_from_slice(r);
+                }
                 if self.probe_src == i as i32 {
                     for (a, b) in l.iter().zip(r.iter()) {
                         self.probe[self.probe_pos] = 0.5 * (a + b);
@@ -232,6 +293,14 @@ impl Rack {
         let n = frames.min(BLOCK);
         self.out_l[..n].fill(0.0);
         self.out_r[..n].fill(0.0);
+        self.cap_l.fill(0.0);
+        self.cap_r.fill(0.0);
+        let (bpm, pos, playing) = (self.bpm, self.song_pos, self.playing);
+        for s in self.slots.iter_mut() {
+            if let Some(d) = s.device() {
+                d.tempo(bpm, pos, playing);
+            }
+        }
         let mut pos = 0;
         let mut i = 0;
         while i < self.queue.len() {
@@ -490,4 +559,72 @@ pub extern "C" fn fwm_probe_pos() -> u32 {
 #[no_mangle]
 pub extern "C" fn fwm_probe_len() -> u32 {
     PROBE_LEN as u32
+}
+
+// ---- tempo, device pictures and commands ----
+
+/// The song's tempo and place for the next block: `pos` in steps into the playing song row (or since Play).
+#[no_mangle]
+pub extern "C" fn fwm_tempo(bpm: f32, pos: f64, playing: u32) {
+    if let Some(r) = rack() {
+        r.bpm = bpm;
+        r.song_pos = pos;
+        r.playing = playing != 0;
+    }
+}
+
+/// A device's numbers for its panel's pictures (`fwm_viz_len` floats; Geode: see `devices::geode::Geode::viz`).
+#[no_mangle]
+pub extern "C" fn fwm_viz(slot: u32) -> *const f32 {
+    rack().and_then(|r| r.device(slot as usize)).map_or(core::ptr::null(), |d| d.viz().as_ptr())
+}
+
+#[no_mangle]
+pub extern "C" fn fwm_viz_len(slot: u32) -> u32 {
+    rack().and_then(|r| r.device(slot as usize)).map_or(0, |d| d.viz().len() as u32)
+}
+
+/// A device action that is not a param (Geode: 1 play the tape (value 1) / stop (0), 2 seek, 3 clear the tape).
+#[no_mangle]
+pub extern "C" fn fwm_command(slot: u32, cmd: u32, value: f32) {
+    if let Some(d) = rack().and_then(|r| r.device(slot as usize)) {
+        d.command(cmd, value);
+    }
+}
+
+// ---- Geode's tape ----
+
+/// Where to write a tape for the Geode in `slot`: `frames` per channel, `chans` 1 or 2, planar (left, then right).
+/// Null when it does not fit. The memory may grow: make new views of it after this call.
+#[no_mangle]
+pub extern "C" fn fwm_sample_alloc(slot: u32, frames: u32, chans: u32) -> *mut f32 {
+    rack().map_or(core::ptr::null_mut(), |r| r.sample_alloc(slot as usize, frames as usize, chans as usize))
+}
+
+/// The tape written after `fwm_sample_alloc` is complete: the Geode plays it from now on.
+#[no_mangle]
+pub extern "C" fn fwm_sample_set(slot: u32, frames: u32, chans: u32) {
+    if let Some(r) = rack() {
+        r.sample_set(slot as usize, frames as usize, chans as usize);
+    }
+}
+
+// ---- recording tap ----
+
+/// Copy a slot's sound (after its fader) into the capture buffers every block; -1 = stop.
+#[no_mangle]
+pub extern "C" fn fwm_capture(src: i32) {
+    if let Some(r) = rack() {
+        r.cap_src = src;
+    }
+}
+
+#[no_mangle]
+pub extern "C" fn fwm_cap_l() -> *const f32 {
+    rack().map_or(core::ptr::null(), |r| r.cap_l.as_ptr())
+}
+
+#[no_mangle]
+pub extern "C" fn fwm_cap_r() -> *const f32 {
+    rack().map_or(core::ptr::null(), |r| r.cap_r.as_ptr())
 }

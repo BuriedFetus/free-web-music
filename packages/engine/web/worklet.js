@@ -25,7 +25,13 @@
 //   {t:'chain', ids:[…]}                           effects chain order (0 reverb, 1 delay, 2 lo-fi, 3 low-pass)
 //   {t:'at', at, m}                                 do `m` ('on' | 'off' | 'param') at audio time `at`, to the sample
 //                                                  (other people's live keys and knob turns, played evenly)
+//   {t:'sample', slot, l, r?}                      Geode: load a tape (Float32Arrays at this context's rate); replies {t:'sampleSet', slot, ok}
+//   {t:'cmd', slot, c, v}                          a device action (Geode: 1 play the tape (v 1) / stop, 2 seek, 3 clear)
+//   {t:'capture', slot}                            recording tap: stream a slot's sound (after its fader) as {t:'cap', l, r};
+//                                                  slot -1 stops (the last piece comes with end: true)
+// Every block the devices get the song's tempo and place (fwm_tempo), so Motion and echoes follow the song.
 // Messages out: {t:'ready'} and ~60×/s {t:'tick', scope, devices, transport, meters}
+// (devices[slot].viz: a device's numbers for its panel's pictures, when it has any)
 // (meters: peak per slot L/R since the last tick, then master L/R).
 // MessagePort is used everywhere for now; a SharedArrayBuffer ring comes later behind the same API.
 const UI_EVERY = 6; // blocks between UI snapshots (~16 ms at 48 kHz)
@@ -379,7 +385,47 @@ export class FwmEngine extends Processor {
         if (this.seq.playing) this.seq.seek(m.row, this.target(m));
         else this.seq.start(m.row, this.target(m));
         break;
+      case 'sample': this.port.postMessage({ t: 'sampleSet', slot: m.slot, ok: this.sample(m.slot, m.l, m.r) }); break;
+      case 'cmd': x.fwm_command(m.slot, m.c, m.v ?? 0); break;
+      case 'capture':
+        if (this.cap && m.slot !== this.cap.slot) this.flushCap(true);
+        x.fwm_capture(m.slot ?? -1);
+        this.cap = m.slot >= 0 ? { slot: m.slot, l: [], r: [], n: 0 } : null;
+        break;
     }
+  }
+  /** Write a tape into a Geode (planar, left then right). The memory may grow: views are made after. */
+  sample(slot, l, r) {
+    const x = this.x;
+    const frames = l?.length | 0;
+    const chans = r && r.length === frames ? 2 : 1;
+    if (!frames) {
+      x.fwm_command(slot, 3, 0);
+      return true;
+    }
+    const ptr = x.fwm_sample_alloc(slot, frames, chans);
+    if (!ptr) return false;
+    const mem = this.view(ptr, frames * chans);
+    mem.set(l, 0);
+    if (chans === 2) mem.set(r, frames);
+    x.fwm_sample_set(slot, frames, chans);
+    return true;
+  }
+  flushCap(end = false) {
+    const c = this.cap;
+    if (!c || (!c.n && !end)) return;
+    const l = new Float32Array(c.n);
+    const r = new Float32Array(c.n);
+    let i = 0;
+    for (let k = 0; k < c.l.length; k++) {
+      l.set(c.l[k], i);
+      r.set(c.r[k], i);
+      i += c.l[k].length;
+    }
+    c.l = [];
+    c.r = [];
+    c.n = 0;
+    this.port.postMessage({ t: 'cap', slot: c.slot, l, r, end }, [l.buffer, r.buffer]);
   }
   param(slot, frame, i, v) {
     this.x.fwm_param(slot, frame, i, v);
@@ -418,9 +464,18 @@ export class FwmEngine extends Processor {
     const out = outputs[0];
     const frames = out[0].length;
     const x = this.x;
-    this.seq.advance(frames, this.emit);
+    const sq = this.seq;
+    x.fwm_tempo(sq.bpm, sq.song ? sq.pos - sq.rowStart : sq.pos, sq.playing ? 1 : 0);
+    sq.advance(frames, this.emit);
     this.runTimed(currentFrame, frames);
     x.fwm_render(frames);
+    if (this.cap) {
+      const c = this.cap;
+      c.l.push(this.view(x.fwm_cap_l(), frames).slice());
+      c.r.push(this.view(x.fwm_cap_r(), frames).slice());
+      c.n += frames;
+      if (c.l.length >= 16) this.flushCap();
+    }
     out[0].set(this.view(x.fwm_out_l(), frames));
     if (out[1]) out[1].set(this.view(x.fwm_out_r(), frames));
     this.next = currentFrame + frames;
@@ -443,6 +498,8 @@ export class FwmEngine extends Processor {
         mods: [x.fwm_mod_source(s, 0), x.fwm_mod_source(s, 1), x.fwm_mod_source(s, 2)],
         step: this.seq.tracks.get(s)?.step ?? -1,
       };
+      const vn = x.fwm_viz_len(s);
+      if (vn) devices[s].viz = this.view(x.fwm_viz(s), vn).slice();
     }
     const sq = this.seq;
     const transport = {

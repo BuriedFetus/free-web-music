@@ -36,7 +36,84 @@ mod pool {
 }
 
 pub use pool::reset as reset_pool;
-pub use pool::take as take_mem;
+
+/// Delay memory for a new effect or line: from the arena while one is set (see [`with_arena`]),
+/// otherwise from the shared pool.
+pub fn take_mem(n: usize) -> &'static mut [f32] {
+    match arena::take(n) {
+        Some(s) => s,
+        None => pool::take(n),
+    }
+}
+
+/// Runs `f` with every delay line it makes carved from `mem` (a device's own block, so a device
+/// with big effects of its own, like Geode, does not use up the shared pool). Returns `f`'s result
+/// and whether everything fitted (lines that did not fit came from the pool).
+pub fn with_arena<R>(mem: &'static mut [f32], f: impl FnOnce() -> R) -> (R, bool) {
+    arena::set(mem);
+    let r = f();
+    (r, arena::clear())
+}
+
+mod arena {
+    struct Arena {
+        ptr: *mut f32,
+        len: usize,
+        used: usize,
+        fits: bool,
+    }
+    #[cfg(target_arch = "wasm32")]
+    mod cell {
+        pub static mut A: Option<super::Arena> = None;
+        pub fn with<R>(f: impl FnOnce(&mut Option<super::Arena>) -> R) -> R {
+            unsafe { f(&mut *core::ptr::addr_of_mut!(A)) }
+        }
+    }
+    #[cfg(not(target_arch = "wasm32"))]
+    mod cell {
+        std::thread_local! { static A: core::cell::RefCell<Option<super::Arena>> = const { core::cell::RefCell::new(None) }; }
+        pub fn with<R>(f: impl FnOnce(&mut Option<super::Arena>) -> R) -> R {
+            A.with(|a| f(&mut a.borrow_mut()))
+        }
+    }
+    pub fn set(mem: &'static mut [f32]) {
+        let (ptr, len) = (mem.as_mut_ptr(), mem.len());
+        cell::with(|a| *a = Some(Arena { ptr, len, used: 0, fits: true }));
+    }
+    pub fn clear() -> bool {
+        cell::with(|a| a.take().map_or(true, |x| x.fits))
+    }
+    pub fn take(n: usize) -> Option<&'static mut [f32]> {
+        cell::with(|a| {
+            let x = a.as_mut()?;
+            if x.used + n > x.len {
+                x.fits = false;
+                return None;
+            }
+            // Safety: each carved piece is handed out once; the block belongs to one device.
+            let s = unsafe { core::slice::from_raw_parts_mut(x.ptr.add(x.used), n) };
+            x.used += n;
+            s.fill(0.0);
+            Some(s)
+        })
+    }
+}
+
+/// A big block of memory that lives as long as the engine (a sampler's tape, a device's own effects).
+/// In WebAssembly it grows the memory (new pages, zeroed); an empty slice when there is no more.
+#[cfg(target_arch = "wasm32")]
+pub fn take_big(n: usize) -> &'static mut [f32] {
+    let pages = (n * 4 + 65535) / 65536;
+    let prev = core::arch::wasm32::memory_grow(0, pages);
+    if prev == usize::MAX {
+        return &mut [];
+    }
+    unsafe { core::slice::from_raw_parts_mut((prev * 65536) as *mut f32, n) }
+}
+#[cfg(not(target_arch = "wasm32"))]
+pub fn take_big(n: usize) -> &'static mut [f32] {
+    std::boxed::Box::leak(std::vec![0.0f32; n].into_boxed_slice())
+}
 
 /// A circular delay line. `read(d)` is the sample written `d` samples ago (d ≥ 1).
 pub struct Line {
@@ -47,7 +124,7 @@ pub struct Line {
 impl Line {
     /// Holds delays up to `max` samples.
     pub fn new(max: usize) -> Line {
-        Line { buf: pool::take(max.max(2) + 2), w: 0 }
+        Line { buf: take_mem(max.max(2) + 2), w: 0 }
     }
     #[inline(always)]
     pub fn len(&self) -> usize {
