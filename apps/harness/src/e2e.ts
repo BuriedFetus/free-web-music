@@ -1526,11 +1526,11 @@ async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { curre
       await addInst('Geode');
       await sleep(400);
       ok(!!$('.fwm-geode canvas') && !!geodeId(), 'Geode shows in the Device panel with its room');
-      ok(document.querySelectorAll('.fwm-geode__dock button').length === 10, 'the dock has its ten icons');
+      ok(document.querySelectorAll('.fwm-devwrap .fwm-geode__dock button').length === 10, 'the dock has its ten icons');
       btn('Sound')?.click();
       await until('engine', () => !!engineRef.current?.last, 4000);
       const gid = geodeId()!;
-      ($('.fwm-geode__dock [data-id="mica"]') as HTMLButtonElement).click();
+      ($('.fwm-devwrap .fwm-geode__dock [data-id="mica"]') as HTMLButtonElement).click();
       await sleep(200);
       const sel = $('.fwm-geode__note select') as HTMLSelectElement | null;
       ok(!!sel && [...sel.options].some((o) => o.textContent === 'Opal'), "Mica's menu offers the Opal as input");
@@ -1635,7 +1635,7 @@ async function runGeodeKeep(p: Project, engineRef: { current: Engine | null }, o
     if (!sessionStorage.getItem('fwm.e2e.gp')) {
       await addInst('Geode');
       await sleep(300);
-      ($('.fwm-geode__dock [data-id="mica"]') as HTMLButtonElement).click();
+      ($('.fwm-devwrap .fwm-geode__dock [data-id="mica"]') as HTMLButtonElement).click();
       await sleep(200);
       ($('[aria-label="Load the demo tape"]') as HTMLButtonElement).click();
       const gid = p.tracks().find((t) => t.device === 'geode')!.id;

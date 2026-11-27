@@ -1,6 +1,18 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-26, night): Geode built in the studio (all three slices); waiting for the user to play it
+## START HERE (2026-11-27): Add instrument, the manual, one octave
+User asked (after Geode): add instruments from the Device panel, not the Library; the Library should be a clickable manual of the instruments (many pages); and the keyboard's octave must match the panel's ("explains why the grains felt too high"). Done, pushed:
+- **+ Add instrument** in the Device panel's header (`studio/AddInstrument.tsx`, `addInstrument()` shared).
+- **Library = the manual** (`studio/views/LibraryView.tsx`, content in `studio/manual.ts`):
+  - an index of instrument pictures (the real panels, inert, `DeviceHost.preview`)
+  - per instrument 2–5 pages with numbered spots on the real panel (spot language: `k:Knob`, `h:Section`, CSS, `@x,y`), plus "+ Add … to the song"
+  - `?e2e=manual` checks every spot finds its control
+- **One octave**: `DeviceHost.octave` (`low` = the C of the computer keyboard's A key, `shift`). PanelKeys and Basalt's keys follow Z / X and move it; Geode's keys start at C4 (the tape's pitch).
+- Pictures are cheap: no Scope, Geode's room draws twice a second, Garnet's picture never takes the number keys. Browser tests now scope their queries to `.fwm-devwrap`, because the pictures share class names.
+- Known: `?e2e=arrange` has two drag failures that were already there before today (checked on a05227a); Garnet's strum-timing check fails about 1 in 3 headless runs (timing-sensitive).
+- Waiting for: the user's review of the manual's look and wording, and of Geode.
+
+## Earlier (2026-11-26, night): Geode built in the studio (all three slices); waiting for the user to play it
 The user asked me to build the rest of the Geode milestone while they work, and to put suggestions in the plan. Done and pushed:
 - slice 1 engine `31ed80a`, slice 2 tapes `3d53884`, slice 3 panel `7b788a7` (details and my suggestions: PLAN.md "Geode").
 - Try it: `npm run dev`, Library → Samplers → Geode, add an Opal too, click Mica (dock, left), REC, play the keys (they play the Opal while armed), REC again. Or DEMO when there is nothing to record. `?geode` = Geode alone (demo tape only); `?geodeback` shows the hidden back.
