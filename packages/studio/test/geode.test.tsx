@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { cleanup, fireEvent, render, screen } from '@testing-library/react';
+import { cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import manifestJson from '@fwm/engine/devices/geode.json';
 import type { DeviceManifest } from '@fwm/engine';
 import { EngineProvider, Geode, GEODE_PRESETS, ThemeRoot, createDeviceStore } from '../src';
@@ -24,7 +24,8 @@ describe('<Geode>', () => {
     mount();
     expect(screen.getByLabelText("Mica's room")).toBeTruthy();
     const dock = screen.getByRole('toolbar', { name: 'Geode controls' });
-    expect(dock.querySelectorAll('button')).toHaveLength(10);
+    expect(dock.querySelectorAll('button[data-id]')).toHaveLength(10);
+    expect(within(dock).getByRole('group', { name: 'Room size' })).toBeTruthy(); // + / − beside Room
   });
 
   it('+ / − beside ROOM make the room bigger or smaller', () => {

@@ -15,16 +15,15 @@ import { lenLabel } from './SeqView';
 import { DrumGrid } from './DrumGrid';
 import { NameInput } from './TrackName';
 
-// Sizes at zoom 1 (px); the Zoom buttons scale them all, and the text with them
-const RH_MIN = 14, RH_MAX = 34; // row height: the rows grow to fill the panel, then scroll
+// Zoom sets how many keys fit in the roll's height: 100% = 2 octaves, 150% ≈ 1⅓ (the default), 300% = 8 keys.
+// The rest scroll. Rows are never thinner than RH_MIN × zoom, even in a small panel.
+const RH_MIN = 14;
+const VIEW_ROWS = 24; // rows in view at 100%
 const KEYW0 = 84; // key column width: a real little keyboard, a name on every key
 const ZOOMS = [1, 1.25, 1.5, 2, 2.5, 3];
 const ZOOM0 = 1.5; // readable by default
-/** Row height: fill the roll's height, never below the zoomed minimum. */
-const rowH = (h: number, rows: number, z: number) => {
-  const lo = Math.round(RH_MIN * z), hi = Math.max(lo, Math.round(RH_MAX * z));
-  return h ? Math.max(lo, Math.min(hi, Math.floor(h / rows))) : lo;
-};
+/** Row height: fat keys, about VIEW_ROWS / zoom of them in view (all of them when there are fewer). */
+const rowH = (h: number, rows: number, z: number) => Math.max(Math.round(RH_MIN * z), h ? Math.floor(h / Math.min(rows, Math.round(VIEW_ROWS / z))) : 0);
 const DIRS: [Direction, string, string][] = [['fwd', '→', 'Forward'], ['rev', '←', 'Reverse'], ['pp', '↔', 'Ping-pong'], ['rnd', '?', 'Random']];
 const RATES: [number, string][] = [[0.5, '½×'], [1, '1×'], [2, '2×']];
 const isBlack = (m: number) => [1, 3, 6, 8, 10].includes(m % 12);
@@ -388,7 +387,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
         <span className="fwm-zoom fwm-lanepick" role="group" aria-label="Zoom the Piano roll">
           <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom out" disabled={zoom <= ZOOMS[0]}
             onClick={() => setZoom(ZOOMS[Math.max(0, ZOOMS.indexOf(zoom) - 1)])}>−</button>
-          <span className="fwm-zoom__v" title="Key size: bigger keys, fewer of them on screen (the whole pattern always fits across)">{Math.round(zoom * 100)}%</span>
+          <span className="fwm-zoom__v" title="Key size: 100% shows 2 octaves, 150% about 1⅓, 300% 8 keys (the whole pattern always fits across)">{Math.round(zoom * 100)}%</span>
           <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom in" disabled={zoom >= ZOOMS[ZOOMS.length - 1]}
             onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + 1)])}>+</button>
         </span>
@@ -502,7 +501,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
                   top: row * RH + 1, height: RH - 3, opacity: 0.45 + 0.55 * n.v,
                   ...(peer ? { '--fwm-who': peer.user.color } : {}),
                 } as React.CSSProperties}>
-                {RH >= 18 && <span className="fwm-nt__n" style={{ fontSize: Math.round(RH * 0.62), lineHeight: RH - 3 + 'px' }}>{noteName(n.m)}</span>}
+                {RH >= 18 && <span className="fwm-nt__n" style={{ fontSize: Math.round(Math.min(RH * 0.55, 18)), lineHeight: RH - 3 + 'px' }}>{noteName(n.m)}</span>}
               </div>
             );
           })}

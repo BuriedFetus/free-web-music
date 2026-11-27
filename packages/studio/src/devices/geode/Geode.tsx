@@ -3,7 +3,7 @@
 // simple control. Mica's face opens her memory: record any instrument in the session into it (up to
 // 30 s), trim it, remove it, play it, choose how it plays. The back of the device (every knob behind
 // the macros, the Temperature scales, the compressor, modulation) is hidden: ?geodeback shows its handle.
-import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
 import type { Engine, ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
 import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
@@ -564,10 +564,6 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
           <canvas ref={cv} aria-label="Mica's room" onPointerDown={onDown} onPointerMove={onHover} />
           <div className="fwm-geode__hud"><span>TEMPERATURE</span><b ref={(r) => void (hud.current.t = r)}>WARM</b></div>
           <div className="fwm-geode__hud fwm-geode__hud--r"><span>ROOM</span><b ref={(r) => void (hud.current.r = r)}>12 m</b>
-            <span className="fwm-geode__roombtns">
-              <button type="button" aria-label="Smaller room" disabled={pv('room') <= 0} onClick={() => set('room', clamp(pv('room') - 0.1))}>−</button>
-              <button type="button" aria-label="Bigger room" disabled={pv('room') >= 1} onClick={() => set('room', clamp(pv('room') + 0.1))}>+</button>
-            </span>
           </div>
           {st.state !== 'ready' && !zoom && (
             <button type="button" className="fwm-geode__hint" onClick={() => setZoom(true)}>
@@ -631,7 +627,8 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
           {pop && !zoom && <div className={'fwm-geode__pop' + (pop === 'temp' ? ' is-bare' : '')} role="dialog" aria-label={pop}>{POPS[pop]?.()}</div>}
           <div className="fwm-geode__dock" role="toolbar" aria-label="Geode controls">
             {DOCK.map(([id, l]) => (
-              <button key={id} type="button" data-id={id} aria-label={l} aria-expanded={id === 'mica' ? zoom : pop === id}
+              <Fragment key={id}>
+              <button type="button" data-id={id} aria-label={l} aria-expanded={id === 'mica' ? zoom : pop === id}
                 className={(id === 'mica' && rec ? 'is-rec' : '') + (DRAG[id] ? ' is-level' : '')}
                 data-eff={DRAG[id]}
                 title={DRAG[id] ? `${l}: click to open, drag up or down to set` : undefined}
@@ -660,6 +657,13 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
                 {ICONS[id]}
                 <span>{dockShow?.id === id ? dockShow.text : l.toUpperCase()}</span>
               </button>
+              {id === 'room' && (
+                <span className="fwm-geode__roombtns" role="group" aria-label="Room size">
+                  <button type="button" aria-label="Bigger room" disabled={pv('room') >= 1} onClick={() => set('room', clamp(pv('room') + 0.1))}>+</button>
+                  <button type="button" aria-label="Smaller room" disabled={pv('room') <= 0} onClick={() => set('room', clamp(pv('room') - 0.1))}>−</button>
+                </span>
+              )}
+              </Fragment>
             ))}
           </div>
           {debug && <button type="button" className="fwm-geode__flip" onClick={() => setBack(true)} title="Debug: the knobs behind the room">BACK</button>}
