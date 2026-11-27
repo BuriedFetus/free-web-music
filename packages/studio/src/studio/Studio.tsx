@@ -260,9 +260,12 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
 
   const strumRec = useRef<{ track: string; pat: string; free: number; s: number; t: number } | null>(null);
   // A recording take, per instrument: from its first note, time runs on from there (it never wraps when
-  // the song loops); the pattern grows ahead of it, bar by bar, up to MAX_LEN, then the take wraps and overdubs.
+  // the song loops). Into a new, empty 1-bar pattern the take grows it ahead, bar by bar, up to MAX_LEN, then
+  // wraps and overdubs. A pattern you gave a length (or that has notes) keeps it: the take loops inside it
+  // and overdubs (user, 2026-11-27: "recording a pattern with 8 bars, I can go above that").
   // (startPos NaN = the take began before the song was playing: it is pinned on the next note)
-  const recTake = useRef(new Map<string, { pat: string; startPos: number; startFree: number; startMs: number }>());
+  const recTake = useRef(new Map<string, { pat: string; startPos: number; startFree: number; startMs: number; grow: boolean }>());
+  const freshPattern = (track: string, pat: string) => project.notes(track, pat).length === 0 && (project.patternInfo(track, pat)?.len ?? BAR) <= BAR;
   useEffect(() => {
     if (!rec || !playing) recTake.current.clear();
   }, [rec, playing]);
@@ -282,14 +285,17 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
             tp = project.addPattern(track.id);
             if (!tp) return;
             project.setCell(row, track.id, tp);
-          } else if (recMode === 'replace') project.clearPattern(track.id, tp);
-          take = { pat: tp, startPos: NaN, startFree: 0, startMs: now };
+          }
+          const grow = freshPattern(track.id, tp);
+          if (recMode === 'replace') project.clearPattern(track.id, tp);
+          take = { pat: tp, startPos: NaN, startFree: 0, startMs: now, grow };
           recTake.current.set(track.id, take);
           // the song's step 0 is this note (it starts that far in after the head start, so later notes stay in time)
           setPlaying(true, { t0: now, stepsPerMs: (project.bpm / 60) * 4 / 1000 });
         }
-        const free = wallSteps(now - take.startMs);
-        const s0 = Math.min(MAX_LEN - 0.01, q0 ? Math.round(free / q0) * q0 : free);
+        const lim = take.grow ? MAX_LEN : (project.patternInfo(track.id, take.pat)?.len ?? BAR);
+        const free = wallSteps(now - take.startMs) % lim;
+        const s0 = Math.min(lim - 0.01, q0 ? Math.round(free / q0) * q0 : free);
         const id = project.addNote(track.id, take.pat, { s: s0, l: q0 || 0.25, m: note, v: vel });
         if (id) recHeld.current.set(`${track.id}:${note}`, { id, track: track.id, pat: take.pat, s: s0, startPos: NaN, startMs: now });
         return;
@@ -309,7 +315,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
       let free: number;
       const take = recTake.current.get(track.id);
       if (take && take.pat === pat && !Number.isNaN(take.startPos)) {
-        free = (take.startFree + (pos - take.startPos) * track.seq.rate) % MAX_LEN;
+        free = (take.startFree + (pos - take.startPos) * track.seq.rate) % (take.grow ? MAX_LEN : len);
       } else if (take && take.pat === pat) {
         // the take began with the song: pin it to the song's position now
         const raw = Math.max(0, rp.pos - latSteps()) * track.seq.rate;
@@ -320,7 +326,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
         const n = Math.floor(raw);
         const idx = stepOf(n, len, track.seq.dir, (slots.current.get(track.id) ?? 0) + 1);
         free = idx + (raw - n);
-        recTake.current.set(track.id, { pat, startPos: pos, startFree: free, startMs: performance.now() });
+        recTake.current.set(track.id, { pat, startPos: pos, startFree: free, startMs: performance.now(), grow: freshPattern(track.id, pat) });
         // replace: the take's first note clears the pattern
         if (recMode === 'replace') project.clearPattern(track.id, pat);
       }
@@ -335,6 +341,8 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
         g!.t = now;
       } else strumRec.current = { track: track.id, pat, free, s, t: now };
       if (s >= MAX_LEN) s -= MAX_LEN;
+      const growing = recTake.current.get(track.id)?.grow ?? false;
+      if (s >= len && !growing) s -= len * Math.floor(s / len); // a set length: the take loops inside it
       if (s >= len) {
         len = Math.min(MAX_LEN, Math.ceil((s + 0.001) / BAR) * BAR);
         project.setPatternLen(track.id, pat, len);
@@ -362,6 +370,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
           take.startFree = 0;
           continue;
         }
+        if (!take.grow) continue; // a pattern you gave a length keeps it
         const cur = take.startFree + (pos - take.startPos) * t.seq.rate;
         if (cur < MAX_LEN && cur > len - BAR) project.setPatternLen(track, take.pat, Math.min(MAX_LEN, (Math.floor(cur / BAR) + 2) * BAR));
       }

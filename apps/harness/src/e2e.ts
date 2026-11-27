@@ -1393,6 +1393,19 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
       const len = p.patternInfo(tid, pat)!.len;
       ok(ss.length === 2 && ss[1] > 16 && len >= 32, `a take runs past the loop: notes at ${ss.map((x) => x.toFixed(1)).join(', ')}, pattern ${len} steps`);
       btn('■ Stop')!.click();
+      // a length you set is kept: the take loops inside it (2 bars here) instead of growing
+      await sleep(200);
+      p.clearPattern(tid, pat);
+      p.setPatternLen(tid, pat, 32);
+      btn('▶ Play')!.click();
+      await sleep(300);
+      await tap('a');
+      await sleep(2300); // past the 2-bar end
+      await tap('s');
+      await sleep(100);
+      const s2 = p.notes(tid, pat).map(([, n]) => n.s).sort((x, y) => x - y);
+      ok(s2.length === 2 && s2.every((x) => x < 32) && p.patternInfo(tid, pat)!.len === 32, `a pattern with a set length keeps it: notes at ${s2.map((x) => x.toFixed(1)).join(', ')}, ${p.patternInfo(tid, pat)!.len} steps`);
+      btn('■ Stop')!.click();
       document.body.dispatchEvent(new KeyboardEvent('keydown', { key: ' ', code: 'Space', shiftKey: true, bubbles: true }));
       await sleep(100);
       ok(btn('● Rec')?.getAttribute('aria-pressed') === 'false', 'Shift+Space disarms Rec');
