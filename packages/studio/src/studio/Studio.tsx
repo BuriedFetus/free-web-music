@@ -571,7 +571,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   const ctx: StudioCtx = {
     project, presence, user, channel, songs, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop,
     transport: sync, liveTiming: timing, rec, setRec, recMode, slotOf, cueRow,
-    playNote, releaseNote, audition, peerHeld, myHeld, toast, tapes,
+    playNote, releaseNote, audition, peerHeld, myHeld, toast, tapes, octave, setOctave: (o: number) => setOctave(Math.max(-3, Math.min(4, o))),
     look: { css: keptLook, set: setLook, preview: lookPreview, setPreview: setLookPreview, hostKeeps: hostLook !== undefined, off: lookOff },
   };
 

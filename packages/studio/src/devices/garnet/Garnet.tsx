@@ -136,7 +136,7 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
   const strumRef = useRef(strum);
   strumRef.current = strum;
   useEffect(() => {
-    if (view.mode !== 'chords') return;
+    if (view.mode !== 'chords' || host?.preview) return; // a picture in the manual never takes the number keys
     const me = ++keyOwner;
     const kd = (e: KeyboardEvent) => {
       if (me !== keyOwner || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -225,7 +225,7 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
             {edited && <small className="fwm-garnet__edited"> edited</small>}
           </P.Screen>
           <P.Button variant="hw" label="Next sound" onPress={() => loadPreset(presetIx + 1)}>›</P.Button>
-          <Scope engine={status === 'on' ? engine : null} note={null} label="String" />
+          <Scope engine={status === 'on' && !host?.preview ? engine : null} note={null} label="String" />
         </div>
       </div>
 

@@ -65,7 +65,7 @@ export function Opal({ store, host, slot, user = { name: 'You', color: 'var(--fw
             {edited && <small className="fwm-garnet__edited"> edited</small>}
           </P.Screen>
           <P.Button variant="hw" label="Next sound" onPress={() => loadPreset(presetIx + 1)}>›</P.Button>
-          <Scope engine={status === 'on' ? engine : null} note={null} label="Pad" />
+          <Scope engine={status === 'on' && !host?.preview ? engine : null} note={null} label="Pad" />
         </div>
       </div>
 

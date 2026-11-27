@@ -32,16 +32,18 @@ export function PanelKeys({ host, slot, octave = 3 }: { host?: DeviceHost; slot:
     },
     [engine, slot, host],
   );
-  const low = 12 * (oct + 1);
+  // in the studio the octave is the computer keyboard's (Z / X), so the A key and the first key on screen match
+  const low = host?.octave ? host.octave.low : 12 * (oct + 1);
+  const shown = Math.floor(low / 12) - 1;
   const sk = host?.songKey;
   const scale = sk && sk.scale !== 'chromatic' ? { has: (n: number) => inKey(n, sk), isRoot: (n: number) => isRoot(n, sk), snap: (n: number) => snapToKey(n, sk) } : undefined;
   return (
     <div className="fwm-perf">
       <div className="fwm-oct">
         <span className="fwm-silk">Octave</span>
-        <P.Button variant="hw" label="Octave up" onPress={() => setOct((o) => Math.min(6, o + 1))}>+</P.Button>
-        <P.Screen variant="readout">C{oct}</P.Screen>
-        <P.Button variant="hw" label="Octave down" onPress={() => setOct((o) => Math.max(0, o - 1))}>−</P.Button>
+        <P.Button variant="hw" label="Octave up" onPress={() => (host?.octave ? host.octave.shift(1) : setOct((o) => Math.min(6, o + 1)))}>+</P.Button>
+        <P.Screen variant="readout">C{shown}</P.Screen>
+        <P.Button variant="hw" label="Octave down" onPress={() => (host?.octave ? host.octave.shift(-1) : setOct((o) => Math.max(0, o - 1)))}>−</P.Button>
       </div>
       <P.Keys low={low} high={low + 24} held={host?.myHeld?.length ? [...held, ...host.myHeld] : held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} scale={scale} />
     </div>

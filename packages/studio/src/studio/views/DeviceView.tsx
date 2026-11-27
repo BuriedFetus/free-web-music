@@ -41,6 +41,10 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
   if (host && t) {
     const mix = st.project.mix(t.id);
     host.sends = { rev: mix.rev, dly: mix.dly, set: (k, v) => st.project.setMix(t.id, { [k]: v }) };
+    if (entry?.layout !== 'pads') {
+      const base = (entry?.rootNote ?? 48) + st.octave * 12;
+      host.octave = { low: Math.floor(base / 12) * 12, shift: (d) => st.setOctave(st.octave + d) };
+    }
     if (t.device === 'geode') {
       const tp = st.tapes;
       const meta = st.project.tape(t.id);

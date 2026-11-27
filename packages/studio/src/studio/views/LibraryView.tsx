@@ -18,6 +18,7 @@ const PREVIEW_HOST: DeviceHost = {
   people: [{ userId: 'me', name: 'You', color: 'var(--fwm-me)' }],
   touch: () => {},
   subtitle: 'manual',
+  preview: true,
   sends: { rev: 0.2, dly: 0.1, set: () => {} },
 };
 

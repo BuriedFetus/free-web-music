@@ -62,7 +62,7 @@ export function Quartz({ store, host, slot, user = { name: 'You', color: 'var(--
             {edited && <small className="fwm-garnet__edited"> edited</small>}
           </P.Screen>
           <P.Button variant="hw" label="Next sound" onPress={() => loadPreset(presetIx + 1)}>›</P.Button>
-          <Scope engine={status === 'on' ? engine : null} note={null} label="Keys" />
+          <Scope engine={status === 'on' && !host?.preview ? engine : null} note={null} label="Keys" />
         </div>
       </div>
 

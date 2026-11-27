@@ -189,8 +189,12 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     let last = performance.now();
     let n = 0;
     const reduce = typeof matchMedia === 'function' ? matchMedia('(prefers-reduced-motion: reduce)') : null;
+    const still = !!host?.preview; // a picture in the manual: a couple of frames a second is plenty
+    let lastDraw = 0;
     const loop = (now: number) => {
       raf = requestAnimationFrame(loop);
+      if (still && now - lastDraw < 500) return;
+      lastDraw = now;
       const dt = Math.min(0.05, (now - last) / 1000);
       last = now;
       if (++n % 120 === 0) pt.pal = pal.current = readPalette(el); // a look or skin may have changed

@@ -45,6 +45,11 @@ export interface DeviceHost {
   subtitle?: string;
   /** The song's key (Garnet builds its chords from it). */
   songKey?: SongKey;
+  /** The panel is only a picture (the manual): it must not take keys, focus or sound. */
+  preview?: boolean;
+  /** The computer keyboard's octave for this track: `low` = the C its A key plays (or the C below it).
+   *  The panel's keys start there and its octave buttons move it, so both always match. */
+  octave?: { low: number; shift(d: number): void };
   /** This track's Reverb / Delay sends (the Mixer's): shown as SEND knobs on the panel. */
   sends?: { rev: number; dly: number; set(which: 'rev' | 'dly', v: number): void };
   /** Geode: its tape (recording, the demo tape, removing it). */
@@ -104,7 +109,10 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
   useEffect(() => {
     if (!host && engine && status === 'on') for (const n of heldRef.current) engine.noteOn(slot, n, 0.85);
   }, [engine, status, slot, host]);
-  const low = 12 * (oct + 1);
+  const low = host?.octave ? host.octave.low : 12 * (oct + 1);
+  const shownOct = Math.floor(low / 12) - 1;
+  const octUp = () => (host?.octave ? host.octave.shift(1) : setOct((o) => Math.min(6, o + 1)));
+  const octDown = () => (host?.octave ? host.octave.shift(-1) : setOct((o) => Math.max(0, o - 1)));
   const sk = host?.songKey;
   const keyScale = sk && sk.scale !== 'chromatic' ? { has: (n: number) => inKey(n, sk), isRoot: (n: number) => isRoot(n, sk), snap: (n: number) => snapToKey(n, sk) } : undefined;
   useComputerKeys({
@@ -166,7 +174,7 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
             </div>
           ))}
         </div>
-        <Scope engine={status === 'on' ? engine : null} note={top} />
+        <Scope engine={status === 'on' && !host?.preview ? engine : null} note={top} />
         <Sends host={host} />
         <div className="fwm-preset">
           <P.Button variant="hw" label="Previous preset" onPress={() => loadPreset(presetIx - 1)}>‹</P.Button>
@@ -272,9 +280,9 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
       <div className="fwm-perf">
         <div className="fwm-oct">
           <span className="fwm-silk">Octave</span>
-          <P.Button variant="hw" label="Octave up" onPress={() => setOct((o) => Math.min(6, o + 1))}>+</P.Button>
-          <P.Screen variant="readout">C{oct}</P.Screen>
-          <P.Button variant="hw" label="Octave down" onPress={() => setOct((o) => Math.max(0, o - 1))}>−</P.Button>
+          <P.Button variant="hw" label="Octave up" onPress={octUp}>+</P.Button>
+          <P.Screen variant="readout">C{shownOct}</P.Screen>
+          <P.Button variant="hw" label="Octave down" onPress={octDown}>−</P.Button>
         </div>
         <P.Keys low={low} high={low + 24} held={host?.myHeld?.length ? [...held, ...host.myHeld] : held} peerHeld={host?.peerHeld} onNoteOn={noteOn} onNoteOff={noteOff} scale={keyScale} />
       </div>

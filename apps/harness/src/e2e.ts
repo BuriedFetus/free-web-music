@@ -20,10 +20,13 @@ async function until(what: string, fn: () => boolean, ms = 8000) {
 }
 const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel);
 /** + Add instrument (Device panel) → pick one. */
-const addInst = (name: string) => {
-  ($('.fwm-addinst') as HTMLButtonElement).click();
+async function addInst(name: string) {
+  await until('+ Add instrument', () => !!$('.fwm-addinst'), 4000);
+  if (!$('.fwm-addmenu')) ($('.fwm-addinst') as HTMLButtonElement).click();
+  await until(`menu item ${name}`, () => !!$(`[role="menuitem"][aria-label="Add ${name}"]`), 2000);
   ($(`[role="menuitem"][aria-label="Add ${name}"]`) as HTMLButtonElement).click();
-};
+  await sleep(50);
+}
 const btn = (text: string) => [...document.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(text));
 
 export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness }, engineRef: { current: Engine | null }) {
@@ -145,7 +148,7 @@ async function runMulti(p: Project, engineRef: { current: Engine | null }, ok: (
     let w = await watch(1500);
     ok(Object.values(w.env).some((v) => v > 0.1), `one track plays (${fmt(w)})`);
     // Add a second Basalt from the Library, while playing.
-    addInst('Basalt');
+    await addInst('Basalt');
     await sleep(200);
     w = await watch(1500);
     const vals = () => Object.values(w.env);
@@ -162,7 +165,7 @@ async function runMulti(p: Project, engineRef: { current: Engine | null }, ok: (
     document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
     ok(w.peak > 0.02, `computer key plays the new track (${fmt(w)})`);
     // Third copy and a removal.
-    addInst('Basalt');
+    await addInst('Basalt');
     await sleep(200);
     p.removeTrack(p.trackIds()[0]);
     btn('▶ Play')!.click();
@@ -503,7 +506,7 @@ async function runFlint(_p: Project, engineRef: { current: Engine | null }, ok: 
   };
   try {
     await sleep(300);
-    addInst('Flint');
+    await addInst('Flint');
     await sleep(200);
     ok(!!$('.fwm-flint'), 'Flint shows in the Device panel');
     btn('Sound')!.click();
@@ -543,7 +546,7 @@ async function runDrums(p: Project, engineRef: { current: Engine | null }, ok: (
   window.addEventListener('error', (e) => errs.push(String(e.message)));
   try {
     await sleep(300);
-    addInst('Flint');
+    await addInst('Flint');
     await sleep(200);
     const id = p.trackIds()[0];
     const pat = p.patternList(id)[0].id;
@@ -1033,9 +1036,11 @@ async function runScope(p: Project, engineRef: { current: Engine | null }, ok: (
 /** One tab: Garnet's panel and neck. Chords follow the song's key and the chord type; strumming plays the right
  *  notes and is recorded; Notes mode lights the scale; keys 1–7 strum; drag across strings plucks each. */
 async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  // the Device panel only (the manual's pictures in the Library have a Garnet too)
+  const dev = () => document.querySelector('.fwm-devwrap') ?? document;
   const errs: string[] = [];
   window.addEventListener('error', (e) => errs.push(String(e.message)));
-  const heads = () => [...document.querySelectorAll('.fwm-garnet__ch b')].map((b) => b.textContent).join(' ');
+  const heads = () => [...dev().querySelectorAll('.fwm-garnet__ch b')].map((b) => b.textContent).join(' ');
   const ptr = (type: string, x: number, y: number) => {
     const el = $('.fwm-garnet__neck')!;
     el.dispatchEvent(new PointerEvent(type, { bubbles: true, cancelable: true, clientX: x, clientY: y, pointerId: 1, pointerType: 'mouse', button: 0, buttons: type === 'pointerup' ? 0 : 1, isPrimary: true }));
@@ -1051,7 +1056,7 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
   };
   try {
     await sleep(300);
-    addInst('Garnet');
+    await addInst('Garnet');
     await sleep(300);
     const id = p.trackIds()[0];
     ok(!!$('.fwm-garnet'), 'Garnet shows in the Device panel');
@@ -1065,7 +1070,7 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     btn('Triad')!.click();
     p.setKey({ root: 0, scale: 'major' });
     await sleep(150);
-    const cell = [...document.querySelectorAll('.fwm-garnet__col')][0];
+    const cell = [...dev().querySelectorAll('.fwm-garnet__col')][0];
     const cs = [...cell.querySelectorAll('.fwm-garnet__cn')].map((c) => c.textContent).join(' ');
     ok(cs === 'E C G E C ×', `the C strip shows the open C shape x32010, top string first (${cs})`);
 
@@ -1074,7 +1079,7 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     await sleep(300);
     ($('.fwm-garnet__ch') as HTMLButtonElement).click();
     ok((await peak(700)) > 0.05, 'clicking a chord name strums it');
-    ok(document.querySelectorAll('.fwm-garnet__str.is-ringing').length >= 5, 'the strings it played are ringing');
+    ok(dev().querySelectorAll('.fwm-garnet__str.is-ringing').length >= 5, 'the strings it played are ringing');
 
     // Rec + Play: a strum is recorded as the chord's notes, a few ms apart
     const pat = p.cell(p.rows()[0].id, id)!;
@@ -1096,21 +1101,21 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     // drag down across the strings in the Am strip: each string plucks once
     const r = $('.fwm-garnet__neck')!.getBoundingClientRect();
     const x = r.left + (r.width * 5.5) / 7;
-    const ringing0 = document.querySelectorAll('.fwm-garnet__str.is-ringing').length;
-    document.querySelectorAll('.fwm-garnet__str').forEach((e) => e.classList.remove('is-ringing'));
+    const ringing0 = dev().querySelectorAll('.fwm-garnet__str.is-ringing').length;
+    dev().querySelectorAll('.fwm-garnet__str').forEach((e) => e.classList.remove('is-ringing'));
     ptr('pointerdown', x, r.top + 4);
     for (let k = 1; k <= 12; k++) { ptr('pointermove', x, r.top + (r.height * k) / 12 - 2); await sleep(8); }
     ptr('pointerup', x, r.bottom - 2);
     await sleep(60);
-    const rung = document.querySelectorAll('.fwm-garnet__str.is-ringing').length;
+    const rung = dev().querySelectorAll('.fwm-garnet__str.is-ringing').length;
     ok(rung === 5 && ringing0 >= 0, `dragging across the Am strip plucks its five strings (x02210), the muted one stays still (${rung})`);
 
     // Notes mode: the scale lit, the root brightest
     btn('Notes')!.click();
     await sleep(150);
-    const lit = document.querySelectorAll('.fwm-garnet__dot:not(.is-off)').length;
-    const roots = [...document.querySelectorAll('.fwm-garnet__dot.is-root')].map((d) => d.textContent);
-    ok(lit === 6 * 13 - document.querySelectorAll('.fwm-garnet__dot.is-off').length && roots.length > 0 && roots.every((t) => t === 'C'), `Notes: C major lit, roots are C (${lit} lit, ${roots.length} roots)`);
+    const lit = dev().querySelectorAll('.fwm-garnet__dot:not(.is-off)').length;
+    const roots = [...dev().querySelectorAll('.fwm-garnet__dot.is-root')].map((d) => d.textContent);
+    ok(lit === 6 * 13 - dev().querySelectorAll('.fwm-garnet__dot.is-off').length && roots.length > 0 && roots.every((t) => t === 'C'), `Notes: C major lit, roots are C (${lit} lit, ${roots.length} roots)`);
     btn('Chords')!.click();
 
     btn('Palm mute')!.click();
@@ -1121,8 +1126,8 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     await sleep(100);
     document.body.dispatchEvent(new KeyboardEvent('keydown', { key: 'a', bubbles: true }));
     await sleep(100);
-    const mineDots = document.querySelectorAll('.fwm-garnet__neck .is-mine').length;
-    const ringing = document.querySelectorAll('.fwm-garnet__str.is-ringing').length;
+    const mineDots = dev().querySelectorAll('.fwm-garnet__neck .is-mine').length;
+    const ringing = dev().querySelectorAll('.fwm-garnet__str.is-ringing').length;
     document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
     await sleep(100);
     ok(mineDots === 1 && ringing >= 1 && !$('.fwm-garnet__neck .is-mine'), `a computer key shows its place on the neck and rings the string (${mineDots}, ${ringing})`);
@@ -1131,7 +1136,7 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     await sleep(150);
     const gRoles = () => {
       const r: Record<string, Set<string>> = {};
-      for (const d of document.querySelectorAll('.fwm-garnet__neck .fwm-garnet__dot')) {
+      for (const d of dev().querySelectorAll('.fwm-garnet__neck .fwm-garnet__dot')) {
         const c = [...d.classList].find((x) => x.startsWith('is-g-'));
         if (c) (r[c.slice(5)] ??= new Set()).add(d.firstChild?.textContent ?? '');
       }
@@ -1147,7 +1152,7 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     ok(gRoles() === 'root:C second:E third:G', `guide after C: ${gRoles()}`);
     await tapKey('d'); // E
     ok(gRoles() === 'alt:BG root:C second:E', `guide after E: C stays the root, Em's G and B purple (${gRoles()})`);
-    const rns = [...new Set([...document.querySelectorAll('.fwm-garnet__rn-badge')].map((e) => e.textContent))].sort().join(' ');
+    const rns = [...new Set([...dev().querySelectorAll('.fwm-garnet__rn-badge')].map((e) => e.textContent))].sort().join(' ');
     ok(rns === 'I V iii vii°', `Roman numerals on every guided note: C = I, E = iii, G = V, B = vii° (${rns})`);
     const legend = $('.fwm-garnet__legend')?.textContent ?? '';
     ok(legend.includes('Root C') && legend.includes('Next: Em (iii)'), `the legend says what the colours mean (${legend})`);
@@ -1308,7 +1313,7 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
   window.addEventListener('error', (e) => errs.push(String(e.message)));
   try {
     await sleep(300);
-    addInst('Opal');
+    await addInst('Opal');
     await sleep(400);
     ok(!!$('.fwm-opal') && p.trackIds().length === 1, 'Opal shows in the Device panel');
     ok(document.querySelectorAll('.fwm-opal [role=slider]').length >= 20, `every control is there (${document.querySelectorAll('.fwm-opal [role=slider]').length} dials)`);
@@ -1450,7 +1455,7 @@ async function runQuartz(p: Project, engineRef: { current: Engine | null }, ok: 
   window.addEventListener('error', (e) => errs.push(String(e.message)));
   try {
     await sleep(300);
-    addInst('Quartz');
+    await addInst('Quartz');
     await sleep(400);
     ok(!!$('.fwm-quartz') && p.trackIds().length === 1, 'Quartz shows in the Device panel');
     btn('Sound')?.click();
@@ -1516,9 +1521,9 @@ async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { curre
   try {
     await sleep(400);
     if (role === 'ga') {
-      addInst('Opal');
+      await addInst('Opal');
       await sleep(300);
-      addInst('Geode');
+      await addInst('Geode');
       await sleep(400);
       ok(!!$('.fwm-geode canvas') && !!geodeId(), 'Geode shows in the Device panel with its room');
       ok(document.querySelectorAll('.fwm-geode__dock button').length === 10, 'the dock has its ten icons');
@@ -1628,7 +1633,7 @@ async function runGeodeKeep(p: Project, engineRef: { current: Engine | null }, o
   try {
     await sleep(400);
     if (!sessionStorage.getItem('fwm.e2e.gp')) {
-      addInst('Geode');
+      await addInst('Geode');
       await sleep(300);
       ($('.fwm-geode__dock [data-id="mica"]') as HTMLButtonElement).click();
       await sleep(200);

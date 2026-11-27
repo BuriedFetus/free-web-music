@@ -60,6 +60,9 @@ export interface StudioCtx {
   /** Notes this person holds on the computer keyboard, per track. */
   myHeld: Record<string, number[]>;
   toast(msg: string, action?: { label: string; run(): void }): void;
+  /** The computer keyboard's octave shift (Z / X), -3..4; the panels' octave buttons move it too. */
+  octave: number;
+  setOctave(o: number): void;
   /** Geode's tapes: recording, keeping and sharing them. */
   tapes: import('./useTapes').TapesCtl;
   /** This person's own look (a stylesheet only they see; never in the shared song). */

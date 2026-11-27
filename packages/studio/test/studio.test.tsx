@@ -37,6 +37,20 @@ function memorySongs() {
 }
 
 describe('<Studio>', () => {
+  it("one octave: the panel's keys start where the computer keyboard's A key plays, and both move together", () => {
+    mount();
+    addInst(screen, 'Geode');
+    const dev = () => within(document.querySelector<HTMLElement>('.fwm-devwrap')!);
+    const readout = () => dev().getByRole('button', { name: 'Octave up' }).parentElement!.textContent!;
+    expect(readout()).toContain('C4'); // A plays C4 (the tape's own pitch): the keys on screen start at C4
+    fireEvent.keyDown(document.body, { key: 'z' });
+    expect(readout()).toContain('C3');
+    fireEvent.click(dev().getByRole('button', { name: 'Octave up' }));
+    fireEvent.click(dev().getByRole('button', { name: 'Octave up' }));
+    expect(readout()).toContain('C5');
+    expect(screen.getByText(/Z\/X octave \+1/)).toBeTruthy();
+  });
+
   it('the Library is a manual: open an instrument, turn its pages, add it from there', () => {
     const p = mount();
     fireEvent.click(screen.getByRole('button', { name: 'How Geode works' }));
