@@ -406,7 +406,10 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
       <span>{label}</span>
       <div className="fwm-seg" role="group" aria-label={label}>
         {options.map((o, i) => (
-          <P.Button key={o} variant="seg" label={`${label}: ${o}`} pressed={Math.round(pv(id)) === i} onPress={() => set(id, i)}>{o}</P.Button>
+          <P.Button key={o} variant="seg" label={`${label}: ${o}`} pressed={Math.round(pv(id)) === i} onPress={() => {
+            set(id, i);
+            if (id === 'walk' && i > 0 && pv('mdepth') < 0.05) set('mdepth', 0.5); // the walk is part of Motion: at 0 she would not move
+          }}>{o}</P.Button>
         ))}
       </div>
     </div>
@@ -468,7 +471,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
         </div>
         {seg('walk', 'Mica walks', spec('walk').options!)}
         {seg('wbars', 'Walk speed', spec('wbars').options!)}
-        <p>One movement in time with the song, on everything you switch on. Drag Mica to place her: left / right = pan, farther back = farther away; her walks go around that spot.</p>
+        <p>One movement in time with the song, on everything you switch on (Depth 0 = nothing moves, Mica's walk included). Drag Mica to place her: left / right = pan, farther back = farther away; her walks go around that spot.</p>
       </>
     ),
     lamp: () => (<><h3>Light</h3>{row('light', 'Dimmer')}<p>Dim the lamp to calm the whole sound (a master low-pass). The room stays as it is.</p></>),

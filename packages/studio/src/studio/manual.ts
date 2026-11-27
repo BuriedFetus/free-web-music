@@ -205,7 +205,7 @@ export const MANUAL: Chapter[] = [
           { at: '[data-id="breath"]', title: 'Breath', text: 'Pluck (short notes) to Swell (slow, long notes). Mica\'s mouth follows it.' },
           { at: '[data-id="grains"]', title: 'Grains', text: 'Plays tiny slices of the tape instead of the tape itself: from plain to a cloud.' },
           { at: '[data-id="crunch"]', title: 'Crunch', text: 'Fewer bits, lower rate: a crunchy, toy-like sound.' },
-          { at: '[data-id="motion"]', title: 'Motion', text: 'One movement in time with the song on the things you pick (window, pitch, pan…), and Mica can walk around the room.' },
+          { at: '[data-id="motion"]', title: 'Motion', text: 'One movement in time with the song on the things you pick (window, pitch, pan…), and Mica can walk around the room. Drag the icon down to 0 and everything stands still, her walk too.' },
         ],
       },
     ],

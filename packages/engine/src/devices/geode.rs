@@ -781,6 +781,9 @@ impl Geode {
             }
             _ => (bx, bz),
         };
+        // the walk is part of Motion: its size follows Motion's depth (0 = Mica stays where she was put)
+        let wd = depth.clamp(0.0, 1.0);
+        let (tx, tz) = (bx + (tx - bx) * wd, bz + (tz - bz) * wd);
         let lz = (room_depth(room) - 0.35).min(2.2).max(0.3);
         let (tx, tz) = (tx.clamp(-0.85, 0.85), tz.clamp(0.25, lz));
         if !self.primed {

@@ -288,6 +288,14 @@ fn mica_walks_and_stays() {
     assert!((g.place().0 - x0).abs() < 1e-3, "Stay stays");
     g.set_param(p::WALK, 1.0); // left ↔ right
     g.set_param(p::WBARS, 0.0);
+    // Motion at 0: the walk is part of Motion, so she stays put
+    g.set_param(p::MDEPTH, 0.0);
+    for k in 0..8 {
+        g.tempo(120.0, k as f64 * 2.0, true);
+        render(&mut g, 12_000);
+        assert!((g.place().0 - x0).abs() < 1e-3, "Motion 0: no walk");
+    }
+    g.set_param(p::MDEPTH, 1.0);
     let mut xs = vec![];
     for k in 0..8 {
         g.tempo(120.0, k as f64 * 2.0, true);
