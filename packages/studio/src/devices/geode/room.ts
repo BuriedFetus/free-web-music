@@ -182,6 +182,25 @@ export class RoomPainter {
     const a = this.P(-1, -1, this.G.L), b = this.P(1, 1, this.G.L);
     return px > a[0] - 8 && px < b[0] + 8 && py > a[1] - 8 && py < b[1] + 8;
   }
+  /** The ceiling lamp (drag it up / down: the Light). */
+  hitLamp(px: number, py: number) {
+    if (!this.W) return false;
+    const a = this.P(-0.2, -1, 0.75), b = this.P(0.2, -0.86, 0.75);
+    return px > a[0] - 10 && px < b[0] + 10 && py > a[1] - 6 && py < b[1] + 14;
+  }
+  /** The window on the left wall (drag up to open it: the Air). */
+  hitWindow(px: number, py: number) {
+    if (!this.W) return false;
+    const z1 = Math.min(0.75, this.G.L - 0.1);
+    const pts = [this.P(-1, -0.62, 0.12), this.P(-1, -0.62, z1), this.P(-1, 0.02, z1), this.P(-1, 0.02, 0.12)];
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    return px > Math.min(...xs) - 8 && px < Math.max(...xs) + 8 && py > Math.min(...ys) - 8 && py < Math.max(...ys) + 8;
+  }
+  /** The window's height on screen (px), so a drag across it opens it fully. */
+  windowPx() {
+    const p = this.P(-1, -0.62, 0.12), q = this.P(-1, 0.02, 0.12);
+    return Math.max(60, q[1] - p[1]);
+  }
   hitMica(px: number, py: number) {
     const m = this.mica;
     return !!m && Math.abs(px - m.x) < m.u * 0.65 && py > m.y - m.u * 1.4 && py < m.y + m.u * 0.15;

@@ -323,6 +323,19 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
       c.addEventListener('pointerup', () => { c.removeEventListener('pointermove', mv); touch(null); }, { once: true });
       return;
     }
+    // the lamp (Light) and the window (Air): drag up = brighter / more open, drag down = dimmer / closed
+    const knob = pt.hitLamp(px, py) ? { id: 'light', span: 220 } : pt.hitWindow(px, py) ? { id: 'air', span: pt.windowPx() * 1.2 } : null;
+    if (knob) {
+      ev.currentTarget.setPointerCapture(ev.pointerId);
+      touch(knob.id);
+      const y0 = ev.clientY, v0 = pv(knob.id);
+      const c = ev.currentTarget;
+      const mv = (e: PointerEvent) => set(knob.id, clamp(v0 + (y0 - e.clientY) / knob.span));
+      c.addEventListener('pointermove', mv);
+      c.addEventListener('pointerup', () => { c.removeEventListener('pointermove', mv); touch(null); }, { once: true });
+      if (pop) setPop(null);
+      return;
+    }
     if (pt.hitBackWall(px, py)) {
       // push the back wall away (drag up) for a bigger room, pull it closer (drag down) for a smaller one
       ev.currentTarget.setPointerCapture(ev.pointerId);
@@ -342,7 +355,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     if (!pt || ev.buttons) return;
     const r = ev.currentTarget.getBoundingClientRect();
     const px = ev.clientX - r.left, py = ev.clientY - r.top;
-    ev.currentTarget.style.cursor = pt.hitMica(px, py) ? 'grab' : pt.wallU(px, py) != null ? 'ew-resize' : pt.hitBackWall(px, py) ? 'ns-resize' : '';
+    ev.currentTarget.style.cursor = pt.hitMica(px, py) ? 'grab' : pt.wallU(px, py) != null ? 'ew-resize' : pt.hitLamp(px, py) || pt.hitWindow(px, py) || pt.hitBackWall(px, py) ? 'ns-resize' : '';
   };
 
   // ---- dock icons: drag up / down sets the icon's main amount (0–100% over ~250 px, so small moves stay small) ----
@@ -550,7 +563,12 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
           }}>
           <canvas ref={cv} aria-label="Mica's room" onPointerDown={onDown} onPointerMove={onHover} />
           <div className="fwm-geode__hud"><span>TEMPERATURE</span><b ref={(r) => void (hud.current.t = r)}>WARM</b></div>
-          <div className="fwm-geode__hud fwm-geode__hud--r"><span>ROOM</span><b ref={(r) => void (hud.current.r = r)}>12 m</b></div>
+          <div className="fwm-geode__hud fwm-geode__hud--r"><span>ROOM</span><b ref={(r) => void (hud.current.r = r)}>12 m</b>
+            <span className="fwm-geode__roombtns">
+              <button type="button" aria-label="Smaller room" disabled={pv('room') <= 0} onClick={() => set('room', clamp(pv('room') - 0.1))}>−</button>
+              <button type="button" aria-label="Bigger room" disabled={pv('room') >= 1} onClick={() => set('room', clamp(pv('room') + 0.1))}>+</button>
+            </span>
+          </div>
           {st.state !== 'ready' && !zoom && (
             <button type="button" className="fwm-geode__hint" onClick={() => setZoom(true)}>
               {st.state === 'empty' ? 'Empty: click Mica to record, or drop an audio file here' : recNote}

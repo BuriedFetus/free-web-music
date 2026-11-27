@@ -27,6 +27,16 @@ describe('<Geode>', () => {
     expect(dock.querySelectorAll('button')).toHaveLength(10);
   });
 
+  it('+ / − beside ROOM make the room bigger or smaller', () => {
+    const store = mount();
+    const r0 = store.getState().params.room;
+    fireEvent.click(screen.getByRole('button', { name: 'Bigger room' }));
+    expect(store.getState().params.room).toBeCloseTo(Math.min(1, r0 + 0.1));
+    fireEvent.click(screen.getByRole('button', { name: 'Smaller room' }));
+    fireEvent.click(screen.getByRole('button', { name: 'Smaller room' }));
+    expect(store.getState().params.room).toBeCloseTo(Math.max(0, Math.min(1, r0 + 0.1) - 0.2));
+  });
+
   it('the thermometer sets the temperature (arrow keys)', () => {
     const store = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Temp' }));
