@@ -62,3 +62,15 @@ describe('<Geode>', () => {
     expect(store.getState().params.end).toBeCloseTo(0.6);
   });
 });
+
+describe('<Geode> back (debug)', () => {
+  it('flips to the back with every knob behind the macros', () => {
+    window.history.pushState({}, '', '/?geodeback');
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'BACK' }));
+    expect(screen.getByLabelText('The back of Geode (debug)')).toBeTruthy();
+    expect(screen.getByRole('slider', { name: 'Window filter' })).toBeTruthy();
+    expect(screen.getByRole('slider', { name: 'Drive pull' })).toBeTruthy();
+    window.history.pushState({}, '', '/');
+  });
+});

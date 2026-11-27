@@ -34,7 +34,9 @@ export function ModRow({ ctx, labels, hint, children }: { ctx: ParamCtx; labels:
   const state = useDeviceState(store);
   const m = store.manifest;
   const mods = useModSources(status === 'on' ? engine : null, slot);
-  const SRC = Object.entries(labels) as [ModSourceId, string][];
+  // only the sources this device has (Geode: Motion and the Breath envelope)
+  const SRC = (Object.entries(labels) as [ModSourceId, string][]).filter(([id]) => !m.modSources?.length || m.modSources.some((s) => s.id === id));
+  const lwave = m.params.find((p) => p.id === 'lwave');
   const set = (id: string, v: number) => {
     store.setParam(id, v);
     host?.paramChanged?.(id, v);
@@ -44,15 +46,17 @@ export function ModRow({ ctx, labels, hint, children }: { ctx: ParamCtx; labels:
     <>
       <div className="fwm-brk">Modulation</div>
       <div className="fwm-opal__mod">
-        <div className="fwm-seg" role="group" aria-label="LFO wave">
-          {m.params.find((p) => p.id === 'lwave')!.options!.map((w, i) => (
-            <P.Button key={w} variant="seg" label={`LFO ${w}`} pressed={Math.round(state.params.lwave ?? 0) === i} onPress={() => set('lwave', i)}>{w}</P.Button>
-          ))}
-        </div>
+        {lwave?.options && (
+          <div className="fwm-seg" role="group" aria-label="LFO wave">
+            {lwave.options.map((w, i) => (
+              <P.Button key={w} variant="seg" label={`LFO ${w}`} pressed={Math.round(state.params.lwave ?? 0) === i} onPress={() => set('lwave', i)}>{w}</P.Button>
+            ))}
+          </div>
+        )}
         {children}
-        {SRC.map(([id, label], i) => (
+        {SRC.map(([id, label]) => (
           <span key={id} className="fwm-opal__src">
-            <span className="fwm-led" style={{ opacity: mods ? 0.25 + 0.75 * (id === 'lfo' ? (mods[0] + 1) / 2 : mods[i]) : 0.6 }} />
+            <span className="fwm-led" style={{ opacity: mods ? 0.25 + 0.75 * (id === 'lfo' ? (mods[0] + 1) / 2 : mods[id === 'amp' ? 1 : 2]) : 0.6 }} />
             <P.Button variant="assign" pressed={assign === id} label={`Assign ${label}`} onPress={() => setAssign(assign === id ? null : id)} />
           </span>
         ))}
