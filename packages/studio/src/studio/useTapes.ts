@@ -33,6 +33,8 @@ export interface TapesCtl {
   stop(): void;
   cancel(): void;
   demo(geode: string): void;
+  /** Load an audio file (WAV, MP3, OGG… anything the browser can decode) as the tape: first 30 s. */
+  file(geode: string, f: File): Promise<void>;
   clear(geode: string): void;
   status(geode: string): TapeStatus;
   /** Where notes for `track` go now (the input instrument while its Geode records). */
@@ -199,7 +201,14 @@ export function useTapes(o: {
               c.n += c.pre[0].length;
             }
             setRec({ ...st, phase: 'rec', level: pk });
-          } else c.pre = [l, r];
+          } else {
+            c.pre = [l, r];
+            const now = performance.now();
+            if (now - lastUi > 80) {
+              lastUi = now;
+              setRec({ ...st, level: pk }); // the meter moves while waiting, so you can see whether sound arrives
+            }
+          }
         }
         if (recRef.current?.phase === 'rec' && c.n < max) {
           c.l.push(l);
@@ -245,6 +254,29 @@ export function useTapes(o: {
     },
     [engine, project, store, send],
   );
+  const file = useCallback(
+    async (geode: string, f: File) => {
+      try {
+        const ctx = engine?.context ?? new OfflineAudioContext(2, 1, 48000);
+        const buf = await ctx.decodeAudioData(await f.arrayBuffer());
+        const sr = buf.sampleRate;
+        const n = Math.min(buf.length, MAX_SECONDS * sr);
+        const l = buf.getChannelData(0).slice(0, n);
+        const r = (buf.numberOfChannels > 1 ? buf.getChannelData(1) : buf.getChannelData(0)).slice(0, n);
+        const kept = finishRecording(l, r, sr);
+        if (!kept) return oRef.current.toast('That file is silent.');
+        const t = makeTape(kept.l, kept.r, sr, `${f.name.replace(/\.[^.]+$/, '').slice(0, 40)} · ${(kept.l.length / sr).toFixed(1)} s`);
+        store.put(t);
+        oRef.current.resetTrim(geode);
+        project.setTape(geode, metaOf(t));
+        send(t);
+        if (buf.length > n) oRef.current.toast('Mica kept the first 30 s.');
+      } catch {
+        oRef.current.toast("Mica can't read that file (try WAV, MP3 or OGG).");
+      }
+    },
+    [engine, project, store, send],
+  );
   const clear = useCallback(
     (geode: string) => {
       const old = project.tape(geode);
@@ -266,5 +298,5 @@ export function useTapes(o: {
   );
   const target = useCallback((track: string) => (recRef.current && recRef.current.geode === track && recRef.current.phase !== 'saving' ? recRef.current.input : track), []);
 
-  return { store, rec, record, stop, cancel, demo, clear, status, target, ask };
+  return { store, rec, record, stop, cancel, demo, file, clear, status, target, ask };
 }

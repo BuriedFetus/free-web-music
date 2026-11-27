@@ -9,12 +9,14 @@ export interface GeodeHost {
   rec: TapeRec | null;
   /** Another Geode is recording right now (one at a time). */
   busy: boolean;
-  /** Instruments it can record from (every other track). */
-  inputs: { id: string; name: string }[];
+  /** Instruments it can record from (every other track); muted ones record silence. */
+  inputs: { id: string; name: string; muted?: boolean }[];
   record(input: string): void;
   /** Stop and keep it (or cancel when nothing was heard yet). */
   stop(): void;
   demo(): void;
+  /** Load an audio file as the tape. */
+  file(f: File): Promise<void>;
   clear(): void;
   /** The tape's sound, when this computer has it (for the film strip). */
   tape(): Tape | null;

@@ -7,7 +7,7 @@ import { useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore
 import type { Engine, ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
 import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
-import { demoTape, fromPcm, type Tape } from '../../model/sampleStore';
+import { demoTape, finishRecording, fromPcm, makeTape, MAX_SECONDS, type Tape } from '../../model/sampleStore';
 import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
 import { ParamKnob, type DeviceProps, type ParamCtx } from '../basalt/Basalt';
 import { defaultsOf } from '../garnet/Garnet';
@@ -43,6 +43,7 @@ const ICONS: Record<string, ReactNode> = {
   play: (<svg viewBox="0 0 32 32"><path d="M11 8l13 8-13 8z" /></svg>),
   stop: (<svg viewBox="0 0 32 32"><path d="M10 10h12v12H10z" /></svg>),
   rec: (<svg viewBox="0 0 32 32"><circle cx="16" cy="16" r="8" fill="currentColor" /></svg>),
+  file: (<svg viewBox="0 0 32 32"><path d="M9 4h10l6 6v18H9z" /><path d="M19 4v6h6" /><path d="M14 23V15l6-2v8" /><circle cx="12.5" cy="23" r="1.6" /><circle cx="18.5" cy="21" r="1.6" /></svg>),
   demo: (<svg viewBox="0 0 32 32"><rect x="5" y="9" width="22" height="14" rx="2" /><circle cx="11" cy="16" r="3" /><circle cx="21" cy="16" r="3" /><path d="M11 13h10" /></svg>),
 };
 const DOCK: [string, string][] = [['mica', 'Mica'], ['motion', 'Motion'], ['temp', 'Temp'], ['fan', 'Air'], ['room', 'Room'], ['echo', 'Echo'], ['breath', 'Breath'], ['lamp', 'Light'], ['grains', 'Grains'], ['crunch', 'Crunch']];
@@ -75,6 +76,16 @@ function useLocalTape(engine: Engine | null, slot: number, enabled: boolean): Ge
       stop: () => {},
       demo: () => {
         setTape(demoTape(engine?.context.sampleRate ?? 48000));
+        setVer((v) => v + 1);
+      },
+      file: async (f) => {
+        const ctx = engine?.context ?? new OfflineAudioContext(2, 1, 48000);
+        const buf = await ctx.decodeAudioData(await f.arrayBuffer()).catch(() => null);
+        if (!buf) return;
+        const n = Math.min(buf.length, MAX_SECONDS * buf.sampleRate);
+        const kept = finishRecording(buf.getChannelData(0).slice(0, n), (buf.numberOfChannels > 1 ? buf.getChannelData(1) : buf.getChannelData(0)).slice(0, n), buf.sampleRate);
+        if (!kept) return;
+        setTape(makeTape(kept.l, kept.r, buf.sampleRate, f.name));
         setVer((v) => v + 1);
       },
       clear: () => {
@@ -141,6 +152,18 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
   const inputs = g.inputs;
   const inputId = inputs.some((i) => i.id === input) ? input : (inputs[0]?.id ?? '');
   const tape = g.tape();
+  const fileIn = useRef<HTMLInputElement>(null);
+  const [dropping, setDropping] = useState(false);
+  // Escape closes what is open (pop-up, Mica's memory)
+  useEffect(() => {
+    const k = (e: KeyboardEvent) => {
+      if (e.key !== 'Escape') return;
+      setPop(null);
+      setZoom(false);
+    };
+    addEventListener('keydown', k);
+    return () => removeEventListener('keydown', k);
+  }, []);
   const peaks = useMemo(() => (tape ? tapePeaks(tape.pcm, tape.frames, 400) : null), [tape?.hash]); // eslint-disable-line react-hooks/exhaustive-deps
 
   // ---- the room ----
@@ -426,13 +449,25 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
       </div>
 
       {!back ? (
-        <div className="fwm-geode__screen">
+        <div className={'fwm-geode__screen' + (dropping ? ' is-drop' : '')}
+          onDragOver={(e) => {
+            if (![...e.dataTransfer.items].some((i) => i.kind === 'file')) return;
+            e.preventDefault();
+            setDropping(true);
+          }}
+          onDragLeave={() => setDropping(false)}
+          onDrop={(e) => {
+            e.preventDefault();
+            setDropping(false);
+            const f = [...e.dataTransfer.files].find((x) => x.type.startsWith('audio/') || /\.(wav|mp3|ogg|flac|m4a|aac|webm)$/i.test(x.name));
+            if (f && !rec) void g.file(f);
+          }}>
           <canvas ref={cv} aria-label="Mica's room" onPointerDown={onDown} onPointerMove={onHover} />
           <div className="fwm-geode__hud"><span>TEMPERATURE</span><b ref={(r) => void (hud.current.t = r)}>WARM</b></div>
           <div className="fwm-geode__hud fwm-geode__hud--r"><span>ROOM</span><b ref={(r) => void (hud.current.r = r)}>12 m</b></div>
           {st.state !== 'ready' && !zoom && (
             <button type="button" className="fwm-geode__hint" onClick={() => setZoom(true)}>
-              {st.state === 'empty' ? 'Mica\'s memory is empty: click her face to record (or try the demo tape)' : recNote}
+              {st.state === 'empty' ? 'Mica\'s memory is empty: click her face to record, drop an audio file here, or try the demo tape' : recNote}
             </button>
           )}
           {zoom && (
@@ -447,6 +482,12 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
                     onClick={() => (rec ? g.stop() : g.record(inputId))}>{rec ? ICONS.stop : ICONS.rec}{rec ? (rec.phase === 'armed' ? 'CANCEL' : 'STOP') : 'REC'}</button>
                 ) : null}
                 {st.state === 'empty' && !rec && <button type="button" aria-label="Load the demo tape" onClick={() => g.demo()}>{ICONS.demo}DEMO</button>}
+                {!rec && <button type="button" aria-label="Load an audio file" onClick={() => fileIn.current?.click()}>{ICONS.file}FILE</button>}
+                <input ref={fileIn} type="file" accept="audio/*" hidden onChange={(e) => {
+                  const f = e.target.files?.[0];
+                  e.target.value = '';
+                  if (f) void g.file(f);
+                }} />
               </div>
               <div className="fwm-geode__note" role="status">
                 {inputs.length > 0 && (
@@ -457,7 +498,8 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
                   </label>
                 )}
                 <span>{recNote}</span>
-                {rec?.phase === 'rec' && <i className="fwm-geode__lvl" style={{ '--lvl': String(Math.min(1, rec.level * 1.4)) } as CSSProperties} />}
+                {!rec && inputs.find((i) => i.id === inputId)?.muted && <b className="fwm-geode__warn"> {inputs.find((i) => i.id === inputId)!.name} is muted: unmute it to record.</b>}
+                {rec && rec.phase !== 'saving' && <i className="fwm-geode__lvl" style={{ '--lvl': String(Math.min(1, rec.level * 1.4)) } as CSSProperties} />}
               </div>
               {seg('mode', 'Plays', spec('mode').options!)}
               <div className="fwm-geode__box">

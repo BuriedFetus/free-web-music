@@ -330,6 +330,8 @@ struct Ctl {
     spray: f32,
     gp: f32,
     jit: f32,
+    /// 1 / the loop seam's fade length, in samples.
+    seam: f32,
     crush: f32,
     drive: f32,
     drive_n: f32,
@@ -801,6 +803,7 @@ impl Geode {
         c.dens_t = fs / density(e[p::GDENS]);
         c.spray = lerp(0.01, 0.5, e[p::SPREAD]);
         c.jit = lerp(0.02, 0.4, e[p::SPREAD]);
+        c.seam = 1.0 / (0.004 * fs).min(c.span * 0.25).max(1.0);
         c.gp = lerp(-7.0, 9.0, e[p::GPITCH]);
         c.gsp = lerp(0.0, 2.0, e[p::GSPEED]);
         c.crush = if on(mt::CRUNCH) { clamp01(e[p::CRUNCH] + (raw * 0.5 + 0.5) * depth * 0.7) } else { e[p::CRUNCH] };
@@ -925,7 +928,12 @@ impl Geode {
                         }
                         _ => c.pos0 + v.pos,
                     };
-                    let g = amp * c.mix_dry;
+                    // Classic / Reverse loop the trimmed part: a 4 ms fade at its ends so the seam never clicks
+                    let edge = if mode == 2 { 1.0 } else {
+                        let u = wrap(x, c.span);
+                        (u.min(c.span - u) * c.seam).min(1.0)
+                    };
+                    let g = amp * c.mix_dry * edge;
                     let (a, b) = self.read2(x);
                     l += a * g;
                     r += b * g;

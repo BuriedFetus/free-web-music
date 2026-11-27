@@ -347,3 +347,18 @@ fn cpu_budget() {
     assert!(s < 0.25, "too slow: {s} s");
 }
 
+
+#[test]
+fn a_classic_loop_never_clicks_at_its_seam() {
+    // a tape that ends far from where it starts: looping it would jump, the seam fade hides the jump
+    let fs = 48_000.0;
+    let mut g = geode(fs);
+    plain(&mut g);
+    let tape: Vec<f32> = (0..4800).map(|i| 0.8 * (i as f32 / 4800.0)).collect(); // a ramp: 0 → 0.8, then back to 0
+    g.load(&tape, None);
+    g.note_on(60, 1.0);
+    let (l, _) = render(&mut g, 48_000);
+    let jump = l[2000..].windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0f32, f32::max);
+    println!("biggest step between samples: {jump:.4}");
+    assert!(jump < 0.05, "the loop seam clicks: {jump}");
+}

@@ -1562,6 +1562,22 @@ async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { curre
       btn('Undo')?.click();
       await sleep(100);
       ok(p.tape(gid)?.hash === meta.hash, 'Undo brings the tape back');
+      // a file: a 0.5 s WAV through the FILE button
+      {
+        const sr = 22050, n = sr / 2, b = new DataView(new ArrayBuffer(44 + n * 2));
+        const w = (o: number, t: string) => [...t].forEach((ch, i) => b.setUint8(o + i, ch.charCodeAt(0)));
+        w(0, 'RIFF'); b.setUint32(4, 36 + n * 2, true); w(8, 'WAVEfmt '); b.setUint32(16, 16, true); b.setUint16(20, 1, true); b.setUint16(22, 1, true);
+        b.setUint32(24, sr, true); b.setUint32(28, sr * 2, true); b.setUint16(32, 2, true); b.setUint16(34, 16, true); w(36, 'data'); b.setUint32(40, n * 2, true);
+        for (let i = 0; i < n; i++) b.setInt16(44 + i * 2, Math.round(Math.sin((2 * Math.PI * 330 * i) / sr) * 12000), true);
+        const dt = new DataTransfer();
+        dt.items.add(new File([b.buffer], 'beep.wav', { type: 'audio/wav' }));
+        const fi = $('.fwm-geode input[type=file]') as HTMLInputElement;
+        fi.files = dt.files;
+        fi.dispatchEvent(new Event('change', { bubbles: true }));
+        await until('file tape', () => (p.tape(gid)?.name ?? '').startsWith('beep'), 4000);
+        ok(Math.abs(p.tape(gid)!.frames / p.tape(gid)!.sr - 0.5) < 0.1, `an audio file becomes the tape (${p.tape(gid)!.name}, ${p.tape(gid)!.sr} Hz)`);
+      }
+      ok(true, `engine sample rate ${engineRef.current!.context.sampleRate} Hz`);
       await sleep(4000); // let B finish
     } else {
       await until('a Geode with a tape', () => !!geodeId() && !!p.tape(geodeId()!), 40000);
