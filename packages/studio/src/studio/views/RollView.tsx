@@ -18,7 +18,6 @@ import { NameInput } from './TrackName';
 // Sizes at zoom 1 (px); the Zoom buttons scale them all, and the text with them
 const RH_MIN = 14, RH_MAX = 34; // row height: the rows grow to fill the panel, then scroll
 const KEYW0 = 84; // key column width: a real little keyboard, a name on every key
-const SW0 = 14; // narrowest step: longer patterns scroll sideways
 const ZOOMS = [1, 1.25, 1.5, 2, 2.5, 3];
 const ZOOM0 = 1.5; // readable by default
 /** Row height: fill the roll's height, never below the zoomed minimum. */
@@ -74,7 +73,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
     }
   };
   const [gutter, setGutter] = useState(0); // the roll's scrollbar width: the lanes leave the same room
-  const [fitH, setFitH] = useState(0); // the roll's height: rows are sized to fill it
+  const [fitH, setFitH] = useState(0);
+  const [fitW, setFitW] = useState(0); // the grid's width: lines and numbers thin out when steps get narrow // the roll's height: rows are sized to fill it
   const [zoom, setZoomState] = useState(() => {
     try {
       const z = Number(localStorage.getItem('fwm.roll.zoom'));
@@ -91,7 +91,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
       /* ignore */
     }
   };
-  const KEYW = Math.round(KEYW0 * zoom), SW = Math.round(SW0 * zoom);
+  const KEYW = Math.round(KEYW0 * zoom); // zoom = how tall (and wide) the keys are: fewer rows on screen, the whole pattern always fits across
   const [lanes, setLanesState] = useState<'none' | 'vel' | 'auto'>(() => {
     try {
       const v = localStorage.getItem('fwm.roll.lanes');
@@ -113,6 +113,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
     if (!el || typeof ResizeObserver === 'undefined') return;
     const ro = new ResizeObserver(() => {
       setFitH(el.clientHeight);
+      setFitW(el.clientWidth);
       setGutter(el.offsetWidth - el.clientWidth);
     });
     ro.observe(el);
@@ -352,15 +353,19 @@ export function RollView({ peers }: { peers: Peer[] }) {
   };
 
   const lenBtn = (v: number) => project.setPatternLen(t.id, pat, v);
-  const minW = { minWidth: KEYW + L * SW } as React.CSSProperties;
+  const minW = { minWidth: KEYW + 160 } as React.CSSProperties; // never scrolls sideways: the whole pattern is always in view
   // The grid's lines, placed exactly like the notes (same % of the width): a line on every Snap step,
   // a medium one on every beat, a bold one on every bar (X.1)
-  const unit = q && q >= 0.25 ? q : 1;
+  const stepPx = fitW ? (fitW - KEYW) / L : 40;
+  // thin lines only where they stay readable: Snap lines need 5 px, beat lines 5 px per beat
+  const unit = q && q >= 0.25 && q * stepPx >= 5 ? q : stepPx >= 5 ? 1 : stepPx * 4 >= 5 ? 4 : BAR;
   const vlines: [number, string][] = [];
   for (let k = 1; k * unit < L - 1e-6; k++) {
     const x = Math.round(k * unit * 1000) / 1000;
     vlines.push([x, x % BAR === 0 ? 'is-bar' : x % 4 === 0 ? 'is-beat' : '']);
   }
+  // ruler numbers: every beat when there is room, else every bar, else every 2nd / 4th / 8th bar
+  const labelEvery = stepPx * 4 >= 38 ? 4 : [1, 2, 4, 8].map((b) => b * BAR).find((n) => n * stepPx >= 38) ?? BAR * 8;
   return (
     <div className="fwm-rl" style={{ '--fwm-rz': zoom } as React.CSSProperties}>
       {patternBar}
@@ -383,7 +388,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
         <span className="fwm-zoom fwm-lanepick" role="group" aria-label="Zoom the Piano roll">
           <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom out" disabled={zoom <= ZOOMS[0]}
             onClick={() => setZoom(ZOOMS[Math.max(0, ZOOMS.indexOf(zoom) - 1)])}>−</button>
-          <span className="fwm-zoom__v" title="Size of the notes and keys">{Math.round(zoom * 100)}%</span>
+          <span className="fwm-zoom__v" title="Key size: bigger keys, fewer of them on screen (the whole pattern always fits across)">{Math.round(zoom * 100)}%</span>
           <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom in" disabled={zoom >= ZOOMS[ZOOMS.length - 1]}
             onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + 1)])}>+</button>
         </span>
@@ -460,8 +465,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
         {/* the ruler is the table's first row (it stays on top while the rows scroll): same width as the grid */}
         <div className="fwm-ruler__corner" />
         <div className="fwm-ruler" aria-hidden>
-          {Array.from({ length: Math.ceil(L / 4) }, (_, b) => {
-            const i = b * 4;
+          {Array.from({ length: Math.ceil(L / labelEvery) }, (_, b) => {
+            const i = b * labelEvery;
             return <span key={i} className={i % BAR === 0 ? 'is-bar' : ''} style={{ left: `${(i / L) * 100}%` }}>{`${Math.floor(i / BAR) + 1}.${(i % BAR) / 4 + 1}`}</span>;
           })}
         </div>
@@ -578,8 +583,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
       )}
       <details className="fwm-hint fwm-rhelp">
         <summary>How the Piano roll works</summary>
-        Pick, name and size the pattern at the top (it plays wherever it is used in the song) · long patterns scroll
-        sideways · press a piano key to hear it · grid lines follow Snap · click to add, drag right for length · drag to move or change pitch · drag the right edge to resize · double-click to
+        Pick, name and size the pattern at the top (it plays wherever it is used in the song) · the whole pattern always fits across (Zoom sizes the keys) ·
+        press a piano key to hear it · grid lines follow Snap · click to add, drag right for length · drag to move or change pitch · drag the right edge to resize · double-click to
         delete · notes on the same pitch never overlap (the one you edit wins) · Shift+drag a note to copy it (with its automation) · arrows nudge the selected note (Shift = length) · Snap Off places notes between steps · lanes: drag to draw,
         Alt-drag or right-drag erases automation · with Rec + Play, knob moves are recorded here.
       </details>
