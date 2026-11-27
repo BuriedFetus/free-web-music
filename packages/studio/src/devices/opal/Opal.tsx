@@ -2,6 +2,7 @@
 // the right, then AMP and MOTION (Drift, Movement, the ensemble chorus, Width). Only theme primitives
 // and --dev-* tokens.
 import { type CSSProperties } from 'react';
+import { PresetBar } from '../PresetBar';
 import type { ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
 import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
@@ -59,12 +60,7 @@ export function Opal({ store, host, slot, user = { name: 'You', color: 'var(--fw
         </div>
         <Sends host={host} />
         <div className="fwm-preset">
-          <P.Button variant="hw" label="Previous sound" onPress={() => loadPreset(presetIx - 1)}>‹</P.Button>
-          <P.Screen variant="preset">
-            {String(presetIx + 1).padStart(2, '0')} {OPAL_PRESETS[presetIx].name}
-            {edited && <small className="fwm-garnet__edited"> edited</small>}
-          </P.Screen>
-          <P.Button variant="hw" label="Next sound" onPress={() => loadPreset(presetIx + 1)}>›</P.Button>
+          <PresetBar device="opal" store={store} host={host} factory={OPAL_PRESETS} factoryIx={presetIx} edited={edited} loadFactory={(i) => loadPreset(i)} noun="sound" editedClass="fwm-garnet__edited" />
           <Scope engine={status === 'on' && !host?.preview ? engine : null} note={null} label="Pad" />
         </div>
       </div>

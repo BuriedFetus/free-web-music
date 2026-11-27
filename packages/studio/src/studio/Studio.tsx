@@ -9,7 +9,8 @@ import { stepOf } from '@fwm/engine/worklet';
 import { PresenceModel } from '../collab/presence';
 import { LiveTiming } from '../collab/liveTiming';
 import { TransportSync, type Loop, type TransportTarget } from '../collab/transport';
-import type { LiveChannel, LiveMessage, SongLibrary, StudioUser } from '../collab/types';
+import type { LiveChannel, LiveMessage, PresetLibrary, SongLibrary, StudioUser } from '../collab/types';
+import { browserPresetLibrary, PresetCache } from '../model/myPresets';
 import { deviceEntry } from '../devices/registry';
 import { EngineProvider, useEngine } from '../engine/EngineProvider';
 import { HeldParams, useDeviceSync } from '../engine/useDeviceSync';
@@ -42,6 +43,8 @@ export interface StudioProps {
   /** Where Geode's tapes (recorded sound) are kept between visits. Leave it out and the studio keeps
    *  them in this browser (IndexedDB); null = only for this visit. They are never put in the song. */
   tapes?: TapeStorage | null;
+  /** Where each person's own presets are kept (with their account). Without it: in this browser. */
+  presets?: PresetLibrary | null;
 }
 
 export function Studio(props: StudioProps) {
@@ -63,7 +66,8 @@ function loadWs(key: string): Workspace {
   }
 }
 
-function StudioInner({ doc, awareness = null, channel = null, songs = null, user, look: hostLook, onLookChange, tapes: tapeStorage }: StudioProps) {
+function StudioInner({ doc, awareness = null, channel = null, songs = null, user, look: hostLook, onLookChange, tapes: tapeStorage, presets }: StudioProps) {
+  const myPresets = useMemo(() => (presets ? new PresetCache(presets, 'host') : new PresetCache(browserPresetLibrary(user.id), 'browser')), [presets, user.id]);
   const project = useMemo(() => new Project(doc, { user: user.id }), [doc, user.id]);
   const presence = useMemo(() => new PresenceModel(awareness, user), [awareness, user]);
   useEffect(() => () => presence.destroy(), [presence]);
@@ -569,7 +573,7 @@ function StudioInner({ doc, awareness = null, channel = null, songs = null, user
   }, [project, playing, setPlaying, rec, setRec]);
 
   const ctx: StudioCtx = {
-    project, presence, user, channel, songs, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop,
+    project, presence, user, channel, songs, myPresets, ws, setWs, playing, setPlaying, alone: tp.alone, setAlone, setLoop,
     transport: sync, liveTiming: timing, rec, setRec, recMode, slotOf, cueRow,
     playNote, releaseNote, audition, peerHeld, myHeld, toast, tapes, octave, setOctave: (o: number) => setOctave(Math.max(-3, Math.min(4, o))),
     look: { css: keptLook, set: setLook, preview: lookPreview, setPreview: setLookPreview, hostKeeps: hostLook !== undefined, off: lookOff },

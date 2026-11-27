@@ -4,6 +4,7 @@
 // 30 s), trim it, remove it, play it, choose how it plays. The back of the device (every knob behind
 // the macros, the Temperature scales, the compressor, modulation) is hidden: ?geodeback shows its handle.
 import { Fragment, useCallback, useEffect, useMemo, useRef, useState, useSyncExternalStore, type CSSProperties, type PointerEvent as RPointerEvent, type ReactNode } from 'react';
+import { PresetBar } from '../PresetBar';
 import type { Engine, ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
 import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
@@ -609,12 +610,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
         </div>
         <Sends host={host} />
         <div className="fwm-preset">
-          <P.Button variant="hw" label="Previous sound" onPress={() => loadPreset(presetIx - 1)}>‹</P.Button>
-          <P.Screen variant="preset">
-            {String(presetIx + 1).padStart(2, '0')} {GEODE_PRESETS[presetIx].name}
-            {edited && <small className="fwm-garnet__edited"> edited</small>}
-          </P.Screen>
-          <P.Button variant="hw" label="Next sound" onPress={() => loadPreset(presetIx + 1)}>›</P.Button>
+          <PresetBar device="geode" store={store} host={host} factory={GEODE_PRESETS} factoryIx={presetIx} edited={edited} loadFactory={(i) => loadPreset(i)} noun="sound" editedClass="fwm-garnet__edited" keep={['px', 'pz', 'start', 'end']} />
         </div>
       </div>
 

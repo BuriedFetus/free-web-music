@@ -30,6 +30,8 @@ export interface StudioCtx {
   channel: LiveChannel | null;
   /** The host's song storage, if it has one. */
   songs: SongLibrary | null;
+  /** This person's saved presets. */
+  myPresets: import('../model/myPresets').PresetCache;
   ws: Workspace;
   setWs(patch: Partial<Workspace>): void;
   /** Playing, for everyone in the session (or only me when alone). */

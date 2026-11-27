@@ -1,7 +1,7 @@
 import { afterEach, describe, expect, it } from 'vitest';
 import { act, cleanup, fireEvent, render, screen, within } from '@testing-library/react';
 import * as Y from 'yjs';
-import { deviceEntry, Project, Studio, type SongFile, type SongLibrary } from '../src';
+import { deviceEntry, Project, Studio, type PresetLibrary, type SongFile, type SongLibrary, type UserPreset } from '../src';
 
 /** + Add instrument (Device panel) → pick one. */
 function addInst(q: { getByRole: typeof screen.getByRole }, name: string) {
@@ -247,6 +247,57 @@ describe('<Studio>', () => {
     expect(ns).toEqual([0, 4]);
     const cut = p.automation(tr, pat, 'cut');
     expect(cut.slice(0, 7)).toEqual([0.3, 0.6, 0.9, null, 0.3, 0.6, null]);
+  });
+
+  it('presets: save the sound as mine, it joins the list after the factory ones, replace it, delete it; the host keeps them', async () => {
+    const kept = new Map<string, UserPreset>();
+    const lib: PresetLibrary = {
+      list: async () => [...kept.values()],
+      save: async (_d, pr) => void kept.set(pr.id, structuredClone(pr)),
+      remove: async (_d, id) => void kept.delete(id),
+    };
+    const doc = new Y.Doc();
+    render(<Studio doc={doc} user={{ id: 'u1', name: 'Tester', color: '#4fc3ff' }} theme={{ loadFonts: false }} presets={lib} />);
+    const p = new Project(doc, { test: true });
+    addInst(screen, 'Basalt');
+    const dev = () => within(document.querySelector<HTMLElement>('.fwm-devwrap')!);
+    const tr = p.trackIds()[0];
+    const params = () => p.deviceStore(tr, deviceEntry('basalt')!.manifest!)!.getState().params;
+    act(() => p.deviceStore(tr, deviceEntry('basalt')!.manifest!)!.setParam('cut', 0.123));
+    expect(dev().getAllByText(/edited/).length).toBeGreaterThan(0);
+    fireEvent.click(dev().getByRole('button', { name: 'Save this preset' }));
+    fireEvent.change(dev().getByRole('textbox', { name: 'Preset name' }), { target: { value: 'Night Bass' } });
+    await act(async () => fireEvent.click(dev().getByRole('button', { name: 'Save as new' })));
+    expect([...kept.values()].map((x) => x.name)).toEqual(['Night Bass']); // the host keeps it
+    expect(dev().getByText('★ Night Bass')).toBeTruthy();
+    // step away to a factory preset and back with ‹ (mine come after the factory ones)
+    fireEvent.click(dev().getByRole('button', { name: 'Next preset' }));
+    expect(dev().queryByText('★ Night Bass')).toBeNull();
+    expect(params().cut).not.toBeCloseTo(0.123);
+    fireEvent.click(dev().getByRole('button', { name: 'Previous preset' }));
+    expect(dev().getByText('★ Night Bass')).toBeTruthy();
+    expect(params().cut).toBeCloseTo(0.123);
+    // change it and replace it
+    act(() => p.deviceStore(tr, deviceEntry('basalt')!.manifest!)!.setParam('cut', 0.5));
+    fireEvent.click(dev().getByRole('button', { name: 'Save this preset' }));
+    await act(async () => fireEvent.click(dev().getByRole('button', { name: 'Replace “Night Bass”' })));
+    expect(kept.size).toBe(1);
+    expect([...kept.values()][0].params.cut).toBeCloseTo(0.5);
+    // delete it
+    fireEvent.click(dev().getByRole('button', { name: 'Save this preset' }));
+    await act(async () => fireEvent.click(dev().getByRole('button', { name: 'Delete Night Bass' })));
+    expect(kept.size).toBe(0);
+  });
+
+  it('presets without a host library are kept in this browser', async () => {
+    mount();
+    addInst(screen, 'Opal');
+    const dev = () => within(document.querySelector<HTMLElement>('.fwm-devwrap')!);
+    fireEvent.click(dev().getByRole('button', { name: 'Save this sound' }));
+    expect(dev().getByText(/Kept in this browser/)).toBeTruthy();
+    fireEvent.change(dev().getByRole('textbox', { name: 'Preset name' }), { target: { value: 'Pad of mine' } });
+    await act(async () => fireEvent.click(dev().getByRole('button', { name: 'Save as new' })));
+    expect(JSON.parse(localStorage.getItem('fwm.presets.u1.opal')!)[0].name).toBe('Pad of mine');
   });
 
   it('songs: save, new from INIT (asks first when not saved), open a saved song, undo', async () => {

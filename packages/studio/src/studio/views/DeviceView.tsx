@@ -35,6 +35,7 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
       },
       subtitle: t.name,
       songKey: st.project.key,
+      myPresets: st.myPresets,
     };
   }, [t?.id, t?.name, peers, st, engine, slot]); // eslint-disable-line react-hooks/exhaustive-deps
 

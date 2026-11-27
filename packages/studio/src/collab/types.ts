@@ -83,3 +83,25 @@ export interface SongLibrary {
   save(file: import('../model/project').SongFile, id?: string | null): Promise<string>;
   remove?(id: string): Promise<void>;
 }
+
+/** A sound someone saved on an instrument ("Mine" in the preset list). */
+export interface UserPreset {
+  id: string;
+  name: string;
+  params: Record<string, number>;
+  routes: import('../model/deviceStore').Route[];
+  /** Last saved, ms since 1970. */
+  updated: number;
+}
+
+/**
+ * Where a person's own presets are kept: provided by the host (its server, so they follow the person
+ * everywhere). Without it the studio keeps them in this browser. Presets are per instrument (`device`,
+ * e.g. 'basalt') and per person; they never go into the shared song.
+ */
+export interface PresetLibrary {
+  list(device: string): Promise<UserPreset[]>;
+  /** Save `preset` (its id is set by the studio, so saving the same id again replaces it). */
+  save(device: string, preset: UserPreset): Promise<void>;
+  remove(device: string, id: string): Promise<void>;
+}

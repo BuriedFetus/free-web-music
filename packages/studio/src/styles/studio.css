@@ -34,6 +34,21 @@
 .fwm-av { width: 30px; height: 30px; border-radius: 50%; display: grid; place-items: center; font: 800 13px var(--fwm-font-ui); color: var(--fwm-on-me); border: 2px solid rgba(0,0,0,.4); }
 .fwm-preset { display: flex; align-items: center; gap: 6px; margin-left: auto; }
 .fwm-preset .fwm-lcd { min-width: 15ch; }
+/* Save: this person's own presets */
+.fwm-psave { position: relative; }
+.fwm-psave__pop { position: absolute; right: 0; top: calc(100% + 8px); z-index: 30; width: 290px; display: flex; flex-direction: column; gap: 8px; padding: 12px;
+  background: var(--dev-case2); color: var(--dev-silk); border: 1px solid var(--dev-edge); border-radius: calc(10px * var(--fwm-round));
+  box-shadow: 0 calc(10px * var(--fwm-depth)) calc(28px * var(--fwm-depth)) color-mix(in srgb, var(--dev-case2) 60%, transparent); font: 14px var(--fwm-font-ui); }
+.fwm-psave__pop label { display: flex; flex-direction: column; gap: 4px; font-size: 12px; }
+.fwm-psave__pop input { min-height: 40px; font: 16px var(--fwm-font-ui); padding: 0 10px; border-radius: 8px; border: 1px solid var(--dev-edge); background: var(--dev-lcd); color: var(--dev-lcdink); }
+.fwm-psave__row { display: flex; flex-wrap: wrap; gap: 6px; }
+.fwm-psave__pop button { min-height: 36px; padding: 0 12px; border-radius: 8px; border: 1px solid var(--dev-edge); background: var(--dev-btn); color: var(--dev-btnink); font: 600 13px var(--fwm-font-ui); cursor: pointer; }
+.fwm-psave__pop button[type=submit] { background: var(--dev-acc); color: var(--dev-case2); border-color: var(--dev-acc); }
+.fwm-psave__list { list-style: none; margin: 0; padding: 0; display: flex; flex-direction: column; gap: 4px; max-height: 200px; overflow-y: auto; }
+.fwm-psave__list li { display: flex; gap: 4px; }
+.fwm-psave__list li button:first-child { flex: 1; text-align: left; overflow: hidden; text-overflow: ellipsis; white-space: nowrap; }
+.fwm-psave__list li.is-on button:first-child { border-color: var(--dev-acc); }
+.fwm-psave__pop small { opacity: .75; font-size: 12px; }
 
 .fwm-lcd {
   position: relative; background: var(--dev-lcd); color: var(--dev-lcdink); font: 24px/1 var(--fwm-font-screen);

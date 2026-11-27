@@ -2,6 +2,7 @@
 // STRINGS (Pick and Body rows) with the AMP block on the right, the PLAY row, and the neck you strum.
 // Only theme primitives and --dev-* tokens. The neck's mode and chord type are this person's own view.
 import { useCallback, useEffect, useMemo, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { PresetBar } from '../PresetBar';
 import { useEngine } from '../../engine/EngineProvider';
 import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
 import type { DeviceStore } from '../../model/deviceStore';
@@ -219,12 +220,7 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
         </div>
         <Sends host={host} />
         <div className="fwm-preset">
-          <P.Button variant="hw" label="Previous sound" onPress={() => loadPreset(presetIx - 1)}>‹</P.Button>
-          <P.Screen variant="preset">
-            {String(presetIx + 1).padStart(2, '0')} {GARNET_PRESETS[presetIx].name}
-            {edited && <small className="fwm-garnet__edited"> edited</small>}
-          </P.Screen>
-          <P.Button variant="hw" label="Next sound" onPress={() => loadPreset(presetIx + 1)}>›</P.Button>
+          <PresetBar device="garnet" store={store} host={host} factory={GARNET_PRESETS} factoryIx={presetIx} edited={edited} loadFactory={(i) => loadPreset(i)} noun="sound" editedClass="fwm-garnet__edited" />
           <Scope engine={status === 'on' && !host?.preview ? engine : null} note={null} label="String" />
         </div>
       </div>

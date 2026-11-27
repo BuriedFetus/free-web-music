@@ -1,10 +1,11 @@
 // Quartz: FM keys, front panel. The synth family layout: two rows (each a carrier pushed by its own
 // modulator) with the FILTER block on the right, then AMP and PLAY. Only theme primitives and --dev-* tokens.
 import { type CSSProperties } from 'react';
+import { PresetBar } from '../PresetBar';
 import type { ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
 import { useDeviceState, useDeviceSync } from '../../engine/useDeviceSync';
-import { useDeviceTokens, usePrimitives } from '../../theme/Theme';
+import { useDeviceTokens } from '../../theme/Theme';
 import { ParamKnob, type DeviceProps, type ParamCtx } from '../basalt/Basalt';
 import { StepDial, defaultsOf } from '../garnet/Garnet';
 import { ModRow, useAssign } from '../ModRow';
@@ -17,7 +18,6 @@ const SRC_LABEL: Record<ModSourceId, string> = { lfo: 'LFO', amp: 'Amp env', fil
 
 export function Quartz({ store, host, slot, user = { name: 'You', color: 'var(--fwm-me)' } }: DeviceProps) {
   const { engine, status } = useEngine();
-  const P = usePrimitives();
   const tokens = useDeviceTokens('quartz');
   const state = useDeviceState(store);
   useDeviceSync(host ? null : engine, store, slot, 'quartz');
@@ -56,12 +56,7 @@ export function Quartz({ store, host, slot, user = { name: 'You', color: 'var(--
         </div>
         <Sends host={host} />
         <div className="fwm-preset">
-          <P.Button variant="hw" label="Previous sound" onPress={() => loadPreset(presetIx - 1)}>‹</P.Button>
-          <P.Screen variant="preset">
-            {String(presetIx + 1).padStart(2, '0')} {QUARTZ_PRESETS[presetIx].name}
-            {edited && <small className="fwm-garnet__edited"> edited</small>}
-          </P.Screen>
-          <P.Button variant="hw" label="Next sound" onPress={() => loadPreset(presetIx + 1)}>›</P.Button>
+          <PresetBar device="quartz" store={store} host={host} factory={QUARTZ_PRESETS} factoryIx={presetIx} edited={edited} loadFactory={(i) => loadPreset(i)} noun="sound" editedClass="fwm-garnet__edited" />
           <Scope engine={status === 'on' && !host?.preview ? engine : null} note={null} label="Keys" />
         </div>
       </div>

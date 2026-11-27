@@ -1,6 +1,7 @@
 // Basalt: mono bass synth, front panel. Layout and behaviour follow the approved design kit
 // (design/kit/index.html). It only uses primitives from the theme, so hosts can restyle it.
 import { inKey, isRoot, snapToKey, type SongKey } from '../../model/scales';
+import { PresetBar } from '../PresetBar';
 import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent as RPointerEvent } from 'react';
 import type { ModSourceId } from '@fwm/engine';
 import { useEngine } from '../../engine/EngineProvider';
@@ -52,6 +53,8 @@ export interface DeviceHost {
   octave?: { low: number; shift(d: number): void };
   /** This track's Reverb / Delay sends (the Mixer's): shown as SEND knobs on the panel. */
   sends?: { rev: number; dly: number; set(which: 'rev' | 'dly', v: number): void };
+  /** This person's saved presets (the host's PresetLibrary, or this browser). */
+  myPresets?: import('../../model/myPresets').PresetCache;
   /** Geode: its tape (recording, the demo tape, removing it). */
   geode?: import('../geode/types').GeodeHost;
 }
@@ -126,6 +129,7 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
 
   // ---- presets -----------------------------------------------------------------------------
   const presetIx = state.preset % BASALT_PRESETS.length;
+  const edited = Object.entries({ ...Object.fromEntries(store.manifest.params.map((q) => [q.id, q.default])), ...BASALT_PRESETS[presetIx].params }).some(([id, v]) => Math.abs((state.params[id] ?? 0) - v) > 1e-6);
   const loadPreset = (i: number) => {
     const n = (i + BASALT_PRESETS.length) % BASALT_PRESETS.length;
     store.load(BASALT_PRESETS[n], n);
@@ -177,11 +181,7 @@ export function Basalt({ store, host, slot, computerKeys = true, user = { name: 
         <Scope engine={status === 'on' && !host?.preview ? engine : null} note={top} />
         <Sends host={host} />
         <div className="fwm-preset">
-          <P.Button variant="hw" label="Previous preset" onPress={() => loadPreset(presetIx - 1)}>‹</P.Button>
-          <P.Screen variant="preset">
-            {String(presetIx + 1).padStart(2, '0')} {BASALT_PRESETS[presetIx].name}
-          </P.Screen>
-          <P.Button variant="hw" label="Next preset" onPress={() => loadPreset(presetIx + 1)}>›</P.Button>
+          <PresetBar device="basalt" store={store} host={host} factory={BASALT_PRESETS} factoryIx={presetIx} edited={edited} loadFactory={(i) => loadPreset(i)} noun="preset" editedClass="fwm-garnet__edited" />
         </div>
       </div>
 
