@@ -204,6 +204,9 @@
 .fwm-garnet__amp > :nth-child(-n+2) { grid-column: span 3; }
 .fwm-garnet__amp > :nth-child(n+3) { grid-column: span 2; }
 .fwm-garnet__play { display: flex; flex-wrap: wrap; align-items: center; gap: 6px 14px; }
+/* the chords of the key, one button each (they fill the row's free space) */
+.fwm-garnet__chords { flex: 1 1 360px; display: grid; grid-template-columns: repeat(7, minmax(0, 1fr)); gap: 4px; }
+.fwm-garnet__chords .fwm-garnet__ch { min-height: 48px; border-radius: calc(10px * var(--fwm-round)); }
 .fwm-garnet__play .fwm-seg { margin-bottom: 0; }
 .fwm-garnet .fwm-btn--seg { background: color-mix(in srgb, var(--dev-silk) 14%, transparent); font-size: 13px; }
 .fwm-garnet__hint { margin: 0; font-size: 12px; }

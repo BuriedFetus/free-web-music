@@ -135,10 +135,19 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
     if (up) order.reverse();
     order.forEach((s, i) => pluck(s, TUNING[s] + ch.frets[s], 0.85 - i * 0.03, i * gap));
   };
-  const strumRef = useRef(strum);
-  strumRef.current = strum;
+  // the chord buttons (PLAY row) light up when they strum, from a click or keys 1–7
+  const [chHit, setChHit] = useState(-1);
+  const chT = useRef(0);
+  const strumShow = (c: number, up = false) => {
+    strum(c, up);
+    setChHit(c);
+    clearTimeout(chT.current);
+    chT.current = window.setTimeout(() => setChHit(-1), 180);
+  };
+  const strumRef = useRef(strumShow);
+  strumRef.current = strumShow;
   useEffect(() => {
-    if (view.mode !== 'chords' || host?.preview) return; // a picture in the manual never takes the number keys
+    if (host?.preview) return; // a picture in the manual never takes the number keys
     const me = ++keyOwner;
     const kd = (e: KeyboardEvent) => {
       if (me !== keyOwner || e.repeat || e.ctrlKey || e.metaKey || e.altKey) return;
@@ -254,6 +263,15 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
       <div className="fwm-brk">Play</div>
       <div className="fwm-garnet__play">
         {['strum', 'vib', 'slide', 'ring'].map((id) => knob(id))}
+        <div className="fwm-garnet__chords" role="group" aria-label="Chords of the key: click to strum (keys 1–7)">
+          {chords.map((c, i) => (
+            <button key={i} type="button" className={'fwm-garnet__ch' + (chHit === i ? ' is-hit' : '')} title={`Strum ${c.name} (key ${i + 1}, Shift: up)`}
+              onClick={(e) => strumShow(i, e.shiftKey)}>
+              <b>{c.name}</b>
+              <small>{c.roman}</small>
+            </button>
+          ))}
+        </div>
         <P.Button variant="hw" label="Only scale notes" pressed={view.lock} onPress={() => setView({ lock: !view.lock })}>Only scale notes</P.Button>
         <P.Button variant="hw" label="Chord guide" pressed={view.guide} onPress={() => { setGuide(NO_GUIDE); setView({ guide: !view.guide }); }}>Chord guide</P.Button>
         <P.Button variant="hw" label="Palm mute" pressed={state.params.mute >= 0.5} presence={host?.presenceFor('mute')}
@@ -268,9 +286,7 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
           pluck(st, m, v);
         }} onSlide={slideTo} onDamp={damp} onStrum={strum} />
       <p className="fwm-silk fwm-garnet__hint">
-        {view.mode === 'chords'
-          ? `Chords of ${NOTE_NAMES[key.root]} ${SCALES[key.scale]?.label.toLowerCase()}${songKey.scale === 'chromatic' ? ' (the song has no key: set one in the top bar)' : ''}. Drag across the strings inside a strip to strum, click one string to pick it. Keys 1–7 strum (Shift: up).`
-          : `${NOTE_NAMES[key.root]} ${SCALES[key.scale]?.label.toLowerCase()}: lit notes are in the scale, the brightest is ${noteName(key.root, key)}. Drag along a string to move up the neck (with Slide on, it glides).`}
+        {`${NOTE_NAMES[key.root]} ${SCALES[key.scale]?.label.toLowerCase()}${songKey.scale === 'chromatic' ? ' (the song has no key: set one in the top bar)' : ''}: lit notes are in the scale, the brightest is ${noteName(key.root, key)}. Drag along a string to move up the neck (with Slide on, it glides). The chord buttons strum the chords of the key (keys 1–7, Shift: up).`}
       </p>
     </div>
   );
