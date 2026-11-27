@@ -70,6 +70,7 @@ describe('<Studio>', () => {
     const id = p.trackIds()[0];
     expect(screen.getByRole('button', { name: 'TRACK 1, Basalt: P1' })).toBeTruthy();
     expect(p.cell(p.rows()[0].id, id)).toBe(p.patternList(id)[0].id);
+    fireEvent.click(screen.getByRole('button', { name: /^Pattern ▾/ }));
     fireEvent.click(screen.getByRole('button', { name: 'Ping-pong' }));
     expect(p.track(id)!.seq.dir).toBe('pp');
     fireEvent.click(screen.getByRole('button', { name: 'Remove Basalt' }));
@@ -90,6 +91,7 @@ describe('<Studio>', () => {
     expect(within(roll).getByText(/Basalt is silent in TRACK 2/)).toBeTruthy();
     fireEvent.click(within(roll).getByRole('button', { name: '+ New' }));
     expect(p.patternInfo(a, p.cell(r2, a))!.name).toBe('P2');
+    fireEvent.click(within(roll).getByRole('button', { name: /^Pattern ▾/ })); // name, length… fold away
     const name = within(roll).getByRole('textbox', { name: 'Rename pattern P2' });
     fireEvent.focus(name);
     fireEvent.change(name, { target: { value: 'Drop' } });
@@ -354,6 +356,16 @@ describe('<Studio>', () => {
     expect(tab(B, 'Basalt').getAttribute('aria-selected')).toBe('true'); // Bob's stay where he left them
     expect(within(B.getByRole('region', { name: 'Device' })).getByText(/Mono bass synth/)).toBeTruthy();
   });
+  it('a panel can take its whole row (the other one in that row hides), and go back', () => {
+    mount();
+    const pane = (n: string) => screen.getByRole('region', { name: n });
+    fireEvent.click(within(pane('Piano roll')).getByRole('button', { name: 'Whole row' }));
+    expect(pane('Piano roll').classList.contains('is-wide')).toBe(true);
+    expect(pane('Library').classList.contains('is-hid')).toBe(true);
+    fireEvent.click(within(pane('Piano roll')).getByRole('button', { name: 'Half width' }));
+    expect(pane('Library').classList.contains('is-hid')).toBe(false);
+  });
+
   it('Tab zooms: the panel under the mouse goes full size, Tab shows all panels, Tab goes back into the same one', () => {
     mount();
     const pane = (n: string) => screen.getByRole('region', { name: n });

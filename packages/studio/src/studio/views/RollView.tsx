@@ -58,6 +58,22 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const lanesRef = useRef<HTMLDivElement>(null); // velocity + automation scroll sideways with the notes
   const rollSc = useRef<HTMLDivElement>(null);
   const keyHeld = useRef<number | null>(null); // piano key being pressed
+  const [tools, setToolsState] = useState(() => {
+    try {
+      return localStorage.getItem('fwm.roll.tools') === '1';
+    } catch {
+      return false;
+    }
+  });
+  const setTools = (v: boolean) => {
+    setToolsState(v);
+    try {
+      localStorage.setItem('fwm.roll.tools', v ? '1' : '0');
+    } catch {
+      /* ignore */
+    }
+  };
+  const [gutter, setGutter] = useState(0); // the roll's scrollbar width: the lanes leave the same room
   const [fitH, setFitH] = useState(0); // the roll's height: rows are sized to fill it
   const [zoom, setZoomState] = useState(() => {
     try {
@@ -95,7 +111,10 @@ export function RollView({ peers }: { peers: Peer[] }) {
   useEffect(() => {
     const el = prw.current;
     if (!el || typeof ResizeObserver === 'undefined') return;
-    const ro = new ResizeObserver(() => setFitH(el.clientHeight));
+    const ro = new ResizeObserver(() => {
+      setFitH(el.clientHeight);
+      setGutter(el.offsetWidth - el.clientWidth);
+    });
     ro.observe(el);
     return () => ro.disconnect();
   }, [t?.id, !!entry?.manifest]); // eslint-disable-line react-hooks/exhaustive-deps
@@ -334,10 +353,51 @@ export function RollView({ peers }: { peers: Peer[] }) {
 
   const lenBtn = (v: number) => project.setPatternLen(t.id, pat, v);
   const minW = { minWidth: KEYW + L * SW } as React.CSSProperties;
+  // The grid's lines, placed exactly like the notes (same % of the width): a line on every Snap step,
+  // a medium one on every beat, a bold one on every bar (X.1)
+  const unit = q && q >= 0.25 ? q : 1;
+  const vlines: [number, string][] = [];
+  for (let k = 1; k * unit < L - 1e-6; k++) {
+    const x = Math.round(k * unit * 1000) / 1000;
+    vlines.push([x, x % BAR === 0 ? 'is-bar' : x % 4 === 0 ? 'is-beat' : '']);
+  }
   return (
-    <div className="fwm-rl">
+    <div className="fwm-rl" style={{ '--fwm-rz': zoom } as React.CSSProperties}>
       {patternBar}
       <div className="fwm-rtb">
+        <label>
+          Snap
+          <select value={ws.snap} aria-label="Snap when editing" onChange={(e) => { setWs({ snap: e.target.value }); e.target.blur(); }}>
+            {Object.keys(QUANT).map((k) => <option key={k}>{k}</option>)}
+          </select>
+        </label>
+        <button type="button" className="fwm-tb fwm-tb--xs" aria-pressed={folded} disabled={!keyed}
+          title={keyed ? `Show only the notes in ${keyLabel(key)}` : 'Pick a song key first (top bar)'}
+          onClick={() => setWs({ fold: !ws.fold })}>
+          Fold to key
+        </button>
+        <button type="button" className="fwm-tb fwm-tb--xs" aria-expanded={tools} onClick={() => setTools(!tools)}
+          title="Name, length, direction, rate, quantize, duplicate, clear">
+          Pattern {tools ? '▴' : '▾'}
+        </button>
+        <span className="fwm-zoom fwm-lanepick" role="group" aria-label="Zoom the Piano roll">
+          <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom out" disabled={zoom <= ZOOMS[0]}
+            onClick={() => setZoom(ZOOMS[Math.max(0, ZOOMS.indexOf(zoom) - 1)])}>−</button>
+          <span className="fwm-zoom__v" title="Size of the notes and keys">{Math.round(zoom * 100)}%</span>
+          <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom in" disabled={zoom >= ZOOMS[ZOOMS.length - 1]}
+            onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + 1)])}>+</button>
+        </span>
+        <label>
+          Lanes
+          <select value={lanes} aria-label="Lanes under the Piano roll" onChange={(e) => { setLanes(e.target.value as 'none' | 'vel' | 'auto'); e.target.blur(); }}>
+            <option value="none">Hidden</option>
+            <option value="vel">Velocity</option>
+            {autoSpecs.length > 0 && <option value="auto">Automation{autoUsed ? ` (${autoUsed})` : ''}</option>}
+          </select>
+        </label>
+      </div>
+      {tools && (
+        <div className="fwm-rtb fwm-rtools">
         <label>
           Name
           <NameInput key={pat} value={info.name} label={`Rename pattern ${info.name}`} maxLength={24} className="fwm-pname"
@@ -369,25 +429,12 @@ export function RollView({ peers }: { peers: Peer[] }) {
               onClick={() => project.setSeq(t.id, { rate: r })}>{label}</button>
           ))}
         </span>
-      </div>
-      <div className="fwm-rtb">
-        <label>
-          Snap
-          <select value={ws.snap} aria-label="Snap when editing" onChange={(e) => { setWs({ snap: e.target.value }); e.target.blur(); }}>
-            {Object.keys(QUANT).map((k) => <option key={k}>{k}</option>)}
-          </select>
-        </label>
         <label>
           Rec quantize
           <select value={ws.recQuant} aria-label="Quantize when recording" onChange={(e) => { setWs({ recQuant: e.target.value }); e.target.blur(); }}>
             {Object.keys(QUANT).map((k) => <option key={k}>{k}</option>)}
           </select>
         </label>
-        <button type="button" className="fwm-tb fwm-tb--xs" aria-pressed={folded} disabled={!keyed}
-          title={keyed ? `Show only the notes in ${keyLabel(key)}` : 'Pick a song key first (top bar)'}
-          onClick={() => setWs({ fold: !ws.fold })}>
-          Fold to key
-        </button>
         <button type="button" className="fwm-tb fwm-tb--xs" disabled={!q} onClick={() => project.quantize(t.id, pat, q)}>
           Quantize notes to {ws.snap}
         </button>
@@ -405,30 +452,19 @@ export function RollView({ peers }: { peers: Peer[] }) {
           }}>
           Clear pattern
         </button>
-        <span className="fwm-zoom fwm-lanepick" role="group" aria-label="Zoom the Piano roll">
-          <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom out" disabled={zoom <= ZOOMS[0]}
-            onClick={() => setZoom(ZOOMS[Math.max(0, ZOOMS.indexOf(zoom) - 1)])}>−</button>
-          <span className="fwm-zoom__v" title="Size of the notes and keys">{Math.round(zoom * 100)}%</span>
-          <button type="button" className="fwm-tb fwm-tb--xs" aria-label="Zoom in" disabled={zoom >= ZOOMS[ZOOMS.length - 1]}
-            onClick={() => setZoom(ZOOMS[Math.min(ZOOMS.length - 1, ZOOMS.indexOf(zoom) + 1)])}>+</button>
-        </span>
-        <label>
-          Lanes
-          <select value={lanes} aria-label="Lanes under the Piano roll" onChange={(e) => { setLanes(e.target.value as 'none' | 'vel' | 'auto'); e.target.blur(); }}>
-            <option value="none">Hidden</option>
-            <option value="vel">Velocity</option>
-            {autoSpecs.length > 0 && <option value="auto">Automation{autoUsed ? ` (${autoUsed})` : ''}</option>}
-          </select>
-        </label>
-      </div>
+        </div>
+      )}
       <div className="fwm-rsc fwm-rsc--roll" ref={rollSc} onScroll={(e) => { if (lanesRef.current) lanesRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
       <div className="fwm-rsc__in" style={minW}>
-      <div className="fwm-ruler" style={{ marginLeft: KEYW, gridTemplateColumns: `repeat(${L}, minmax(0, 1fr))` }}>
-        {Array.from({ length: L }, (_, i) => (
-          <span key={i} className={i % BAR === 0 ? 'is-bar' : ''}>{i % 4 === 0 ? `${Math.floor(i / BAR) + 1}.${(i % BAR) / 4 + 1}` : ''}</span>
-        ))}
-      </div>
       <div ref={prw} className="fwm-prw" style={{ gridTemplateColumns: `${KEYW}px minmax(0,1fr)` }}>
+        {/* the ruler is the table's first row (it stays on top while the rows scroll): same width as the grid */}
+        <div className="fwm-ruler__corner" />
+        <div className="fwm-ruler" aria-hidden>
+          {Array.from({ length: Math.ceil(L / 4) }, (_, b) => {
+            const i = b * 4;
+            return <span key={i} className={i % BAR === 0 ? 'is-bar' : ''} style={{ left: `${(i / L) * 100}%` }}>{`${Math.floor(i / BAR) + 1}.${(i % BAR) / 4 + 1}`}</span>;
+          })}
+        </div>
         <div className="fwm-pkeys" aria-label="Piano keys: press to hear a note" {...keyCol}>
           {pitches.map((m) => {
             const cls = (isBlack(m) ? ' is-b' : '') + (keyed && !inKey(m, key) ? ' is-out' : '') + (isRoot(m, key) ? ' is-root' : '');
@@ -439,7 +475,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
             );
           })}
         </div>
-        <div ref={grid} className="fwm-grid" style={{ height: rows * RH, '--fwm-snapw': `${((q || 1) / L) * 100}%`, '--fwm-beatw': `${(4 / L) * 100}%` } as React.CSSProperties} tabIndex={0} aria-label={`Piano roll, ${t.name}`}
+        <div ref={grid} className="fwm-grid" style={{ height: rows * RH }} tabIndex={0} aria-label={`Piano roll, ${t.name}`}
           onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onKeyDown={onKey}
           onDoubleClick={(e) => { const el = (e.target as HTMLElement).closest<HTMLElement>('[data-note]'); if (el) remove(el.dataset.note!); }}
           onContextMenu={(e) => { const el = (e.target as HTMLElement).closest<HTMLElement>('[data-note]'); if (el) { e.preventDefault(); remove(el.dataset.note!); } }}>
@@ -464,7 +500,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
               </div>
             );
           })}
-          {Array.from({ length: Math.ceil(L / BAR) - 1 }, (_, b) => <div key={'b' + b} className="fwm-barl" style={{ left: `${(((b + 1) * BAR) / L) * 100}%` }} />)}
+          {vlines.map(([x, cls]) => <div key={x} className={'fwm-vl ' + cls} style={{ left: `${(x / L) * 100}%` }} />)}
           {step >= 0 && <div className="fwm-phd" style={{ left: `${(step / L) * 100}%` }} />}
         </div>
       </div>
@@ -478,7 +514,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
       )}
       {lanes !== 'none' && (
       <div className="fwm-rsc fwm-rsc--lanes" ref={lanesRef} onScroll={(e) => { if (rollSc.current) rollSc.current.scrollLeft = e.currentTarget.scrollLeft; }}>
-      <div style={minW}>
+      <div style={{ ...minW, paddingRight: gutter }}>
 {lanes === 'vel' && (<>
       <div className="fwm-lanehead" style={{ marginLeft: KEYW }}>Velocity</div>
       <div className="fwm-abars" style={{ marginLeft: KEYW, gridTemplateColumns: `repeat(${L}, minmax(0, 1fr))` }} aria-label="Velocity lane" {...lane('vel')}>

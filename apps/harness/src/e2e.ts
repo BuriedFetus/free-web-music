@@ -415,6 +415,8 @@ async function runSong(p: Project, engineRef: { current: Engine | null }, ok: (c
     // Editing while playing: rename the pattern; the field keeps focus and text through playback.
     ($('[aria-label="TRACK 2, Basalt: P2"]') as HTMLButtonElement).click();
     await sleep(100);
+    if (!$('[aria-label="Rename pattern P2"]')) [...document.querySelectorAll<HTMLButtonElement>('button[aria-expanded]')].find((b) => b.textContent?.startsWith('Pattern'))?.click();
+    await sleep(100);
     const name = $<HTMLInputElement>('[aria-label="Rename pattern P2"]')!;
     name.focus();
     const set = Object.getOwnPropertyDescriptor(HTMLInputElement.prototype, 'value')!.set!;

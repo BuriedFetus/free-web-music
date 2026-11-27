@@ -19,8 +19,10 @@ interface Layout {
   c1: number;
   r1: number;
   max: number;
+  /** Panels that take their whole row (the other one in that row hides). */
+  wide?: number[];
 }
-const DEFAULT: Layout = { views: ['seq', 'device', 'roll', 'library'], c1: 48, r1: 46, max: -1 };
+const DEFAULT: Layout = { views: ['seq', 'device', 'roll', 'library'], c1: 48, r1: 46, max: -1, wide: [] };
 
 function load(key: string): Layout {
   try {
@@ -95,10 +97,10 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
   };
 
   return (
-    <div ref={grid} className={'fwm-ws' + (L.max >= 0 ? ' is-max' : '') + (zoom ? ' is-zoom-' + zoom : '')} onAnimationEnd={() => setZoom(null)}
+    <div ref={grid} className={'fwm-ws' + (L.max >= 0 ? ' is-max' : '') + (L.wide?.some((k) => k < 2) ? ' is-wide-top' : '') + (L.wide?.some((k) => k >= 2) ? ' is-wide-bot' : '') + (zoom ? ' is-zoom-' + zoom : '')} onAnimationEnd={() => setZoom(null)}
       onPointerLeave={() => (over.current = -1)} style={{ '--c1': L.c1 + '%', '--r1': L.r1 + '%' } as CSSProperties}>
       {L.views.map((v, i) => (
-        <section key={i} className={'fwm-pane' + (L.max === i ? ' is-maxed' : '')} data-i={i} aria-label={VIEWS[v]}
+        <section key={i} className={'fwm-pane' + (L.max === i ? ' is-maxed' : '') + (L.wide?.includes(i) ? ' is-wide' : '') + (L.wide?.includes(i ^ 1) ? ' is-hid' : '')} data-i={i} aria-label={VIEWS[v]}
           onPointerMove={() => (over.current = i)} onPointerEnter={() => (over.current = i)}>
           <header className="fwm-ph">
             <select value={v} aria-label={`Panel ${i + 1} view`}
@@ -117,6 +119,14 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
             </select>
             {v === 'roll' || v === 'device' ? <TrackTabs peers={peers} /> : <PaneContext view={v} />}
             {v === 'device' && <AddInstrument />}
+            <button type="button" className="fwm-ib" aria-pressed={!!L.wide?.includes(i)} aria-label={L.wide?.includes(i) ? 'Half width' : 'Whole row'}
+              title={L.wide?.includes(i) ? 'Back to half the width' : `Take the whole row (hides ${VIEWS[L.views[i ^ 1]]})`}
+              onClick={() => {
+                const w = (L.wide ?? []).filter((k) => k !== i && k !== (i ^ 1));
+                save({ ...L, wide: L.wide?.includes(i) ? w : [...w, i] });
+              }}>
+              ⟷
+            </button>
             <button type="button" className="fwm-ib" aria-pressed={L.max === i} aria-label={L.max === i ? 'Restore panels' : 'Maximise panel'} title={(L.max === i ? 'Show all panels' : 'Full size') + ' (Tab)'}
               onClick={() => save({ ...L, max: L.max === i ? -1 : i })}>
               {L.max === i ? '⤡' : '⤢'}
