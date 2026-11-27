@@ -7,6 +7,7 @@
 - Dock icons: drag up / down sets their main amount (Room wet, Echo wet, Grains, Crunch, Light, Temperature, Air, Breath, Motion depth; 250 px = 0–100%), they fill up from the bottom with it; a click still opens the pop-up; arrow keys too. Map `DRAG` in Geode.tsx.
 - Thermometer pop-up: only the thermometer (no title, no text, no window).
 - Mica's walk and Motion no longer restart when a TRACK loops: devices get `Sequencer.clock` (steps since Play; a joiner starts at the row position), not the row position.
+- Breath: Pluck now really plucks (Sustain pulled to 0, shorter decay; the pull is near full in the Pluck / Swell zones, gentle in the middle). Test `pluck_dies_away_while_the_key_is_held`.
 - The user is thinking about ideas for the other pop-up menus: wait for them.
 
 ## Earlier (2026-11-27, later): Geode lighter, darker, plays once

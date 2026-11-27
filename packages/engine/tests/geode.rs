@@ -387,3 +387,23 @@ fn a_loop_fades_each_new_pass_in_and_never_clicks() {
     assert!((later - first_pass).abs() < first_pass * 0.25 + 0.01, "and reaches full level");
     assert!(g.active() == 1, "a loop keeps going while held");
 }
+
+#[test]
+fn pluck_dies_away_while_the_key_is_held() {
+    // Breath at Pluck: a held key on a long tape (with grains) falls silent; at Swell it keeps singing
+    let fs = 48_000.0;
+    let level_after = |breath: f32| {
+        let mut g = geode(fs);
+        g.load(&sine(fs, 220.0, 3.0), None);
+        for (i, v) in [(p::BREATH, breath), (p::EWET, 0.0), (p::WET, 0.0), (p::GRAINS, 0.8)] {
+            g.set_param(i, v);
+        }
+        g.note_on(60, 1.0);
+        let (l, _) = render(&mut g, (fs * 1.5) as usize);
+        rms(&l[(fs * 1.2) as usize..])
+    };
+    let (pluck, edge, swell) = (level_after(0.0), level_after(0.15), level_after(1.0));
+    println!("held 1.2 s: pluck {pluck:.5}, breath 15% {edge:.5}, swell {swell:.4}");
+    assert!(pluck < 0.003 && edge < 0.006, "a pluck keeps going: {pluck} / {edge}");
+    assert!(swell > 0.05, "a swell keeps singing");
+}

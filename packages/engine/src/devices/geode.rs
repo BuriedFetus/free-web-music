@@ -725,7 +725,8 @@ impl Geode {
         let tw = libm::powf((libm::fabsf(t - 0.5) * 2.4).min(1.0), 0.8);
         let aw = sstep(0.0, 0.6, a);
         let breath = at(&self.sm, p::BREATH);
-        let bw = libm::fabsf(breath - 0.5) * 2.0;
+        // Breath pulls hard as soon as it is in Pluck (< 0.2) or Swell (> 0.8); gently around the middle
+        let bw = sstep(0.0, 0.6, libm::fabsf(breath - 0.5) * 2.0);
         for i in 0..p::COUNT {
             if i < p::DRIVE || i > p::ER {
                 self.eff[i] = if discrete_max(i).is_some() { self.params[i] } else { at(&self.sm, i) };
@@ -751,8 +752,8 @@ impl Geode {
                 p::PRE => wish(0.9, room * 0.9),
                 p::ER => wish(0.9, lerp(0.85, 0.25, room)),
                 p::ATK => wish(bw, lerp(0.02, 0.75, breath)),
-                p::DEC => wish(bw, lerp(0.25, 0.7, breath)),
-                p::SUS => wish(bw, lerp(0.1, 1.0, breath)),
+                p::DEC => wish(bw, lerp(0.18, 0.7, breath)),
+                p::SUS => wish(bw, sstep(0.15, 0.85, breath)), // a pluck dies away even while the key is held
                 p::REL => wish(bw, lerp(0.12, 0.85, breath)),
                 _ => {}
             }
