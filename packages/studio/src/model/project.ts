@@ -805,6 +805,23 @@ export class Project {
       else a.set(`${param}@${step}`, Math.max(0, Math.min(1, value)));
     });
   }
+  /**
+   * Copies the automation under a note (the steps it covers, every knob) by `by` steps: used when a note is
+   * duplicated (Shift+drag), so its knob moves go with it. Points past the pattern's end are left out.
+   */
+  copyAutomationSpan(track: string, pat: string, s: number, l: number, by: number) {
+    const a = this.autoMap(track, pat);
+    const len = this.patternInfo(track, pat)?.len ?? BAR;
+    if (!a || !by) return;
+    const from = Math.floor(s + 1e-6), to = Math.max(from + 1, Math.ceil(s + l - 1e-6));
+    const pts: [string, number, number][] = [];
+    for (const [k, v] of a.entries()) {
+      const [param, st] = k.split('@');
+      const i = Number(st);
+      if (i >= from && i < to && i + by >= 0 && i + by < len) pts.push([param, i + by, v]);
+    }
+    if (pts.length) this.transact(() => pts.forEach(([param, i, v]) => a.set(`${param}@${i}`, v)));
+  }
   /** How many automation points this instrument has, in every pattern. */
   automationCount(track: string): number {
     return this.patternList(track).reduce((n, p) => n + (this.autoMap(track, p.id)?.size ?? 0), 0);

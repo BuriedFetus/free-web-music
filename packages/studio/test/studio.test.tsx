@@ -215,6 +215,33 @@ describe('<Studio>', () => {
     expect(p.automationCount(tr)).toBeGreaterThan(0);
   });
 
+  it('piano roll: Shift+drag a note leaves it and drags a copy; the automation under it comes along', () => {
+    const p = mount();
+    addInst(screen, 'Basalt');
+    const tr = p.trackIds()[0];
+    const pat = p.patternList(tr)[0].id;
+    act(() => {
+      for (const [id] of p.notes(tr, pat)) p.deleteNote(tr, pat, id);
+      p.addNote(tr, pat, { s: 0, l: 2, m: 48, v: 0.8 });
+      p.setAutomation(tr, pat, 'cut', 0, 0.3);
+      p.setAutomation(tr, pat, 'cut', 1, 0.6);
+      p.setAutomation(tr, pat, 'cut', 2, 0.9); // after the note: stays behind
+    });
+    const g = screen.getByLabelText(/^Piano roll, /);
+    const L = p.patternInfo(tr, pat)!.len;
+    g.getBoundingClientRect = () => ({ left: 0, top: 0, right: L * 10, bottom: 2000, width: L * 10, height: 2000, x: 0, y: 0, toJSON() {} });
+    const note = g.querySelector<HTMLElement>('[data-note]')!;
+    note.getBoundingClientRect = () => ({ left: 0, top: 0, right: 20, bottom: 14, width: 20, height: 14, x: 0, y: 0, toJSON() {} });
+    const y = Number.parseFloat(note.style.top) + 5 || 5;
+    fireEvent.pointerDown(note, { button: 0, shiftKey: true, clientX: 5, clientY: y, pointerId: 1 });
+    fireEvent.pointerMove(g, { clientX: 45, clientY: y, pointerId: 1 }); // 4 steps later
+    fireEvent.pointerUp(g, { clientX: 45, clientY: y, pointerId: 1 });
+    const ns = p.notes(tr, pat).map(([, n]) => n.s).sort((a, b) => a - b);
+    expect(ns).toEqual([0, 4]);
+    const cut = p.automation(tr, pat, 'cut');
+    expect(cut.slice(0, 7)).toEqual([0.3, 0.6, 0.9, null, 0.3, 0.6, null]);
+  });
+
   it('songs: save, new from INIT (asks first when not saved), open a saved song, undo', async () => {
     const { lib, files } = memorySongs();
     const p = mount(lib);

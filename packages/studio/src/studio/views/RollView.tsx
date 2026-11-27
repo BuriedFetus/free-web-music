@@ -30,6 +30,8 @@ interface Drag {
   m0: number;
   row0: number;
   pitch: number;
+  /** Shift+drag: this note is a copy; the original's start and length (its automation comes along). */
+  copy?: { s: number; l: number };
 }
 
 export function RollView({ peers }: { peers: Peer[] }) {
@@ -147,8 +149,12 @@ export function RollView({ peers }: { peers: Peer[] }) {
       const n = notes.find(([k]) => k === id)?.[1];
       if (!n) return;
       const r = el.getBoundingClientRect();
-      drag.current = { id, mode: e.clientX > r.right - 9 ? 'len' : 'move', x0: c.x, s0: n.s, m0: n.m, row0: c.row, pitch: n.m };
-      setSel(id);
+      const len = !e.shiftKey && e.clientX > r.right - 9;
+      // Shift+drag: leave the note where it is and drag a copy of it (its automation follows on release)
+      const cid = e.shiftKey ? project.addNote(t.id, pat, { ...n }) : id;
+      if (!cid) return;
+      drag.current = { id: cid, mode: len ? 'len' : 'move', x0: c.x, s0: n.s, m0: n.m, row0: c.row, pitch: n.m, copy: e.shiftKey ? { s: n.s, l: n.l } : undefined };
+      setSel(cid);
       st.audition(t.id, n.m, true);
     } else {
       const s = q ? Math.min(L - q, Math.floor(c.x / q) * q) : Math.min(L - 0.25, c.x);
@@ -188,6 +194,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
     st.audition(t.id, d.pitch, false);
     drag.current = null;
     touch(null);
+    const n = project.notes(t.id, pat).find(([k]) => k === d.id)?.[1];
+    if (d.copy && n) project.copyAutomationSpan(t.id, pat, d.copy.s, d.copy.l, Math.round(n.s - d.copy.s));
     project.resolveOverlaps(t.id, pat, d.id); // the note you just edited wins: no stacked notes
     project.undoManager.stopCapturing();
   };
@@ -460,7 +468,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
       <p className="fwm-hint">
         Pick, name and size the pattern at the top (it plays wherever it is used in the song) · long patterns scroll
         sideways · press a piano key to hear it · grid lines follow Snap · click to add, drag right for length · drag to move or change pitch · drag the right edge to resize · double-click to
-        delete · notes on the same pitch never overlap (the one you edit wins) · arrows nudge the selected note (Shift = length) · Snap Off places notes between steps · lanes: drag to draw,
+        delete · notes on the same pitch never overlap (the one you edit wins) · Shift+drag a note to copy it (with its automation) · arrows nudge the selected note (Shift = length) · Snap Off places notes between steps · lanes: drag to draw,
         Alt-drag or right-drag erases automation · with Rec + Play, knob moves are recorded here.
       </p>
     </div>
