@@ -4,6 +4,7 @@ import { useCallback, useRef, useState, type CSSProperties, type PointerEvent } 
 import type { Peer } from '../collab/presence';
 import { useStudio } from './context';
 import { DeviceView } from './views/DeviceView';
+import { AddInstrument } from './AddInstrument';
 import { LibraryView } from './views/LibraryView';
 import { FxView, MixerView } from './views/MixerView';
 import { ScopeView } from './views/ScopeView';
@@ -86,6 +87,7 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
               ))}
             </select>
             {v === 'roll' || v === 'device' ? <TrackTabs peers={peers} /> : <PaneContext view={v} />}
+            {v === 'device' && <AddInstrument />}
             <button type="button" className="fwm-ib" aria-pressed={L.max === i} aria-label={L.max === i ? 'Restore panels' : 'Maximise panel'}
               onClick={() => save({ ...L, max: L.max === i ? -1 : i })}>
               {L.max === i ? '⤡' : '⤢'}
@@ -123,7 +125,7 @@ function PaneContext({ view }: { view: ViewId }) {
           ? 'What you hear, drawn live'
         : view === 'fx'
           ? 'Instruments ➜ effects ➜ master'
-        : 'Bring a device in to add an instrument';
+        : 'The manual: click an instrument to see how it works';
   return <span className="fwm-ctx">{text}</span>;
 }
 

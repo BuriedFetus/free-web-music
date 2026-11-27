@@ -3,6 +3,12 @@ import { act, cleanup, fireEvent, render, screen, within } from '@testing-librar
 import * as Y from 'yjs';
 import { deviceEntry, Project, Studio, type SongFile, type SongLibrary } from '../src';
 
+/** + Add instrument (Device panel) → pick one. */
+function addInst(q: { getByRole: typeof screen.getByRole }, name: string) {
+  fireEvent.click(q.getByRole('button', { name: '+ Add instrument' }));
+  fireEvent.click(q.getByRole('menuitem', { name: `Add ${name}` }));
+}
+
 afterEach(() => {
   cleanup();
   localStorage.clear();
@@ -31,9 +37,21 @@ function memorySongs() {
 }
 
 describe('<Studio>', () => {
+  it('the Library is a manual: open an instrument, turn its pages, add it from there', () => {
+    const p = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'How Geode works' }));
+    expect(screen.getByRole('tab', { name: /1\. Meet Geode/ })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: 'Next ›' }));
+    expect(screen.getByRole('heading', { name: 'Recording into her memory' })).toBeTruthy();
+    fireEvent.click(screen.getByRole('button', { name: '+ Add Geode to the song' }));
+    expect(p.tracks().map((t) => t.device)).toEqual(['geode']);
+    fireEvent.click(screen.getByRole('button', { name: '‹ All instruments' }));
+    expect(screen.getByRole('button', { name: 'How Opal works' })).toBeTruthy();
+  });
+
   it('adds an instrument from the library: it plays P1 in TRACK 1; remove it with undo', () => {
     const p = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    addInst(screen, 'Basalt');
     expect(p.tracks().map((t) => t.name)).toEqual(['Basalt']);
     const id = p.trackIds()[0];
     expect(screen.getByRole('button', { name: 'TRACK 1, Basalt: P1' })).toBeTruthy();
@@ -48,8 +66,8 @@ describe('<Studio>', () => {
 
   it('arrangement: add a TRACK, give an instrument a new pattern there, name and size it in the Piano roll', () => {
     const p = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
-    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    addInst(screen, 'Basalt');
+    addInst(screen, 'Basalt');
     const [a, b] = p.trackIds();
     fireEvent.click(screen.getByRole('button', { name: '+ Add TRACK' }));
     const r2 = p.rows()[1].id;
@@ -97,7 +115,7 @@ describe('<Studio>', () => {
 
   it('the Device panel has a tab per track to switch which one you edit', () => {
     mount();
-    for (let i = 0; i < 3; i++) fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    for (let i = 0; i < 3; i++) addInst(screen, 'Basalt');
     const device = screen.getByRole('region', { name: 'Device' });
     const tabs = within(device).getAllByRole('tab');
     expect(tabs.map((t) => t.textContent)).toEqual(['Basalt', 'Basalt 2', 'Basalt 3']);
@@ -117,7 +135,7 @@ describe('<Studio>', () => {
 
   it('rename a track from the sequencer (✎) or the Device panel', () => {
     const p = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    addInst(screen, 'Basalt');
     const id = p.trackIds()[0];
     const seq = screen.getByRole('region', { name: 'Song arrangement' });
     fireEvent.click(within(seq).getByRole('button', { name: 'Rename Basalt' }));
@@ -136,7 +154,7 @@ describe('<Studio>', () => {
 
   it('piano roll: pick a key, fold to it', () => {
     const p = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    addInst(screen, 'Basalt');
     const roll = screen.getByRole('region', { name: 'Piano roll' });
     const rows = () => roll.querySelectorAll('.fwm-gr').length;
     const all = rows();
@@ -156,7 +174,7 @@ describe('<Studio>', () => {
   it('songs: save, new from INIT (asks first when not saved), open a saved song, undo', async () => {
     const { lib, files } = memorySongs();
     const p = mount(lib);
-    fireEvent.click(screen.getByRole('button', { name: 'Add Basalt as a new track' }));
+    addInst(screen, 'Basalt');
     const id = p.trackIds()[0];
     act(() => { p.addNote(id, p.patternList(id)[0].id, { s: 0, l: 1, m: 36, v: 1 }); });
     const songBtn = () => screen.getByRole('button', { name: /^Song/ });
@@ -191,7 +209,7 @@ describe('<Studio>', () => {
 
   it('Flint: add it, hit pads, change a pad drum and character, switch kits ("edited" when changed)', () => {
     const p = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Add Flint as a new track' }));
+    addInst(screen, 'Flint');
     const id = p.trackIds()[0];
     const dev = screen.getByRole('region', { name: 'Device' });
     expect(within(dev).getByText(/Drum machine · Flint/)).toBeTruthy();
@@ -211,7 +229,7 @@ describe('<Studio>', () => {
 
   it('Flint drum grid: draw, accent, roll, row length, mute and solo', () => {
     const p = mount();
-    fireEvent.click(screen.getByRole('button', { name: 'Add Flint as a new track' }));
+    addInst(screen, 'Flint');
     const id = p.trackIds()[0];
     const pat = () => p.cell(p.rows()[0].id, id)!;
     const roll = screen.getByRole('region', { name: 'Piano roll' });
@@ -250,8 +268,8 @@ describe('<Studio>', () => {
     const rb = render(<Studio doc={b} user={{ id: 'bob', name: 'Bob', color: '#08f' }} theme={{ loadFonts: false }} />);
     const A = within(ra.container);
     const B = within(rb.container);
-    fireEvent.click(A.getByRole('button', { name: 'Add Basalt as a new track' }));
-    fireEvent.click(A.getByRole('button', { name: 'Add Flint as a new track' }));
+    addInst(A, 'Basalt');
+    addInst(A, 'Flint');
     const tab = (W: typeof A, name: string) => within(W.getByRole('region', { name: 'Device' })).getByRole('tab', { name: new RegExp(name) });
     // Bob picks Basalt; Ann then clicks Flint in her sequencer.
     fireEvent.click(tab(B, 'Basalt'));

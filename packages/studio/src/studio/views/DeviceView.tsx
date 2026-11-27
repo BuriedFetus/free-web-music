@@ -61,7 +61,7 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
     }
   }
   if (!t || !entry?.Component || !store || !host)
-    return <p className="fwm-empty">No track selected. Bring a device in from the Library to make one.</p>;
+    return <p className="fwm-empty">No instrument yet. Click + Add instrument above to bring one in.</p>;
   const C = entry.Component;
   return (
     <div className="fwm-devwrap">

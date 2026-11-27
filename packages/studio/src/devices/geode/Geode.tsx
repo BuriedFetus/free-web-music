@@ -110,7 +110,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
   const state = useDeviceState(store);
   useDeviceSync(host ? null : engine, store, slot, 'geode');
   const live = status === 'on' ? engine : null;
-  const local = useLocalTape(live, slot, !host?.geode);
+  const local = useLocalTape(live, slot, !host); // standalone only (in the studio the host has the tape; in the manual it is a picture)
   const g = host?.geode ?? local;
   useSyncExternalStore(g.subscribe, g.version, g.version);
   const m = store.manifest;

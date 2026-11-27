@@ -19,6 +19,11 @@ async function until(what: string, fn: () => boolean, ms = 8000) {
   }
 }
 const $ = <T extends Element = HTMLElement>(sel: string) => document.querySelector<T>(sel);
+/** + Add instrument (Device panel) → pick one. */
+const addInst = (name: string) => {
+  ($('.fwm-addinst') as HTMLButtonElement).click();
+  ($(`[role="menuitem"][aria-label="Add ${name}"]`) as HTMLButtonElement).click();
+};
 const btn = (text: string) => [...document.querySelectorAll('button')].find((b) => b.textContent?.trim().startsWith(text));
 
 export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness }, engineRef: { current: Engine | null }) {
@@ -40,6 +45,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'quartz') return runQuartz(p, engineRef, ok, out);
   if (role === 'ga' || role === 'gb') return runGeode(role, p, s.doc, engineRef, ok, out);
   if (role === 'gp') return runGeodeKeep(p, engineRef, ok, out);
+  if (role === 'manual') return runManual(ok, out);
   if (role === 'look') return runLook(s.doc, ok, out);
   if (role === 'arrange') return runArrange(p, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
@@ -139,7 +145,7 @@ async function runMulti(p: Project, engineRef: { current: Engine | null }, ok: (
     let w = await watch(1500);
     ok(Object.values(w.env).some((v) => v > 0.1), `one track plays (${fmt(w)})`);
     // Add a second Basalt from the Library, while playing.
-    ($('[aria-label="Add Basalt as a new track"]') as HTMLButtonElement).click();
+    addInst('Basalt');
     await sleep(200);
     w = await watch(1500);
     const vals = () => Object.values(w.env);
@@ -156,7 +162,7 @@ async function runMulti(p: Project, engineRef: { current: Engine | null }, ok: (
     document.body.dispatchEvent(new KeyboardEvent('keyup', { key: 'a', bubbles: true }));
     ok(w.peak > 0.02, `computer key plays the new track (${fmt(w)})`);
     // Third copy and a removal.
-    ($('[aria-label="Add Basalt as a new track"]') as HTMLButtonElement).click();
+    addInst('Basalt');
     await sleep(200);
     p.removeTrack(p.trackIds()[0]);
     btn('▶ Play')!.click();
@@ -497,7 +503,7 @@ async function runFlint(_p: Project, engineRef: { current: Engine | null }, ok: 
   };
   try {
     await sleep(300);
-    ($('[aria-label="Add Flint as a new track"]') as HTMLButtonElement).click();
+    addInst('Flint');
     await sleep(200);
     ok(!!$('.fwm-flint'), 'Flint shows in the Device panel');
     btn('Sound')!.click();
@@ -537,7 +543,7 @@ async function runDrums(p: Project, engineRef: { current: Engine | null }, ok: (
   window.addEventListener('error', (e) => errs.push(String(e.message)));
   try {
     await sleep(300);
-    ($('[aria-label="Add Flint as a new track"]') as HTMLButtonElement).click();
+    addInst('Flint');
     await sleep(200);
     const id = p.trackIds()[0];
     const pat = p.patternList(id)[0].id;
@@ -1045,7 +1051,7 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
   };
   try {
     await sleep(300);
-    ($('[aria-label="Add Garnet as a new track"]') as HTMLButtonElement).click();
+    addInst('Garnet');
     await sleep(300);
     const id = p.trackIds()[0];
     ok(!!$('.fwm-garnet'), 'Garnet shows in the Device panel');
@@ -1302,7 +1308,7 @@ async function runOpal(p: Project, engineRef: { current: Engine | null }, ok: (c
   window.addEventListener('error', (e) => errs.push(String(e.message)));
   try {
     await sleep(300);
-    ($('[aria-label="Add Opal as a new track"]') as HTMLButtonElement).click();
+    addInst('Opal');
     await sleep(400);
     ok(!!$('.fwm-opal') && p.trackIds().length === 1, 'Opal shows in the Device panel');
     ok(document.querySelectorAll('.fwm-opal [role=slider]').length >= 20, `every control is there (${document.querySelectorAll('.fwm-opal [role=slider]').length} dials)`);
@@ -1444,7 +1450,7 @@ async function runQuartz(p: Project, engineRef: { current: Engine | null }, ok: 
   window.addEventListener('error', (e) => errs.push(String(e.message)));
   try {
     await sleep(300);
-    ($('[aria-label="Add Quartz as a new track"]') as HTMLButtonElement).click();
+    addInst('Quartz');
     await sleep(400);
     ok(!!$('.fwm-quartz') && p.trackIds().length === 1, 'Quartz shows in the Device panel');
     btn('Sound')?.click();
@@ -1510,9 +1516,9 @@ async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { curre
   try {
     await sleep(400);
     if (role === 'ga') {
-      ($('[aria-label="Add Opal as a new track"]') as HTMLButtonElement).click();
+      addInst('Opal');
       await sleep(300);
-      ($('[aria-label="Add Geode as a new track"]') as HTMLButtonElement).click();
+      addInst('Geode');
       await sleep(400);
       ok(!!$('.fwm-geode canvas') && !!geodeId(), 'Geode shows in the Device panel with its room');
       ok(document.querySelectorAll('.fwm-geode__dock button').length === 10, 'the dock has its ten icons');
@@ -1622,7 +1628,7 @@ async function runGeodeKeep(p: Project, engineRef: { current: Engine | null }, o
   try {
     await sleep(400);
     if (!sessionStorage.getItem('fwm.e2e.gp')) {
-      ($('[aria-label="Add Geode as a new track"]') as HTMLButtonElement).click();
+      addInst('Geode');
       await sleep(300);
       ($('.fwm-geode__dock [data-id="mica"]') as HTMLButtonElement).click();
       await sleep(200);
@@ -1651,6 +1657,37 @@ async function runGeodeKeep(p: Project, engineRef: { current: Engine | null }, o
     ok(pk > 0.02, `after a reload the tape comes back from this browser, alone in the room (peak ${pk.toFixed(3)})`);
   } catch (e) {
     out.push(`FAIL gp: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** The Library (manual): every page's numbered spots find their control on the real panel. */
+async function runManual(ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  try {
+    await sleep(600);
+    const names = [...document.querySelectorAll('.fwm-man__card[aria-label]')].map((c) => c.getAttribute('aria-label')!);
+    ok(names.length >= 6, `the manual shows every instrument (${names.length})`);
+    for (const n of names) {
+      ($(`.fwm-man__card[aria-label="${n}"]`) as HTMLButtonElement).click();
+      await sleep(500);
+      const tabs = [...document.querySelectorAll<HTMLButtonElement>('.fwm-man__tabs button')];
+      const missing: string[] = [];
+      for (const t of tabs) {
+        t.click();
+        await sleep(900);
+        const want = document.querySelectorAll('.fwm-man__notes li').length;
+        const got = document.querySelectorAll('.fwm-man__spot').length;
+        if (got < want) { const have = [...document.querySelectorAll('.fwm-man__spot')].map((b) => b.getAttribute('aria-label')!.split(': ')[1]); missing.push(`${t.textContent}: missing ${[...document.querySelectorAll('.fwm-man__notes li b')].map((b) => b.textContent!).filter((x) => !have.includes(x)).join(', ')}`); }
+      }
+      ok(!missing.length, `${n}: every spot is on the panel ${missing.join(' | ')}`);
+      btn('‹ All instruments')?.click();
+      await sleep(300);
+    }
+  } catch (e) {
+    out.push(`FAIL manual: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
