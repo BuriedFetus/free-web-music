@@ -71,6 +71,8 @@ Every device is drawn from the same template. Its skin is just these tokens:
 | `--dev-btn`, `--dev-btn2`, `--dev-btnink`, `--dev-btnedge` | Hardware buttons |
 | `--dev-sec`, `--dev-track` | Section panels, fader tracks |
 | `--dev-key`, `--dev-keyb` | White and black keys |
+| `--dev-guide-*` | Garnet's chord guide (root, 2nd, 3rd, next chord, text on them) |
+| `--dev-geode-*` | Geode's room, drawn on a canvas that reads these tokens (so they restyle it too): `-bg`, the room's neon `-neon-freeze/-chill/-warm/-hot`, temperature colours `-freeze/-chill/-warm/-hot` (thermometer, Mica's clothes), `-line`, `-ink`, `-mute`, `-accent`, `-rec`, `-night`, `-frost`, `-lamp`, `-mica`, `-mica-fill`, `-panel`, `-edge`, and the pitch colours' `-pitch-sat` / `-pitch-light` (numbers, %) |
 
 Each device's skin lives in its own small file, `packages/studio/src/skins/<device>.css` (the template defaults, all commented, are in `device-base.css`). Preview any skin in all three reference styles with `design/check-skin.sh <device>`.
 
