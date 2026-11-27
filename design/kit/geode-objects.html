@@ -51,7 +51,7 @@ small.st { color: var(--dev-geode-mute); }
     <div class="room" id="room">
       <canvas id="cv" aria-label="Mica's room with a rug, a door and a mirror"></canvas>
       <div class="tag" id="tag"></div>
-      <div class="hint" id="hint">Drag the rug's corner · push the door left to open it · drag the mirror right to turn it, click it to flip the tape</div>
+      <div class="hint" id="hint">Drag the rug's corner · pull the door left to open it · drag the mirror right to turn it, click it to flip the tape</div>
     </div>
     <aside>
       <div class="row">
@@ -65,7 +65,7 @@ small.st { color: var(--dev-geode-mute); }
       </div>
       <div class="card" id="c-door">
         <h3>Door <small class="st" id="v-door"></small></h3>
-        <p>Push it left and it swings back, open to the rest of the song. The more it is open, the more Geode goes to the song's shared Reverb and Delay (its SEND knobs).</p>
+        <p>Pull it left and it swings open into the room: the way out to the rest of the song. The more it is open, the more Geode goes to the song's shared Reverb and Delay (its SEND knobs).</p>
         <input type="range" min="0" max="1" step="0.001" id="s-door" aria-label="Door open">
         <div class="knobs" id="k-door"></div>
       </div>
@@ -251,7 +251,7 @@ function drawRug(t) {
 
 function doorPts() {
   const L = G.L, a = doorAngle();
-  const hx = DOOR.x0, fx = DOOR.x0 + DOOR.w * Math.cos(a), fz = L + Math.sin(a) * Math.min(1.4, L * 0.32); // it swings back, out of the room into the dark
+  const hx = DOOR.x0, fx = DOOR.x0 + DOOR.w * Math.cos(a), fz = L - Math.sin(a) * Math.min(1.4, L * 0.32); // it swings into the room
   return { frame: [P(hx, DOOR.y0, L), P(hx + DOOR.w, DOOR.y0, L), P(hx + DOOR.w, 1, L), P(hx, 1, L)], panel: [P(hx, DOOR.y0, L), P(fx, DOOR.y0, fz), P(fx, 1, fz), P(hx, 1, L)] };
 }
 function drawDoor(t, dt) {
@@ -452,7 +452,7 @@ cv.addEventListener('pointerdown', (e) => {
       const f = floorAt(qx, qy), b = rugBox();
       if (f) set('rug', clamp((Math.abs(f.x - b.cx) - 0.2) / (0.78 - 0.2)));
     } else if (id === 'door') {
-      // the door's edge follows the finger: push it left, toward its hinge, and it swings back open
+      // the door's edge follows the finger: pull it left and it swings open into the room
       const f = doorPts().frame, w = Math.max(30, f[1][0] - f[0][0]);
       set('door', clamp(v0 + (x0 - ev.clientX) / w));
     } else set('mirror', clamp(v0 + (ev.clientX - x0) / 200)); // turn it: right = toward the room = wider
