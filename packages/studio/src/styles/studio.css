@@ -349,6 +349,23 @@
 .fwm-geode__row .fwm-seg > * { flex: 0 0 auto; min-width: 0; }
 .fwm-geode__row output { text-align: right; color: var(--dev-geode-accent); font-variant-numeric: tabular-nums; white-space: nowrap; }
 .fwm-geode__row input[type=range] { width: 100%; accent-color: var(--dev-geode-line); height: 28px; }
+/* a slider: the handle is your setting, the bar is what you hear now (macros and Motion move it) */
+.fwm-geode__track { position: relative; display: grid; align-items: center; height: 28px; }
+.fwm-geode__track::before, .fwm-geode__track > i { content: ''; position: absolute; left: 8px; height: 4px; border-radius: 2px; pointer-events: none; }
+.fwm-geode__track::before { right: 8px; background: color-mix(in srgb, var(--dev-geode-line) 18%, transparent); }
+.fwm-geode__track > i { width: calc((100% - 16px) * var(--eff, 0)); background: var(--dev-geode-line); }
+.fwm-geode__row .fwm-geode__track input[type=range] { position: relative; margin: 0; -webkit-appearance: none; appearance: none; background: transparent; }
+.fwm-geode__track input::-webkit-slider-runnable-track { background: transparent; }
+.fwm-geode__track input::-moz-range-track { background: transparent; }
+.fwm-geode__track input::-moz-range-progress { background: transparent; }
+.fwm-geode__track input::-webkit-slider-thumb { -webkit-appearance: none; width: 16px; height: 16px; border-radius: 50%; background: var(--dev-geode-ink); border: 2px solid var(--dev-geode-line); }
+.fwm-geode__track input::-moz-range-thumb { width: 12px; height: 12px; border-radius: 50%; background: var(--dev-geode-ink); border: 2px solid var(--dev-geode-line); }
+/* dock icons that set an amount: they fill up from the bottom with it */
+.fwm-geode__dock button.is-level { position: relative; touch-action: none;
+  background: linear-gradient(to top, color-mix(in srgb, var(--dev-geode-line) 22%, transparent) calc(var(--eff, 0) * 100%), transparent 0); }
+.fwm-geode__dock button.is-level:hover, .fwm-geode__dock button.is-level[aria-expanded=true] {
+  background: linear-gradient(to top, color-mix(in srgb, var(--dev-geode-line) 32%, transparent) calc(var(--eff, 0) * 100%), color-mix(in srgb, var(--dev-geode-line) 10%, transparent) 0); }
+.fwm-geode__pop.is-bare { background: none; box-shadow: none; width: auto; padding: 0; overflow: visible; }
 .fwm-geode__pres { display: inline-block; width: 8px; height: 8px; border-radius: 50%; margin-left: 4px; }
 .fwm-geode__thermo { display: grid; grid-template-columns: 110px 1fr; gap: 16px; align-items: center; }
 .fwm-geode__thermo svg { width: 110px; height: 230px; touch-action: none; cursor: ns-resize; }

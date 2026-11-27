@@ -46,6 +46,8 @@ const ICONS: Record<string, ReactNode> = {
   file: (<svg viewBox="0 0 32 32"><path d="M9 4h10l6 6v18H9z" /><path d="M19 4v6h6" /><path d="M14 23V15l6-2v8" /><circle cx="12.5" cy="23" r="1.6" /><circle cx="18.5" cy="21" r="1.6" /></svg>),
   demo: (<svg viewBox="0 0 32 32"><rect x="5" y="9" width="22" height="14" rx="2" /><circle cx="11" cy="16" r="3" /><circle cx="21" cy="16" r="3" /><path d="M11 13h10" /></svg>),
 };
+/** What dragging a dock icon up / down sets. */
+const DRAG: Record<string, string> = { temp: 'temp', fan: 'air', room: 'wet', echo: 'ewet', breath: 'breath', lamp: 'light', grains: 'grains', crunch: 'crunch', motion: 'mdepth' };
 const DOCK: [string, string][] = [['mica', 'Mica'], ['motion', 'Motion'], ['temp', 'Temp'], ['fan', 'Air'], ['room', 'Room'], ['echo', 'Echo'], ['breath', 'Breath'], ['lamp', 'Light'], ['grains', 'Grains'], ['crunch', 'Crunch']];
 
 /** Standalone (no studio): a tape kept in the panel, the demo tape only. */
@@ -241,6 +243,15 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
       }
       el.style.setProperty('--geode-t', String(t));
       el.style.setProperty('--geode-air', String(input.air));
+      // what you hear right now, on every slider and dock icon (macros and Motion move it, not only your hand)
+      for (const n of el.querySelectorAll<HTMLElement>('[data-eff]')) {
+        const id = n.dataset.eff!;
+        if (IX[id] == null) continue;
+        const v = val(id);
+        n.style.setProperty('--eff', v.toFixed(4));
+        const o = n.querySelector<HTMLElement>('.fwm-geode__val');
+        if (o) o.textContent = fmtOf(id, m.params[IX[id]])(v);
+      }
     };
     raf = requestAnimationFrame(loop);
     return () => {
@@ -312,6 +323,18 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
       c.addEventListener('pointerup', () => { c.removeEventListener('pointermove', mv); touch(null); }, { once: true });
       return;
     }
+    if (pt.hitBackWall(px, py)) {
+      // push the back wall away (drag up) for a bigger room, pull it closer (drag down) for a smaller one
+      ev.currentTarget.setPointerCapture(ev.pointerId);
+      touch('room');
+      const y0 = ev.clientY, r0 = pv('room');
+      const c = ev.currentTarget;
+      const mv = (e: PointerEvent) => set('room', clamp(r0 + (y0 - e.clientY) / 300));
+      c.addEventListener('pointermove', mv);
+      c.addEventListener('pointerup', () => { c.removeEventListener('pointermove', mv); touch(null); }, { once: true });
+      if (pop) setPop(null);
+      return;
+    }
     if (pop) setPop(null);
   };
   const onHover = (ev: RPointerEvent<HTMLCanvasElement>) => {
@@ -319,21 +342,62 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     if (!pt || ev.buttons) return;
     const r = ev.currentTarget.getBoundingClientRect();
     const px = ev.clientX - r.left, py = ev.clientY - r.top;
-    ev.currentTarget.style.cursor = pt.hitMica(px, py) ? 'grab' : pt.wallU(px, py) != null ? 'ew-resize' : '';
+    ev.currentTarget.style.cursor = pt.hitMica(px, py) ? 'grab' : pt.wallU(px, py) != null ? 'ew-resize' : pt.hitBackWall(px, py) ? 'ns-resize' : '';
+  };
+
+  // ---- dock icons: drag up / down sets the icon's main amount (0–100% over ~250 px, so small moves stay small) ----
+  const dockDragged = useRef(false);
+  const [dockShow, setDockShow] = useState<{ id: string; text: string } | null>(null);
+  const dockDown = (e: RPointerEvent<HTMLButtonElement>, id: string) => {
+    const k = DRAG[id];
+    if (!k || e.button !== 0) return;
+    const b = e.currentTarget;
+    const y0 = e.clientY, v0 = pv(k);
+    let moved = false;
+    dockDragged.current = false;
+    const mv = (ev: PointerEvent) => {
+      const dy = y0 - ev.clientY;
+      if (!moved && Math.abs(dy) < 5) return;
+      if (!moved) {
+        moved = true;
+        b.setPointerCapture?.(ev.pointerId);
+        touch(k);
+        if (status !== 'on' && status !== 'loading') void start();
+      }
+      const v = clamp(v0 + dy / 250);
+      set(k, v);
+      setDockShow({ id, text: fmtOf(k, spec(k))(v) });
+    };
+    const up = () => {
+      removeEventListener('pointermove', mv);
+      removeEventListener('pointerup', up);
+      if (moved) {
+        dockDragged.current = true;
+        touch(null);
+        setDockShow(null);
+      }
+    };
+    addEventListener('pointermove', mv);
+    addEventListener('pointerup', up);
   };
 
   // ---- controls ----
   // plain functions, not components: a range being dragged must stay the same element between renders
   const row = (id: string, label: string, base = false) => {
+    // the handle is your setting; the bar behind it is what you hear now (updated every frame)
     const v = pv(id);
-    const shown = base && live?.last?.devices[slot]?.eff ? live.last.devices[slot].eff[IX[id]] : v;
+    const shown = live?.last?.devices[slot]?.eff?.[IX[id]] ?? v;
     const pres = host?.presenceFor(id) ?? [];
+    void base;
     return (
-      <label className="fwm-geode__row" key={id}>
+      <label className="fwm-geode__row" key={id} data-eff={id} style={{ '--eff': String(shown) } as CSSProperties}>
         <span>{label}</span>
-        <input type="range" min={0} max={1} step={0.005} value={v} aria-label={label}
-          onPointerDown={() => touch(id)} onPointerUp={() => touch(null)} onChange={(e) => set(id, Number(e.target.value))} />
-        <output>{fmtOf(id, spec(id))(shown)}{pres.length > 0 && <i className="fwm-geode__pres" style={{ background: pres[0].color }} title={pres.map((p) => p.name).join(', ')} />}</output>
+        <span className="fwm-geode__track">
+          <i aria-hidden="true" />
+          <input type="range" min={0} max={1} step={0.005} value={v} aria-label={label}
+            onPointerDown={() => touch(id)} onPointerUp={() => touch(null)} onChange={(e) => set(id, Number(e.target.value))} />
+        </span>
+        <output><span className="fwm-geode__val">{fmtOf(id, spec(id))(shown)}</span>{pres.length > 0 && <i className="fwm-geode__pres" style={{ background: pres[0].color }} title={pres.map((p) => p.name).join(', ')} />}</output>
       </label>
     );
   };
@@ -380,7 +444,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     </div>
   );
   const POPS: Record<string, () => ReactNode> = {
-    temp: () => (<><h3>Temperature</h3>{thermo}<p>Drag the mercury. It moves slowly, like a real thermometer: the room and the sound follow.</p></>),
+    temp: () => thermo,
     fan: () => (<><h3>Air · the window</h3>{row('air', 'Window')}<p>More open: a brighter filter, a whistle, and the blinds (and the sound) sway more.</p></>),
     room: () => (<><h3>Room</h3>{row('room', 'Size')}{row('wet', 'Wet')}<p>Geode's own reverb. The room stretches into the distance as it grows.</p></>),
     echo: () => (<><h3>Echo</h3>{seg('div', 'Time', spec('div').options!)}{row('fb', 'Bounces')}{row('ewet', 'Wet')}<p>Mica's voice bounces off the back wall: one round trip per repeat, in time with the song.</p></>),
@@ -543,12 +607,26 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
             </div>
           )}
           {zoom && <button type="button" className="fwm-geode__backbtn" onClick={() => setZoom(false)}>← Back to the room</button>}
-          {pop && !zoom && <div className="fwm-geode__pop" role="dialog" aria-label={pop}>{POPS[pop]?.()}</div>}
+          {pop && !zoom && <div className={'fwm-geode__pop' + (pop === 'temp' ? ' is-bare' : '')} role="dialog" aria-label={pop}>{POPS[pop]?.()}</div>}
           <div className="fwm-geode__dock" role="toolbar" aria-label="Geode controls">
             {DOCK.map(([id, l]) => (
               <button key={id} type="button" data-id={id} aria-label={l} aria-expanded={id === 'mica' ? zoom : pop === id}
-                className={id === 'mica' && rec ? 'is-rec' : ''}
+                className={(id === 'mica' && rec ? 'is-rec' : '') + (DRAG[id] ? ' is-level' : '')}
+                data-eff={DRAG[id]}
+                title={DRAG[id] ? `${l}: click to open, drag up or down to set` : undefined}
+                onPointerDown={(e) => dockDown(e, id)}
+                onKeyDown={(e) => {
+                  const k = DRAG[id];
+                  const d = e.key === 'ArrowUp' ? 0.05 : e.key === 'ArrowDown' ? -0.05 : 0;
+                  if (!k || !d) return;
+                  e.preventDefault();
+                  set(k, clamp(pv(k) + d));
+                }}
                 onClick={() => {
+                  if (dockDragged.current) {
+                    dockDragged.current = false;
+                    return;
+                  }
                   if (status !== 'on' && status !== 'loading') void start();
                   if (id === 'mica') {
                     setZoom((z) => !z);
@@ -559,7 +637,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
                   }
                 }}>
                 {ICONS[id]}
-                <span>{l.toUpperCase()}</span>
+                <span>{dockShow?.id === id ? dockShow.text : l.toUpperCase()}</span>
               </button>
             ))}
           </div>

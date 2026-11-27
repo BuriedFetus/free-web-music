@@ -176,6 +176,12 @@ export class RoomPainter {
     const Z = G.D / s2 - G.D;
     return { x: clamp((px - G.vx) / (G.hw * s2), -0.85, 0.85), z: clamp(Z, 0.25, Math.max(0.3, Math.min(G.L - 0.35, 2.2))) };
   }
+  /** The back wall (drag it to make the room bigger or smaller). */
+  hitBackWall(px: number, py: number) {
+    if (!this.W) return false;
+    const a = this.P(-1, -1, this.G.L), b = this.P(1, 1, this.G.L);
+    return px > a[0] - 8 && px < b[0] + 8 && py > a[1] - 8 && py < b[1] + 8;
+  }
   hitMica(px: number, py: number) {
     const m = this.mica;
     return !!m && Math.abs(px - m.x) < m.u * 0.65 && py > m.y - m.u * 1.4 && py < m.y + m.u * 0.15;

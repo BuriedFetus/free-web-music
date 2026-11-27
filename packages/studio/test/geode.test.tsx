@@ -74,3 +74,27 @@ describe('<Geode> back (debug)', () => {
     window.history.pushState({}, '', '/');
   });
 });
+
+describe('<Geode> dock icons', () => {
+  it('drag up sets the amount (scaled: 100 px ≈ 40%), drag does not open the pop-up, a click does', () => {
+    const store = mount();
+    const room = screen.getByRole('button', { name: 'Room' });
+    const wet0 = store.getState().params.wet;
+    fireEvent.pointerDown(room, { clientY: 400, button: 0 });
+    fireEvent.pointerMove(window, { clientY: 300 });
+    fireEvent.pointerUp(window, { clientY: 300 });
+    fireEvent.click(room);
+    expect(store.getState().params.wet).toBeCloseTo(wet0 + 0.4, 2);
+    expect(screen.queryByRole('dialog', { name: 'room' })).toBeNull();
+    fireEvent.click(room);
+    expect(screen.getByRole('dialog', { name: 'room' })).toBeTruthy();
+  });
+
+  it('the thermometer pop-up is just the thermometer', () => {
+    mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Temp' }));
+    const d = screen.getByRole('dialog', { name: 'temp' });
+    expect(d.querySelector('h3, p')).toBeNull();
+    expect(d.className).toContain('is-bare');
+  });
+});

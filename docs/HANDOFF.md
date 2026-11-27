@@ -1,6 +1,14 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-27, later): Geode lighter, darker, plays once
+## START HERE (2026-11-27, evening): Geode feedback round
+- Every note sends its ring at once (short notes were missed); the Light dims only the lamp.
+- Sliders in Geode's pop-ups: the handle = your setting, a bar behind it = what you hear now, and the number too, updated every frame from the engine (macros like Breath / Temperature and Motion move them). Element hook: `data-eff="<param>"` + `--eff`.
+- Drag the room's back wall: up = bigger room, down = smaller.
+- Dock icons: drag up / down sets their main amount (Room wet, Echo wet, Grains, Crunch, Light, Temperature, Air, Breath, Motion depth; 250 px = 0–100%), they fill up from the bottom with it; a click still opens the pop-up; arrow keys too. Map `DRAG` in Geode.tsx.
+- Thermometer pop-up: only the thermometer (no title, no text, no window).
+- The user is thinking about ideas for the other pop-up menus: wait for them.
+
+## Earlier (2026-11-27, later): Geode lighter, darker, plays once
 User: "performance … a bit lacking", the room "full of dust due to the constant reflection", wants a darker background, the light as a dimmer neon, and no auto-looping ("the looping needs a solid fade in for the next loop, not fade out"). Done, pushed:
 - Room drawing: no canvas blur anywhere (it was the costly part and the haze); a cheap neon only on the room's edges (a wide faint stroke under the thin one); a quiet grid; no back-wall gradient, no wind streaks; the lamp is a neon tube that dims (no light cone); `--dev-geode-bg` #010103.
 - Speed: the manual's pictures are memoised (they re-rendered on every knob turn in the studio); dragging Mica writes to the song ~25×/s (she still follows the pointer at once).
