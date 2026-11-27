@@ -5,7 +5,20 @@ The user asked me to build the rest of the Geode milestone while they work, and 
 - slice 1 engine `31ed80a`, slice 2 tapes `3d53884`, slice 3 panel `7b788a7` (details and my suggestions: PLAN.md "Geode").
 - Try it: `npm run dev`, Library → Samplers → Geode, add an Opal too, click Mica (dock, left), REC, play the keys (they play the Opal while armed), REC again. Or DEMO when there is nothing to record. `?geode` = Geode alone (demo tape only); `?geodeback` shows the hidden back.
 - Tests: `cargo test --release --test geode` (15), `test/sampleStore.test.ts` (8), browser `?e2e=ga` + `?e2e=gb` in one room (two tabs, 16 checks), and the older roles still pass (opal, a/b, ta/tb).
-- Not checked by ear: the sound at 44.1 kHz in a real browser, the feel of the springs and of dragging Mica. That is the user's review.
+- QA pass after the slices (all pushed):
+  - no click at the Classic loop seam
+  - the input meter moves while REC waits; a warning when the input is muted
+  - Escape closes things
+  - FILE button / drop an audio file on the room
+  - grain events now really reach the panel (`Device::viz_len`)
+  - the room fills the panel's width
+  - clicking Mica opens her memory
+  - presets keep Mica's place and the trim
+  - the hidden back works (`ModRow` fixed for devices without `lwave`)
+  - Motion pop-up wraps
+  - `?e2e=gp`: a tape comes back after a reload
+  - the browser tests also run at 44.1 kHz (Firefox pref `media.cubeb.force_sample_rate`)
+- Not checked by ear: the sound itself, the feel of the springs and of dragging Mica. That is the user's review.
 - The mock-up artifact is now older than the studio version; republish only if asked.
 
 ## Earlier (2026-11-26, evening): Geode mock-up round 2 waiting for the user's review

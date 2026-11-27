@@ -223,17 +223,16 @@ Full approved plan (5 rounds with the user): sample-based synth, starts empty, r
   - CPU: worst case (8 voices, 64 grains of 300 ms, everything on) 16% of one core natively
 - [x] **Slice 2, tapes** (`model/sampleStore.ts`, `studio/useTapes.ts`, 8 tests): REC arms a tap on any other track (after its fader), waits for sound, records up to 30 s, the keys meant for the Geode play the input while armed; trimmed, normalised, rounded to 16 bits, fingerprinted (FNV ×2 on the PCM: identical everywhere). Kept in IndexedDB (or a host `tapes: TapeStorage` prop), sent in paced chunks (`{t:'smp'}`, 24 KB PCM each, 4 per 40 ms) on the live channel; a newcomer asks (`{t:'smp?'}`), whoever has it answers after a random wait unless someone else already is. The song holds only `TapeMeta` (`Project.tape / setTape`, saved in song files, undoable). Peers at another sample rate resample on load.
 - [x] **Slice 3, panel** (`devices/geode/`: `Geode.tsx`, `room.ts`, `presets.ts`, `types.ts`; skin `skins/geode.css`, tokens `--dev-geode-*` in device-base.css and the My look brief): the room painter is the mock-up's drawing, reading every colour from tokens; the dock and its pop-ups; Mica's memory (REC / STOP, TRIM with a waveform, REMOVE + Undo toast, PLAY, DEMO tape, Classic / Reverse / Slices, speed, position, "getting the tape 40%" / "waiting for someone who has it"); drag Mica (pan, distance), drag the film strip (grain position); the hidden back (`?geodeback`: every knob behind the macros with its macro arc, the Temperature scales, dynamics + squash meter, modulation); 8 presets that never move Mica or the trim; Library → Samplers; harness `?geode`; browser test `?e2e=ga` + `?e2e=gb` (two tabs: record an Opal through Mica's REC, play it, thermometer eases, PLAY, REMOVE + Undo; the other tab gets the tape live and plays it; the song stays ~3 KB)
-- [ ] The user plays it (sound at 44.1 kHz in a real browser, the feel of the springs, dragging Mica on a touch screen)
+- [x] QA pass: the Classic loop seam fade, the meter while armed, the muted-input warning, Escape, FILE / drop a file, grain events reaching the panel, full-width room, click Mica = her memory, presets keep her place, the back fixed, `?e2e=gp` (tape back after a reload), e2e at 44.1 kHz
+- [ ] The user plays it (the sound by ear, the feel of the springs, dragging Mica on a touch screen)
 
 #### Geode: suggestions for later (mine, 2026-11-26; not started, pick any)
 Quality of life
-- **Level while armed**: show the input's meter while REC waits (not only once recording), and say so when the input track is muted ("Opal is muted: unmute it to record").
 - **Record the song**: an "arm with the song" option that starts recording on the next bar when Play starts, so a whole Opal phrase lands on the beat; and a count-in click.
 - **Tape snapping**: when recording during Play, trim the start to the nearest beat so Classic loops stay in time.
 - **Undo for a re-recording** already works (the old tape stays in the store); add a small "previous tapes" list in Mica's menu (the last 5 tapes of this browser) to swap back without undo.
-- **Drop a file**: drag a WAV / MP3 onto the room to load it (decodeAudioData, mono-mix, 30 s cap). Not asked for; cheap and very handy.
 - **Keyboard**: arrow keys move Mica when she has focus (accessibility for the pan drag); `R` in her menu = REC.
-- **Pop-up memory**: remember which pop-up was last open per person (workspace), and close pop-ups with Escape.
+- **Pop-up memory**: remember which pop-up was last open per person (workspace).
 - **Touch**: bigger hit area for Mica on small screens; long-press on the film strip to seek.
 Sound
 - **Shimmer** at FREEZING (an octave-up feed into the room's tail), in the plan but not built.
