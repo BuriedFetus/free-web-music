@@ -134,7 +134,8 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
   const loadPreset = (i: number) => {
     const n = (i + GEODE_PRESETS.length) % GEODE_PRESETS.length;
     // a starting point never moves Mica or her tape trim
-    const keep = { px: pv('px'), pz: pv('pz'), start: pv('start'), end: pv('end') };
+    const cur = store.getState().params; // now, not as of the last render (a peer may have just moved her)
+    const keep = { px: cur.px, pz: cur.pz, start: cur.start, end: cur.end };
     store.load({ ...GEODE_PRESETS[n], params: { ...GEODE_PRESETS[n].params, ...keep } }, n);
   };
 
@@ -181,8 +182,8 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     pal.current = readPalette(el);
     const pt = new RoomPainter(canvas, pal.current);
     painter.current = pt;
-    const ro = new ResizeObserver(() => pt.size());
-    ro.observe(canvas);
+    const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => pt.size()) : null;
+    ro?.observe(canvas);
     pt.size();
     let raf = 0;
     let last = performance.now();
@@ -240,7 +241,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     raf = requestAnimationFrame(loop);
     return () => {
       cancelAnimationFrame(raf);
-      ro.disconnect();
+      ro?.disconnect();
     };
   }, [m, IX]);
 
