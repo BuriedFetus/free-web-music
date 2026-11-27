@@ -16,12 +16,15 @@ import { OPAL_PRESETS } from './opal/presets';
 import quartzManifest from '@fwm/engine/devices/quartz.json';
 import { Quartz } from './quartz/Quartz';
 import { QUARTZ_PRESETS } from './quartz/presets';
+import geodeManifest from '@fwm/engine/devices/geode.json';
+import { Geode } from './geode/Geode';
+import { GEODE_PRESETS } from './geode/presets';
 
 export interface DeviceEntry {
   id: string;
   name: string;
   kind: string;
-  category: 'Synths' | 'Strings' | 'Drums' | 'Keys & pads';
+  category: 'Synths' | 'Strings' | 'Drums' | 'Keys & pads' | 'Samplers';
   /** Range shown in the piano roll (MIDI notes). */
   roll: { low: number; high: number };
   /** Default pitch when a step is switched on in the main sequencer. */
@@ -53,6 +56,10 @@ export const LIBRARY: DeviceEntry[] = [
   {
     id: 'opal', name: 'Opal', kind: 'Pad synth: 8 voices, stack & chorus', category: 'Keys & pads', roll: { low: 36, high: 84 }, rootNote: 60,
     available: true, manifest: opalManifest as DeviceManifest, Component: Opal, presets: OPAL_PRESETS,
+  },
+  {
+    id: 'geode', name: 'Geode', kind: "Sampler: record anything into Mica's room", category: 'Samplers', roll: { low: 36, high: 84 }, rootNote: 60,
+    available: true, manifest: geodeManifest as unknown as DeviceManifest, Component: Geode, presets: GEODE_PRESETS,
   },
   {
     id: 'flint', name: 'Flint', kind: 'Drum machine', category: 'Drums', roll: { low: 36, high: 43 }, rootNote: 36, layout: 'pads',

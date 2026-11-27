@@ -134,6 +134,11 @@ const DEV_TOKENS: [string, string][] = [
   ['--dev-sec, --dev-track', 'section panels, fader tracks'],
   ['--dev-key, --dev-keyb, --dev-keyb2, --dev-keybed, --dev-keyhi, --dev-keylabel', 'on-screen keys (Garnet: the strings are --dev-key and --dev-keyb)'],
   ['--dev-guide-root, --dev-guide-2, --dev-guide-3, --dev-guide-alt, --dev-guide-ink', "Garnet's chord guide: root, the chord's 2nd and 3rd notes, the next chord, text on them"],
+  ['--dev-geode-bg, --dev-geode-neon-freeze, --dev-geode-neon-chill, --dev-geode-neon-warm, --dev-geode-neon-hot', "Geode: the room's darkness and its neon lines from FREEZING to HOT"],
+  ['--dev-geode-freeze, --dev-geode-chill, --dev-geode-warm, --dev-geode-hot', "Geode: temperature colours (thermometer, Mica's clothes)"],
+  ['--dev-geode-line, --dev-geode-ink, --dev-geode-mute, --dev-geode-accent, --dev-geode-rec', 'Geode: icons and sliders, text, quiet text, values, recording'],
+  ['--dev-geode-night, --dev-geode-frost, --dev-geode-lamp, --dev-geode-mica, --dev-geode-mica-fill', 'Geode: outside the window, blinds and wind, lamp light, Mica outline and body'],
+  ['--dev-geode-panel, --dev-geode-edge, --dev-geode-pitch-sat, --dev-geode-pitch-light', 'Geode: dock and pop-ups and their edges; waves coloured by pitch (saturation, lightness)'],
 ];
 const AREAS: [string, string][] = [
   ['&', 'the studio root: set tokens here'],

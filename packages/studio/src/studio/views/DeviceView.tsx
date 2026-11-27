@@ -41,6 +41,23 @@ export function DeviceView({ peers }: { peers: Peer[] }) {
   if (host && t) {
     const mix = st.project.mix(t.id);
     host.sends = { rev: mix.rev, dly: mix.dly, set: (k, v) => st.project.setMix(t.id, { [k]: v }) };
+    if (t.device === 'geode') {
+      const tp = st.tapes;
+      const meta = st.project.tape(t.id);
+      host.geode = {
+        status: tp.status(t.id),
+        rec: tp.rec?.geode === t.id ? tp.rec : null,
+        busy: !!tp.rec && tp.rec.geode !== t.id,
+        inputs: st.project.tracks().filter((x) => x.id !== t.id).map((x) => ({ id: x.id, name: x.name })),
+        record: (input) => tp.record(t.id, input),
+        stop: () => tp.stop(),
+        demo: () => tp.demo(t.id),
+        clear: () => tp.clear(t.id),
+        tape: () => (meta ? tp.store.peek(meta.hash) : null),
+        subscribe: tp.store.subscribe,
+        version: tp.store.getVersion,
+      };
+    }
   }
   if (!t || !entry?.Component || !store || !host)
     return <p className="fwm-empty">No track selected. Bring a device in from the Library to make one.</p>;

@@ -1,0 +1,18 @@
+/* Geode: a sampler with a little room in it. A black case around Mica's room; the room's own colours
+   are the --dev-geode-* tokens (device-base.css). */
+:where(.geode, [data-device="geode"]) {
+  --dev-case: #0d1018;
+  --dev-case2: #05070b;
+  --dev-edge: #1d2a3a;
+  --dev-silk: #b8cde0;
+  --dev-acc: #5fd4ff;
+  --dev-lcd: #04050a;
+  --dev-lcdink: #5fd4ff;
+  --dev-btn: #16202c;
+  --dev-btn2: #0c1219;
+  --dev-btnink: #e6f4ff;
+  --dev-btnedge: #000;
+  --dev-sec: rgba(95, 212, 255, .06);
+  --dev-cap: #2a3a4c;
+  --dev-capd: #0c131b;
+}

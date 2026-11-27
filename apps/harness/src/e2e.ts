@@ -38,6 +38,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'garnet') return runGarnet(p, engineRef, ok, out);
   if (role === 'opal') return runOpal(p, engineRef, ok, out);
   if (role === 'quartz') return runQuartz(p, engineRef, ok, out);
+  if (role === 'ga' || role === 'gb') return runGeode(role, p, s.doc, engineRef, ok, out);
   if (role === 'look') return runLook(s.doc, ok, out);
   if (role === 'arrange') return runArrange(p, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
@@ -1481,6 +1482,105 @@ async function runQuartz(p: Project, engineRef: { current: Engine | null }, ok: 
     ok(seenQ.size > 3, `Quartz: the engine's cutoff moves with the LFO (${seenQ.size} values)`);
   } catch (e) {
     out.push(`FAIL quartz: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/**
+ * Two tabs, one room: A records an Opal into a Geode through Mica's REC (its keys play the Opal while
+ * armed), plays the tape, moves the thermometer, removes the tape and undoes it. B gets the tape over
+ * the live channel (never through the song) and its own Geode plays it.
+ */
+async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  const peak = async (ms: number) => {
+    let pk = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < ms) {
+      pk = Math.max(pk, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+      await sleep(25);
+    }
+    return pk;
+  };
+  const key = (k: string, down: boolean) => document.body.dispatchEvent(new KeyboardEvent(down ? 'keydown' : 'keyup', { key: k, bubbles: true }));
+  const geodeId = () => p.tracks().find((t) => t.device === 'geode')?.id;
+  try {
+    await sleep(400);
+    if (role === 'ga') {
+      ($('[aria-label="Add Opal as a new track"]') as HTMLButtonElement).click();
+      await sleep(300);
+      ($('[aria-label="Add Geode as a new track"]') as HTMLButtonElement).click();
+      await sleep(400);
+      ok(!!$('.fwm-geode canvas') && !!geodeId(), 'Geode shows in the Device panel with its room');
+      ok(document.querySelectorAll('.fwm-geode__dock button').length === 10, 'the dock has its ten icons');
+      btn('Sound')?.click();
+      await until('engine', () => !!engineRef.current?.last, 4000);
+      const gid = geodeId()!;
+      ($('.fwm-geode__dock [data-id="mica"]') as HTMLButtonElement).click();
+      await sleep(200);
+      const sel = $('.fwm-geode__note select') as HTMLSelectElement | null;
+      ok(!!sel && [...sel.options].some((o) => o.textContent === 'Opal'), "Mica's menu offers the Opal as input");
+      ($('[aria-label="Rec: wait for sound, then record"]') as HTMLButtonElement).click();
+      await sleep(300);
+      ok(($('.fwm-geode__note') as HTMLElement).textContent!.includes('Waiting for sound'), 'REC waits for sound');
+      for (const k of ['a', 'd', 'g']) key(k, true);
+      await sleep(1300);
+      for (const k of ['a', 'd', 'g']) key(k, false);
+      await sleep(400);
+      ok(($('.fwm-geode__note') as HTMLElement).textContent!.includes('Recording'), `the keys played the Opal and it records (${$('.fwm-geode__note')!.textContent})`);
+      ($('[aria-label="Stop recording"]') as HTMLButtonElement).click();
+      await until('tape on the track', () => !!p.tape(gid), 4000);
+      const meta = p.tape(gid)!;
+      ok(meta.frames / meta.sr > 0.8 && meta.frames / meta.sr < 4, `a tape of ${(meta.frames / meta.sr).toFixed(2)} s is on the track (${meta.name})`);
+      await sleep(400);
+      const slot = Number(Object.entries(engineRef.current!.last!.devices).find(([, d]) => d.eff.length === 59)![0]);
+      key('a', true);
+      const pk = await peak(700);
+      const viz = engineRef.current!.last!.devices[slot].viz;
+      key('a', false);
+      ok(pk > 0.02 && pk <= 1, `the Geode plays the tape (peak ${pk.toFixed(3)})`);
+      ok(!!viz && viz[3] >= 0, `the panel sees the voice (note ${viz?.[3]})`);
+      // the thermometer eases in the engine (the same for everyone)
+      const st = p.deviceStore(gid, deviceEntry('geode')!.manifest!)!;
+      st.setParam('temp', 0);
+      await sleep(250);
+      const mid = engineRef.current!.last!.devices[slot].eff[0];
+      await sleep(1800);
+      const end = engineRef.current!.last!.devices[slot].eff[0];
+      ok(mid > 0.05 && mid < 0.55 && end < 0.03, `the thermometer moves slowly (${mid.toFixed(2)} after 0.25 s, ${end.toFixed(2)} after 2 s)`);
+      st.setParam('px', 0.1);
+      await until('Mica moved', () => engineRef.current!.last!.devices[slot].eff[19] < 0.2, 3000);
+      ok(true, 'placing Mica reaches the engine');
+      ($('[aria-label="Play the tape"]') as HTMLButtonElement).click();
+      await until('tape plays', () => (engineRef.current!.last!.devices[slot].viz?.[0] ?? -1) >= 0, 2000);
+      ok(true, "Mica's PLAY plays the tape on its own");
+      ($('[aria-label="Trash: remove the tape"]') as HTMLButtonElement).click();
+      await sleep(100);
+      ok(!p.tape(gid), 'REMOVE empties her memory');
+      btn('Undo')?.click();
+      await sleep(100);
+      ok(p.tape(gid)?.hash === meta.hash, 'Undo brings the tape back');
+      await sleep(4000); // let B finish
+    } else {
+      await until('a Geode with a tape', () => !!geodeId() && !!p.tape(geodeId()!), 40000);
+      btn('Sound')?.click();
+      await until('engine', () => !!engineRef.current?.last, 4000);
+      const gid = geodeId()!;
+      const hash = p.tape(gid)!.hash;
+      await until('geode slot', () => Object.values(engineRef.current!.last!.devices).some((d) => d.eff.length === 59), 4000);
+      const slot = Number(Object.entries(engineRef.current!.last!.devices).find(([, d]) => d.eff.length === 59)![0]);
+      await sleep(1500); // the tape arrives in pieces, then loads
+      engineRef.current!.noteOn(slot, 60, 0.9);
+      const pk = await peak(700);
+      engineRef.current!.noteOff(slot, 60);
+      ok(pk > 0.02, `B's Geode plays the tape it got from A (peak ${pk.toFixed(3)}, ${hash})`);
+      const size = (await import('yjs')).encodeStateAsUpdate(doc).length;
+      ok(size < 60000, `the sound never went into the song (doc ${size} bytes)`);
+    }
+  } catch (e) {
+    out.push(`FAIL ${role}: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});

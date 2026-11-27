@@ -28,4 +28,28 @@
   --dev-guide-3: #a5eea0;      /* chord guide: the chord's 3rd note (light green) */
   --dev-guide-alt: #c9a6ff;    /* chord guide: the next chord's notes (purple) */
   --dev-guide-ink: #10131a;    /* text on the guide colours */
+  /* Geode: Mica's room (drawn on a canvas from these) */
+  --dev-geode-bg: #04050a;         /* the room's darkness */
+  --dev-geode-neon-freeze: #beeeff; /* the room's neon lines at FREEZING … */
+  --dev-geode-neon-chill: #6ecdff;
+  --dev-geode-neon-warm: #ffc48c;
+  --dev-geode-neon-hot: #ff966e;    /* … at HOT */
+  --dev-geode-freeze: #cdeeff;     /* temperature colours: winter suit, thermometer … */
+  --dev-geode-chill: #7fb8ff;      /* sweater, sweat drops */
+  --dev-geode-warm: #ffa24a;       /* tank top */
+  --dev-geode-hot: #ff5a4a;        /* scarf, flushed cheeks */
+  --dev-geode-line: #5fd4ff;       /* dock icons, sliders */
+  --dev-geode-ink: #e6f4ff;        /* text in the room */
+  --dev-geode-mute: #7f93a8;       /* quiet text */
+  --dev-geode-accent: #ffd166;     /* values, the tape position, grains on the film strip */
+  --dev-geode-rec: #ff3b4a;        /* recording */
+  --dev-geode-night: #28466e;      /* outside the window */
+  --dev-geode-frost: #cdeeff;      /* blinds and wind */
+  --dev-geode-lamp: #ffdc96;       /* lamp light */
+  --dev-geode-mica: #d6c8ff;       /* Mica's outline */
+  --dev-geode-mica-fill: #141028;  /* Mica's body */
+  --dev-geode-panel: rgba(4,5,10,.88); /* dock, pop-ups and Mica's menu */
+  --dev-geode-edge: #24405a;       /* their edges */
+  --dev-geode-pitch-sat: 90;       /* waves and sparks are coloured by pitch: saturation (%) … */
+  --dev-geode-pitch-light: 66;     /* … and lightness (%) */
 }

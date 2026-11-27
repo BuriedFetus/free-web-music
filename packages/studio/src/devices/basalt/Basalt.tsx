@@ -47,6 +47,8 @@ export interface DeviceHost {
   songKey?: SongKey;
   /** This track's Reverb / Delay sends (the Mixer's): shown as SEND knobs on the panel. */
   sends?: { rev: number; dly: number; set(which: 'rev' | 'dly', v: number): void };
+  /** Geode: its tape (recording, the demo tape, removing it). */
+  geode?: import('../geode/types').GeodeHost;
 }
 
 /** Props every device front panel takes (Basalt, Flint…). */

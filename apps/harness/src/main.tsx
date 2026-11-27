@@ -1,15 +1,16 @@
 // Dev harness: plays the part of the host app.
 //   /             the studio, synced between tabs (open a second tab = a second person)
-//   /?basalt      Phase 1 view: Basalt alone
+//   /?basalt      Phase 1 view: Basalt alone (?opal, ?quartz, ?geode: those alone)
 //   ?selftest     plays a note and POSTs what the engine produced to ./log (headless checks)
 import { StrictMode, useEffect, useMemo, useState } from 'react';
 import { createRoot } from 'react-dom/client';
 import basaltManifest from '@fwm/engine/devices/basalt.json';
 import opalManifest from '@fwm/engine/devices/opal.json';
 import quartzManifest from '@fwm/engine/devices/quartz.json';
+import geodeManifest from '@fwm/engine/devices/geode.json';
 import flintManifest from '@fwm/engine/devices/flint.json';
 import type { DeviceManifest, Engine } from '@fwm/engine';
-import { Basalt, BASALT_PRESETS, Opal, OPAL_PRESETS, Quartz, QUARTZ_PRESETS, FLINT_KITS, EngineProvider, Project, Studio, ThemeRoot, createDeviceStore, useEngine } from '@fwm/studio';
+import { Basalt, BASALT_PRESETS, Geode, GEODE_PRESETS, Opal, OPAL_PRESETS, Quartz, QUARTZ_PRESETS, FLINT_KITS, EngineProvider, Project, Studio, ThemeRoot, createDeviceStore, useEngine } from '@fwm/studio';
 import '@fwm/studio/skins/host-examples.css';
 import { localSongs } from './songStore';
 import { connectTabs, tabUser } from './tabSync';
@@ -35,7 +36,7 @@ function SkinButtons({ skin, setSkin }: { skin: string; setSkin(s: string): void
 }
 
 // ---------- the studio, as the friend's app would mount it ----------
-const session = params.has('basalt') || params.has('opal') || params.has('quartz') ? null : connectTabs('fwm-demo' + (params.get('room') ?? ''));
+const session = params.has('basalt') || params.has('opal') || params.has('quartz') || params.has('geode') ? null : connectTabs('fwm-demo' + (params.get('room') ?? ''));
 const engineRef: { current: Engine | null } = { current: null };
 const me = tabUser(params.has('newuser'));
 
@@ -177,13 +178,14 @@ function BasaltPage() {
   const store = useMemo(() => createDeviceStore(basaltManifest as DeviceManifest, BASALT_PRESETS[0]), []);
   const quartzStore = useMemo(() => createDeviceStore(quartzManifest as DeviceManifest, QUARTZ_PRESETS[0]), []);
   const opalStore = useMemo(() => createDeviceStore(opalManifest as DeviceManifest, OPAL_PRESETS[0]), []);
+  const geodeStore = useMemo(() => createDeviceStore(geodeManifest as unknown as DeviceManifest, GEODE_PRESETS[0]), []);
   return (
     <EngineProvider>
       <div className="h-page" data-fwm-theme={skin || undefined}>
         <ThemeRoot>
           <header className="h-top">
             <div>
-              <h1>{params.has('quartz') ? 'Quartz' : params.has('opal') ? 'Opal' : 'Basalt'} · harness</h1>
+              <h1>{params.has('geode') ? 'Geode' : params.has('quartz') ? 'Quartz' : params.has('opal') ? 'Opal' : 'Basalt'} · harness</h1>
               <p>Phase 1 view. Play with A W S E D F T G Y H U J K O L P ; (Z / X = octave), or the keys.</p>
             </div>
             <div className="h-tools">
@@ -191,7 +193,7 @@ function BasaltPage() {
               <SkinButtons skin={skin} setSkin={setSkin} />
             </div>
           </header>
-          {params.has('quartz') ? <Quartz store={quartzStore} slot={0} /> : params.has('opal') ? <Opal store={opalStore} slot={0} /> : <Basalt store={store} slot={0} />}
+          {params.has('geode') ? <Geode store={geodeStore} slot={0} /> : params.has('quartz') ? <Quartz store={quartzStore} slot={0} /> : params.has('opal') ? <Opal store={opalStore} slot={0} /> : <Basalt store={store} slot={0} />}
           {params.has('selftest') && <SelfTest />}
         </ThemeRoot>
       </div>
@@ -199,4 +201,4 @@ function BasaltPage() {
   );
 }
 
-createRoot(document.getElementById('root')!).render(<StrictMode>{params.has('basalt') || params.has('opal') || params.has('quartz') ? <BasaltPage /> : <StudioPage />}</StrictMode>);
+createRoot(document.getElementById('root')!).render(<StrictMode>{params.has('basalt') || params.has('opal') || params.has('quartz') || params.has('geode') ? <BasaltPage /> : <StudioPage />}</StrictMode>);
