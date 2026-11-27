@@ -1158,6 +1158,9 @@ async function runGarnet(p: Project, engineRef: { current: Engine | null }, ok: 
     ok(legend.includes('Root C') && legend.includes('Next: Em (iii)'), `the legend says what the colours mean (${legend})`);
     await tapKey('g'); // G: one of the purple notes → E becomes the root
     ok(gRoles().includes('root:E'), `a purple note makes E the root (${gRoles()})`);
+    ([...dev().querySelectorAll('.fwm-garnet__chords .fwm-garnet__ch')][3] as HTMLButtonElement).click(); // F
+    await sleep(500);
+    ok(gRoles() === 'root:F second:A third:C', `the F chord button guides like pressing F (${gRoles()})`);
     // whammy ribbon: drag to the left end dives, letting go springs back to rest
     const rib = $('.fwm-garnet [role=slider][aria-label="Whammy"]')!;
     const rr = rib.getBoundingClientRect();

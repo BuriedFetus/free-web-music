@@ -140,6 +140,10 @@ export function Garnet({ store, host, slot, user = { name: 'You', color: 'var(--
   const chT = useRef(0);
   const strumShow = (c: number, up = false) => {
     strum(c, up);
+    // with the chord guide on: the same as pressing the chord's root (once the strum is out: redrawing the
+    // neck mid-strum would delay its notes)
+    const root = chords[c]?.root;
+    if (root != null && guideOn) timers.current.push(window.setTimeout(() => press(root), 6 * gap + 15));
     setChHit(c);
     clearTimeout(chT.current);
     chT.current = window.setTimeout(() => setChHit(-1), 180);
