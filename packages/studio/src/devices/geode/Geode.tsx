@@ -255,7 +255,11 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
       ev.currentTarget.setPointerCapture(ev.pointerId);
       ev.currentTarget.style.cursor = 'grabbing';
       touch('px');
+      const x0 = ev.clientX, y0 = ev.clientY;
+      let moved = false;
       const place = (e: PointerEvent) => {
+        if (!moved && Math.hypot(e.clientX - x0, e.clientY - y0) < 5) return; // a click opens her memory; a drag moves her
+        moved = true;
         const f = pt.floorAt(e.clientX - r.left, e.clientY - r.top);
         if (!f) return;
         live$.current.drag = f;
@@ -268,6 +272,10 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
         c.style.cursor = '';
         live$.current.drag = null;
         touch(null);
+        if (!moved) {
+          setPop(null);
+          setZoom(true);
+        }
       };
       c.addEventListener('pointermove', place);
       c.addEventListener('pointerup', up, { once: true });
@@ -467,7 +475,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
           <div className="fwm-geode__hud fwm-geode__hud--r"><span>ROOM</span><b ref={(r) => void (hud.current.r = r)}>12 m</b></div>
           {st.state !== 'ready' && !zoom && (
             <button type="button" className="fwm-geode__hint" onClick={() => setZoom(true)}>
-              {st.state === 'empty' ? 'Mica\'s memory is empty: click her face to record, drop an audio file here, or try the demo tape' : recNote}
+              {st.state === 'empty' ? 'Empty: click Mica to record, or drop an audio file here' : recNote}
             </button>
           )}
           {zoom && (

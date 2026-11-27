@@ -321,13 +321,13 @@
 .fwm-geode .fwm-btn--hw, .fwm-geode .fwm-btn--seg { color: var(--dev-btnink); }
 .fwm-geode .fwm-btn--seg { background: var(--dev-btn); }
 .fwm-geode .fwm-btn--seg[aria-pressed=true] { background: var(--dev-geode-line); color: var(--dev-geode-bg); }
-.fwm-geode__screen { position: relative; aspect-ratio: 16 / 9; min-height: 300px; max-height: 70vh; border-radius: calc(12px * var(--fwm-round)); overflow: hidden;
+.fwm-geode__screen { position: relative; width: 100%; height: clamp(240px, 56.25cqw, 58vh); border-radius: calc(12px * var(--fwm-round)); overflow: hidden;
   background: var(--dev-geode-bg); box-shadow: 0 0 0 1px var(--dev-edge); color: var(--dev-geode-ink); font-family: var(--fwm-font-ui); }
 .fwm-geode__screen > canvas { position: absolute; inset: 0; width: 100%; height: 100%; display: block; touch-action: none; }
 .fwm-geode__hud { position: absolute; left: 16px; top: 12px; font-size: 12px; letter-spacing: .12em; color: var(--dev-geode-line); pointer-events: none; }
 .fwm-geode__hud b { display: block; font-size: 28px; font-weight: 300; letter-spacing: 0; line-height: 1; color: var(--dev-geode-ink); }
 .fwm-geode__hud--r { left: auto; right: 16px; text-align: right; }
-.fwm-geode__hint { position: absolute; left: 50%; top: 14px; transform: translateX(-50%); max-width: min(520px, 60%); border: 1px solid var(--dev-geode-edge); border-radius: calc(10px * var(--fwm-round));
+.fwm-geode__hint { position: absolute; left: 50%; bottom: 84px; transform: translateX(-50%); max-width: min(480px, calc(100% - 24px)); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; border: 1px solid var(--dev-geode-edge); border-radius: calc(10px * var(--fwm-round));
   background: var(--dev-geode-panel); color: var(--dev-geode-ink); font: inherit; font-size: 13px; padding: 6px 12px; cursor: pointer; }
 .fwm-geode__dock { position: absolute; left: 50%; bottom: 10px; transform: translateX(-50%); display: flex; gap: 4px; padding: 6px 8px; border-radius: calc(14px * var(--fwm-round));
   background: var(--dev-geode-panel); box-shadow: 0 0 0 1px var(--dev-geode-edge); max-width: calc(100% - 16px); }
@@ -391,5 +391,6 @@
   .fwm-geode__big button { width: 58px; height: 58px; font-size: 9px; }
   .fwm-geode__big svg { width: 22px; height: 22px; }
   .fwm-geode__menu { top: 30%; }
+  .fwm-geode__hint { bottom: 62px; font-size: 12px; }
 }
 @media (prefers-reduced-motion: reduce) { .fwm-geode__blades { animation: none; } }
