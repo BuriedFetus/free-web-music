@@ -238,7 +238,12 @@ export class RoomPainter {
     const v = this.vis;
     I.voices.forEach(([n, e], k) => {
       const [pn, pe] = v.prev[k] ?? [-1, 0];
-      if (n >= 0 && e > 0.03 && (pn !== n || pe < 0.01) && I.echoWet > 0.02) v.echoes.push({ n, born: t, z: S.z0 });
+      // a note starts (a new note in this voice, or a key pressed again): a ring at once, and its echo
+      if (n >= 0 && e > 0 && (pn !== n || pe < 0.01 || e - pe > 0.15)) {
+        v.rings.push({ n, a: Math.max(0.7, Math.min(1, e)), r: 0.05, t: 0, x: S.x, z: S.z0 });
+        v.ringT = 0;
+        if (I.echoWet > 0.02) v.echoes.push({ n, born: t, z: S.z0 });
+      }
     });
     v.prev = I.voices.map((x) => [x[0], x[1]]);
     for (const [x, m] of I.events) this.spawnGrain(x, m, I);
@@ -283,7 +288,7 @@ export class RoomPainter {
     c.translate(W / 2, H / 2);
     c.scale(zs, zs);
     c.translate(-lerp(W / 2, head[0], z), -lerp(H / 2, head[1], z));
-    const lit = lerp(0.3, 1, I.light);
+    const lit = 1; // the Light dims only the lamp, never the room
     const nc = along(pal.neon, S.temp);
     const x = clamp(S.temp) * 3, gi = Math.min(2, Math.floor(x));
     const nb = lerp(GLOW[gi], GLOW[gi + 1], sstep(0, 1, x - gi)) * pal.glow;
@@ -334,8 +339,6 @@ export class RoomPainter {
     this.drawMica(c, I, t, dt, msz, mh, lit);
     this.drawSparks(c, dt, lit);
     c.restore();
-    c.fillStyle = rgba(pal.bg, (1 - I.light) * 0.55);
-    c.fillRect(0, 0, W, H);
     if (z > 0.02) this.drawBrain(c, I, z, t);
   }
 
@@ -465,9 +468,9 @@ export class RoomPainter {
       for (const [n, e] of I.voices) if (n >= 0 && e > 0.02) v.rings.push({ n, a: Math.min(1, e), r: 0.05, t: 0, x: S.x, z: S.z0 });
     }
     const life = lerp(0.6, 3.2, I.decay) * (0.5 + I.wet);
-    c.setLineDash(I.grains > 0.08 ? [1.2, lerp(1, 7, I.grains)] : []);
+    c.setLineDash(I.grains > 0.08 ? [2.4, lerp(2, 6, I.grains)] : []);
     c.lineCap = 'round';
-    c.lineWidth = 1.3;
+    c.lineWidth = 2;
     v.rings = v.rings.filter((g) => {
       g.t += dt;
       g.r += dt * lerp(0.6, 1.4, S.room);

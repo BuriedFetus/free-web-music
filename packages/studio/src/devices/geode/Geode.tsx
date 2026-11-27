@@ -407,7 +407,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
         <p>One movement in time with the song, on everything you switch on. Drag Mica to place her: left / right = pan, farther back = farther away; her walks go around that spot.</p>
       </>
     ),
-    lamp: () => (<><h3>Light</h3>{row('light', 'Dimmer')}<p>Dim the room to calm the whole sound (a master low-pass).</p></>),
+    lamp: () => (<><h3>Light</h3>{row('light', 'Dimmer')}<p>Dim the lamp to calm the whole sound (a master low-pass). The room stays as it is.</p></>),
     grains: () => (<><h3>Grains</h3>{row('grains', 'Dry / wet')}{row('gsize', 'Size')}{row('gdens', 'Density')}{row('spread', 'Spread', true)}<p>Tiny slices of the tape. Drag on the film strip (right wall) to choose where they come from.</p></>),
     crunch: () => (<><h3>Crunch</h3>{row('crunch', 'Dry / wet')}<p>Bitcrush. The waves turn into steps.</p></>),
   };
