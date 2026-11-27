@@ -229,6 +229,7 @@ Full approved plan (5 rounds with the user): sample-based synth, starts empty, r
 - [ ] The user's ideas for the other pop-up menus (they are thinking about them)
 - [x] Piano roll automation (2026-11-27): only lanes that hold something show (+ Automate a knob opens a new one), Clear per lane, Clear all automation of the instrument in every pattern (asks once, Ctrl+Z undoes)
 - [x] Piano roll Shift+drag (2026-11-27): copies the note and drags the copy; the automation under the original (every knob, the steps it covers) is copied by the same number of steps on release
+- [x] Piano roll fills its panel (2026-11-27): rows grow to fit (12-34 px, then scroll); Lanes dropdown (Hidden / Velocity / Automation (n)), remembered per browser, starts Hidden; the how-to text folds away
 - [x] Tab zooms the panels (2026-11-27): mouse over the panels, Tab = full size / all four, and back into the same panel. Shift+Tab and typing untouched
 - [ ] Proposed, awaiting a yes: rings = Mica's voice only (real tape level, solid lines); grains shown on the memory wall (a flash per grain) and as sparks faded by the grains' real level; needs the engine to report each voice's real level instead of the envelope
 - [ ] The user plays it (the sound by ear, the feel of the springs, dragging Mica on a touch screen)

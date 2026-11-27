@@ -15,7 +15,7 @@ import { lenLabel } from './SeqView';
 import { DrumGrid } from './DrumGrid';
 import { NameInput } from './TrackName';
 
-const RH = 14; // row height (px)
+const RH_MIN = 12, RH_MAX = 34; // row height (px): the rows grow to fill the panel, then scroll
 const KEYW = 44; // key column width (px)
 const SW = 14; // narrowest step (px): longer patterns scroll sideways
 const DIRS: [Direction, string, string][] = [['fwd', '→', 'Forward'], ['rev', '←', 'Reverse'], ['pp', '↔', 'Ping-pong'], ['rnd', '?', 'Random']];
@@ -50,6 +50,30 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const lanesRef = useRef<HTMLDivElement>(null); // velocity + automation scroll sideways with the notes
   const rollSc = useRef<HTMLDivElement>(null);
   const keyHeld = useRef<number | null>(null); // piano key being pressed
+  const [fitH, setFitH] = useState(0); // the roll's height: rows are sized to fill it
+  const [lanes, setLanesState] = useState<'none' | 'vel' | 'auto'>(() => {
+    try {
+      const v = localStorage.getItem('fwm.roll.lanes');
+      return v === 'vel' || v === 'auto' ? v : 'none';
+    } catch {
+      return 'none';
+    }
+  });
+  const setLanes = (v: 'none' | 'vel' | 'auto') => {
+    setLanesState(v);
+    try {
+      localStorage.setItem('fwm.roll.lanes', v);
+    } catch {
+      /* ignore */
+    }
+  };
+  useEffect(() => {
+    const el = prw.current;
+    if (!el || typeof ResizeObserver === 'undefined') return;
+    const ro = new ResizeObserver(() => setFitH(el.clientHeight));
+    ro.observe(el);
+    return () => ro.disconnect();
+  }, [t?.id, !!entry?.manifest]); // eslint-disable-line react-hooks/exhaustive-deps
   const pat = t ? project.cell(ws.row, t.id) : null;
   // Open centred on the pattern's notes (or the device's root note) when the pattern changes.
   useEffect(() => {
@@ -60,8 +84,10 @@ export function RollView({ peers }: { peers: Peer[] }) {
     const fold = ws.fold && k.scale !== 'chromatic';
     let row = 0;
     for (let m = entry.roll.high; m > centre; m--) if (!fold || inKey(m, k)) row++;
-    prw.current.scrollTop = row * RH - prw.current.clientHeight / 2;
-  }, [t?.id, pat, ws.fold]); // eslint-disable-line react-hooks/exhaustive-deps
+    const n = entry.roll.high - entry.roll.low + 1;
+    const rh = prw.current.clientHeight ? Math.max(RH_MIN, Math.min(RH_MAX, Math.floor(prw.current.clientHeight / n))) : 14;
+    prw.current.scrollTop = row * rh - prw.current.clientHeight / 2;
+  }, [t?.id, pat, ws.fold, fitH > 0]); // eslint-disable-line react-hooks/exhaustive-deps
 
   if (!t || !entry?.manifest) return <p className="fwm-empty">No instrument selected. Add one from the Library.</p>;
   const rowIds = project.rows().map((r) => r.id);
@@ -116,6 +142,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const pitches = Array.from({ length: high - low + 1 }, (_, r) => high - r).filter((m) => !folded || inKey(m, key));
   const rows = pitches.length;
   const rowOf = (m: number) => pitches.indexOf(m);
+  const RH = fitH ? Math.max(RH_MIN, Math.min(RH_MAX, Math.floor(fitH / rows))) : 14;
   const notes = project.notes(t.id, pat);
   const hidden = folded ? notes.filter(([, n]) => n.m >= low && n.m <= high && !inKey(n.m, key)).length : 0;
   const q = QUANT[ws.snap] ?? 1;
@@ -128,6 +155,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
   const autoFree = autoSpecs.filter((p) => !autoLanes.some((l) => l.p.id === p.id));
   const autoName = (p: { id: string; label: string }) => (p.id.includes('.') ? `${p.id.startsWith('amp') ? 'Amp' : 'Filter'} ${p.label}` : p.label);
   const autoTotal = project.automationCount(t.id);
+  const autoUsed = autoLanes.filter(({ v }) => v.some((x) => x != null)).length; // knobs automated in this pattern
   const peerNote = (id: string) => peers.find((p) => p.touch?.track === t.id && p.touch.control === 'note:' + id);
 
   const at = (e: { clientX: number; clientY: number }) => {
@@ -353,9 +381,17 @@ export function RollView({ peers }: { peers: Peer[] }) {
           }}>
           Clear pattern
         </button>
+        <label className="fwm-lanepick">
+          Lanes
+          <select value={lanes} aria-label="Lanes under the Piano roll" onChange={(e) => { setLanes(e.target.value as 'none' | 'vel' | 'auto'); e.target.blur(); }}>
+            <option value="none">Hidden</option>
+            <option value="vel">Velocity</option>
+            {autoSpecs.length > 0 && <option value="auto">Automation{autoUsed ? ` (${autoUsed})` : ''}</option>}
+          </select>
+        </label>
       </div>
-      <div className="fwm-rsc" ref={rollSc} onScroll={(e) => { if (lanesRef.current) lanesRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
-      <div style={minW}>
+      <div className="fwm-rsc fwm-rsc--roll" ref={rollSc} onScroll={(e) => { if (lanesRef.current) lanesRef.current.scrollLeft = e.currentTarget.scrollLeft; }}>
+      <div className="fwm-rsc__in" style={minW}>
       <div className="fwm-ruler" style={{ marginLeft: KEYW, gridTemplateColumns: `repeat(${L}, minmax(0, 1fr))` }}>
         {Array.from({ length: L }, (_, i) => (
           <span key={i} className={i % BAR === 0 ? 'is-bar' : ''}>{i % 4 === 0 ? `${Math.floor(i / BAR) + 1}.${(i % BAR) / 4 + 1}` : ''}</span>
@@ -406,8 +442,10 @@ export function RollView({ peers }: { peers: Peer[] }) {
           <button type="button" className="fwm-tb fwm-tb--xs" onClick={() => setWs({ fold: false })}>Unfold</button>
         </p>
       )}
-      <div className="fwm-rsc" ref={lanesRef} onScroll={(e) => { if (rollSc.current) rollSc.current.scrollLeft = e.currentTarget.scrollLeft; }}>
+      {lanes !== 'none' && (
+      <div className="fwm-rsc fwm-rsc--lanes" ref={lanesRef} onScroll={(e) => { if (rollSc.current) rollSc.current.scrollLeft = e.currentTarget.scrollLeft; }}>
       <div style={minW}>
+{lanes === 'vel' && (<>
       <div className="fwm-lanehead" style={{ marginLeft: KEYW }}>Velocity</div>
       <div className="fwm-abars" style={{ marginLeft: KEYW, gridTemplateColumns: `repeat(${L}, minmax(0, 1fr))` }} aria-label="Velocity lane" {...lane('vel')}>
         {Array.from({ length: L }, (_, i) => {
@@ -415,7 +453,8 @@ export function RollView({ peers }: { peers: Peer[] }) {
           return <div key={i} className="fwm-ab is-vel"><i style={{ height: `${n ? Math.round(n.v * 100) : 0}%` }} /></div>;
         })}
       </div>
-{autoSpecs.length > 0 && (<>
+</>)}
+{lanes === 'auto' && autoSpecs.length > 0 && (<>
       <div className="fwm-lanehead" style={{ marginLeft: KEYW }}>
         <span>Automation</span>
         <select value="" aria-label="Automate a knob" disabled={!autoFree.length} onChange={(e) => { setAdding(e.target.value || null); e.target.blur(); }}>
@@ -465,12 +504,14 @@ export function RollView({ peers }: { peers: Peer[] }) {
 </>)}
       </div>
       </div>
-      <p className="fwm-hint">
+      )}
+      <details className="fwm-hint fwm-rhelp">
+        <summary>How the Piano roll works</summary>
         Pick, name and size the pattern at the top (it plays wherever it is used in the song) · long patterns scroll
         sideways · press a piano key to hear it · grid lines follow Snap · click to add, drag right for length · drag to move or change pitch · drag the right edge to resize · double-click to
         delete · notes on the same pitch never overlap (the one you edit wins) · Shift+drag a note to copy it (with its automation) · arrows nudge the selected note (Shift = length) · Snap Off places notes between steps · lanes: drag to draw,
         Alt-drag or right-drag erases automation · with Rec + Play, knob moves are recorded here.
-      </p>
+      </details>
     </div>
   );
 }

@@ -150,7 +150,14 @@
 .fwm-addt { justify-self: start; }
 
 /* piano roll */
-.fwm-rl { display: flex; flex-direction: column; padding: 6px 8px 10px; min-height: 100%; }
+.fwm-rl { display: flex; flex-direction: column; padding: 6px 8px 10px; height: 100%; min-height: 360px; box-sizing: border-box; }
+/* the roll takes whatever height is left; its rows grow to fill it (RollView sizes them) */
+.fwm-rsc--roll { flex: 1 1 0; min-height: 140px; display: flex; flex-direction: column; overflow-y: hidden; }
+.fwm-rsc__in { flex: 1; min-height: 0; display: flex; flex-direction: column; }
+.fwm-rsc--lanes { flex: none; max-height: 45%; overflow-y: auto; }
+.fwm-lanepick { margin-left: auto; }
+.fwm-rhelp { flex: none; margin-top: 6px; }
+.fwm-rhelp summary { cursor: pointer; font-weight: 600; }
 .fwm-rtb, .fwm-lanehead { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-size: 14px; }
 .fwm-rtb { margin-bottom: 6px; }
 .fwm-rtb label, .fwm-lanehead label { display: flex; gap: 6px; align-items: center; }
@@ -169,7 +176,7 @@
 .fwm-pk:disabled { opacity: .4; cursor: default; }
 .fwm-pname { width: 140px; min-height: 34px; }
 .fwm-lenbox { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
-.fwm-prw { display: grid; max-height: 300px; min-height: 120px; overflow-y: auto; border-radius: 6px; scrollbar-width: thin; }
+.fwm-prw { display: grid; flex: 1; min-height: 0; align-content: start; overflow-y: auto; border-radius: 6px; scrollbar-width: thin; }
 .fwm-pkr { font: 13px var(--fwm-font-screen); color: var(--fwm-roll-keyink); background: var(--fwm-roll-key); border-bottom: 1px solid var(--fwm-roll-keyline); padding-left: 4px; white-space: nowrap; overflow: hidden; }
 .fwm-pkr.is-b { background: var(--fwm-roll-keyb); color: var(--fwm-roll-key); }
 .fwm-pkeys { cursor: pointer; touch-action: none; user-select: none; }

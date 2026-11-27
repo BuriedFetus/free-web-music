@@ -190,6 +190,10 @@ describe('<Studio>', () => {
     addInst(screen, 'Basalt');
     const roll = within(screen.getByRole('region', { name: 'Piano roll' }));
     const lanes = () => roll.queryAllByLabelText(/^Automation lane for/).map((el) => el.getAttribute('aria-label'));
+    expect(roll.queryByLabelText('Velocity lane')).toBeNull(); // lanes start hidden: the roll gets the room
+    fireEvent.change(roll.getByRole('combobox', { name: 'Lanes under the Piano roll' }), { target: { value: 'vel' } });
+    expect(roll.getByLabelText('Velocity lane')).toBeTruthy();
+    fireEvent.change(roll.getByRole('combobox', { name: 'Lanes under the Piano roll' }), { target: { value: 'auto' } });
     expect(lanes()).toEqual([]);
     expect(roll.getByText(/No automation yet/)).toBeTruthy();
     const tr = p.trackIds()[0];
