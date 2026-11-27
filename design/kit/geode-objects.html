@@ -1,0 +1,685 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Geode: rug, door and mirror</title>
+<link rel="stylesheet" href="skins/app.css">
+<link rel="stylesheet" href="skins/device-base.css">
+<link rel="stylesheet" href="skins/geode.css">
+<style>
+/* Mock-up for the user: three new objects in Mica's room, each one idea that moves a few knobs.
+   RUG (floor): the room soaks up sound: reverb tail darker and shorter, slap-backs softer, echo repeats duller.
+   DOOR (back wall): open it and Geode leaks out to the song's shared Reverb and Delay (the SEND knobs).
+   MIRROR (right wall): turn it for a wider stereo picture; click it to play the tape backwards.
+   Colours come from the device tokens (--dev-geode-*), as in the real panel. */
+* { box-sizing: border-box; min-width: 0; }
+body { margin: 0; background: var(--fwm-bg, #0a0c12); color: var(--dev-geode-ink); font: 15px/1.45 var(--fwm-font-ui, system-ui, sans-serif); }
+main { max-width: 1280px; margin: 0 auto; padding: 16px; }
+h1 { font-weight: 600; font-size: 26px; margin: 0 0 2px; }
+.lead { color: var(--dev-geode-mute); margin: 0 0 12px; }
+.wrap { display: grid; grid-template-columns: minmax(0, 1fr) 320px; gap: 14px; align-items: start; }
+@media (max-width: 900px) { .wrap { grid-template-columns: 1fr; } }
+.room { position: relative; border-radius: 14px; overflow: hidden; background: var(--dev-geode-bg); border: 1px solid var(--dev-geode-edge); }
+canvas { display: block; width: 100%; height: 560px; touch-action: none; }
+.hint { position: absolute; left: 50%; transform: translateX(-50%); bottom: 12px; padding: 6px 12px; border-radius: 10px; background: var(--dev-geode-panel);
+  border: 1px solid var(--dev-geode-edge); color: var(--dev-geode-ink); font-size: 13px; pointer-events: none; white-space: nowrap; transition: opacity .2s; }
+.tag { position: absolute; padding: 6px 10px; border-radius: 10px; background: var(--dev-geode-panel); border: 1px solid var(--dev-geode-edge); font-size: 13px; pointer-events: none;
+  transform: translate(-50%, -100%); white-space: nowrap; opacity: 0; transition: opacity .15s; }
+.tag.on { opacity: 1; }
+.tag b { color: var(--dev-geode-accent); font-weight: 600; }
+aside { display: flex; flex-direction: column; gap: 10px; }
+.card { background: var(--dev-geode-panel); border: 1px solid var(--dev-geode-edge); border-radius: 12px; padding: 10px 12px; }
+.card h3 { margin: 0 0 4px; font-size: 15px; display: flex; justify-content: space-between; align-items: center; }
+.card p { margin: 0 0 6px; color: var(--dev-geode-mute); font-size: 13px; }
+.card.is-hot { border-color: var(--dev-geode-line); }
+.knobs { display: grid; grid-template-columns: 1fr auto; gap: 1px 10px; font-size: 13px; }
+.knobs span:nth-child(even) { color: var(--dev-geode-accent); text-align: right; font-variant-numeric: tabular-nums; }
+input[type=range] { width: 100%; accent-color: var(--dev-geode-line); }
+button.big { width: 100%; min-height: 44px; border-radius: 10px; border: 1px solid var(--dev-geode-line); background: transparent; color: var(--dev-geode-ink); font: inherit; font-weight: 600; cursor: pointer; }
+button.big[aria-pressed=true] { background: color-mix(in srgb, var(--dev-geode-line) 22%, transparent); }
+.row { display: flex; gap: 8px; }
+.row > * { flex: 1; }
+small.st { color: var(--dev-geode-mute); }
+</style>
+</head>
+<body>
+<main class="fwm-root" data-device="geode">
+  <h1>Geode: a rug, a door and a mirror</h1>
+  <p class="lead">Three new things in Mica's room. Each one is one idea that moves a few knobs. Press <b>Sound</b>, then drag them in the room (or use the cards).</p>
+  <div class="wrap">
+    <div class="room" id="room">
+      <canvas id="cv" aria-label="Mica's room with a rug, a door and a mirror"></canvas>
+      <div class="tag" id="tag"></div>
+      <div class="hint" id="hint">Drag the rug's corner · drag the door up to open it · drag the mirror up to turn it, click it to flip the tape</div>
+    </div>
+    <aside>
+      <div class="row">
+        <button class="big" id="snd" aria-pressed="false">Sound: off</button>
+      </div>
+      <div class="card" id="c-rug">
+        <h3>Rug <small class="st" id="v-rug"></small></h3>
+        <p>Soaks up the room. A bigger rug: the reverb tail gets darker and shorter, the slap-backs softer, and every echo repeat a little duller.</p>
+        <input type="range" min="0" max="1" step="0.001" id="s-rug" aria-label="Rug size">
+        <div class="knobs" id="k-rug"></div>
+      </div>
+      <div class="card" id="c-door">
+        <h3>Door <small class="st" id="v-door"></small></h3>
+        <p>Opens to the rest of the song. The more it is open, the more Geode goes to the song's shared Reverb and Delay (its SEND knobs).</p>
+        <input type="range" min="0" max="1" step="0.001" id="s-door" aria-label="Door open">
+        <div class="knobs" id="k-door"></div>
+      </div>
+      <div class="card" id="c-mirror">
+        <h3>Mirror <small class="st" id="v-mirror"></small></h3>
+        <p>Turn it toward the room for a wider stereo picture. Click it to flip the tape: Mica's reflection turns her back, and the tape plays backwards.</p>
+        <input type="range" min="0" max="1" step="0.001" id="s-mirror" aria-label="Mirror turn (stereo width)">
+        <div class="row" style="margin-top:6px"><button class="big" id="flip" aria-pressed="false">Tape: forwards</button></div>
+        <div class="knobs" id="k-mirror"></div>
+      </div>
+      <div class="card">
+        <h3>The room</h3>
+        <p>To hear the rug and the door against something: room size and echo.</p>
+        <label>Room size<input type="range" min="0" max="1" step="0.001" id="s-room"></label>
+        <label>Echo<input type="range" min="0" max="1" step="0.001" id="s-echo"></label>
+      </div>
+      <small class="st" id="selftest"></small>
+    </aside>
+  </div>
+</main>
+<script>
+'use strict';
+addEventListener('error', (e) => { document.getElementById('selftest').textContent = 'Error: ' + e.message; });
+// ---------- state (what would be params in the song) ----------
+const S = { rug: 0.45, door: 0.25, mirror: 0.5, rev: false, room: 0.45, echo: 0.45 };
+// ?s=rug,door,mirror,backwards opens with the objects set (for screenshots)
+{ const q = new URLSearchParams(location.search).get('s'); if (q) { const [r, d, m, b] = q.split(',').map(Number); Object.assign(S, { rug: r, door: d, mirror: m, rev: !!b }); } }
+const clamp = (x, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+const lerp = (a, b, t) => a + (b - a) * t;
+const sstep = (a, b, x) => { const t = clamp((x - a) / (b - a)); return t * t * (3 - 2 * t); };
+
+// What each object makes of the knobs (shown on the cards; the sound below uses the same numbers)
+const K = {
+  decay: () => lerp(0.4, 6.5, S.room ** 1.3) * lerp(1, 0.55, S.rug),           // s
+  damp: () => lerp(9000, 1800, S.rug),                                        // reverb tail tone, Hz
+  er: () => lerp(1, 0.25, S.rug),                                             // early reflections
+  etone: () => lerp(11000, 2200, S.rug * 0.85),                               // echo repeats tone, Hz
+  sendRev: () => sstep(0, 1, S.door) * 0.8,
+  sendDly: () => sstep(0.25, 1, S.door) * 0.5,
+  width: () => lerp(0.15, 1.8, S.mirror),
+};
+const fmtHz = (h) => (h >= 1000 ? (h / 1000).toFixed(1) + ' kHz' : Math.round(h) + ' Hz');
+const pct = (x) => Math.round(x * 100) + '%';
+
+// ---------- colours from the tokens ----------
+const root = document.querySelector('main');
+const probe = document.createElement('span');
+probe.style.display = 'none';
+root.appendChild(probe);
+const col = (v) => {
+  probe.style.color = `var(${v})`;
+  const m = getComputedStyle(probe).color.match(/[\d.]+/g);
+  return m ? [+m[0], +m[1], +m[2]] : [128, 128, 128];
+};
+const pal = {
+  bg: col('--dev-geode-bg'), neon: col('--dev-geode-neon-warm'), ink: col('--dev-geode-ink'), mute: col('--dev-geode-mute'),
+  acc: col('--dev-geode-accent'), lamp: col('--dev-geode-lamp'), mica: col('--dev-geode-mica'), micaFill: col('--dev-geode-mica-fill'),
+  frost: col('--dev-geode-frost'), night: col('--dev-geode-night'), line: col('--dev-geode-line'), warm: col('--dev-geode-warm'),
+};
+const rgba = (c, a = 1) => `rgba(${c[0]},${c[1]},${c[2]},${a})`;
+
+// ---------- the room's geometry (as in the panel: x -1..1, y -1 ceiling … 1 floor, Z = depth) ----------
+const cv = document.getElementById('cv');
+let W = 0, H = 0, dpr = 1, G = {};
+function size() {
+  dpr = Math.min(2, devicePixelRatio || 1);
+  W = cv.clientWidth; H = cv.clientHeight;
+  cv.width = Math.round(W * dpr); cv.height = Math.round(H * dpr);
+}
+function geom() {
+  const zoom = lerp(1, 0.86, S.room);
+  const mx = W * 0.05, top = H * 0.05, bot = H - Math.max(70, H * 0.12);
+  const fw = (W - 2 * mx) * zoom, vx = W / 2, vy = top + (bot - top) * 0.44;
+  G = { vx, vy, hw: fw / 2, top: (top - vy) * zoom, bot: (bot - vy) * zoom, L: lerp(1.6, 9, S.room ** 1.4), D: 1.5 };
+}
+const sc = (Z) => G.D / (G.D + Z);
+const P = (x, y, Z) => { const s = sc(Z); return [G.vx + x * G.hw * s, G.vy + (y < 0 ? -y * G.top : y * G.bot) * s]; };
+function floorAt(px, py) {
+  const s2 = (py - G.vy) / G.bot;
+  if (s2 <= 0.05) return null;
+  return { x: (px - G.vx) / (G.hw * s2), z: G.D / s2 - G.D };
+}
+let c;
+function line(pts, close = false) {
+  c.beginPath();
+  pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+  if (close) c.closePath();
+  c.stroke();
+}
+function fillPoly(pts) {
+  c.beginPath();
+  pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+  c.closePath();
+  c.fill();
+}
+
+// Mica stands here
+const MICA = { x: -0.08, z: 1.05 };
+const MICA_SHAPE = [[0, -1.25], [0.42, -1.05], [0.48, -0.45], [0.3, -0.18], [-0.3, -0.18], [-0.48, -0.45], [-0.42, -1.05]];
+
+// ---------- objects: where they are ----------
+const rugBox = () => {
+  const w = lerp(0.2, 0.78, S.rug), d = lerp(0.16, Math.min(0.95, G.L * 0.3), S.rug);
+  return { cx: MICA.x, cz: MICA.z + 0.05, w, d };
+};
+const DOOR = { x0: 0.28, w: 0.4, y0: -0.12 };
+const doorAngle = () => S.door * 1.45;
+const MIRROR = { z: 0.62, y: 0.12, rz: 0.2, ry: 0.36 };
+const mirrorZ = () => Math.min(MIRROR.z, G.L * 0.4);
+
+// ---------- what is sounding (for the rings) ----------
+const vis = { rings: [], echoes: [], leaks: [], sing: 0, hot: null };
+
+function drawRoom(t, dt) {
+  c = cv.getContext('2d');
+  c.setTransform(dpr, 0, 0, dpr, 0, 0);
+  c.fillStyle = rgba(pal.bg);
+  c.fillRect(0, 0, W, H);
+  geom();
+  const L = G.L, nc = pal.neon;
+  const corners = (Z) => [P(-1, -1, Z), P(1, -1, Z), P(1, 1, Z), P(-1, 1, Z)];
+  const edges = (a, w) => {
+    c.lineWidth = w; c.strokeStyle = rgba(nc, a);
+    line(corners(0), true);
+    for (const [a1, b1] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) line([P(a1, b1, 0), P(a1, b1, L)]);
+    line(corners(L), true);
+  };
+  edges(0.14, 6); edges(0.85, 1.4);
+  c.lineWidth = 1;
+  for (let i = 1; i < 40; i++) {
+    const Z = i * 0.35;
+    if (Z >= L) break;
+    c.strokeStyle = rgba(nc, 0.14 * (1 - Z / (L + 0.5)));
+    line([P(-1, 1, Z), P(1, 1, Z)]);
+    line([P(-1, -1, Z), P(1, -1, Z)]);
+  }
+  c.strokeStyle = rgba(nc, 0.1);
+  for (let i = -4; i <= 4; i++) line([P(i / 5, 1, 0), P(i / 5, 1, L)]);
+  // the window (as it is today) and the lamp, for orientation
+  c.strokeStyle = rgba(nc, 0.7);
+  line([P(-1, -0.62, 0.12), P(-1, -0.62, 0.75), P(-1, 0.02, 0.75), P(-1, 0.02, 0.12)], true);
+  c.strokeStyle = rgba(pal.frost, 0.35);
+  for (let i = 0; i < 7; i++) { const y = lerp(-0.58, -0.02, (i + 0.5) / 7); line([P(-0.98, y, 0.14), P(-0.98, y + 0.03, 0.73)]); }
+  c.lineCap = 'round'; c.lineWidth = sc(0.75) * G.hw * 0.022; c.strokeStyle = rgba(pal.lamp, 0.95);
+  line([P(-0.18, -0.88, 0.75), P(0.18, -0.88, 0.75)]);
+  c.lineCap = 'butt'; c.lineWidth = 1.3;
+
+  drawDoor(t, dt);
+  drawMirror(t);
+  drawRug(t);
+  drawWaves(t, dt);
+  drawMica(t, dt, MICA.x, MICA.z, 1);
+}
+
+function drawRug(t) {
+  const r = rugBox(), hot = vis.hot === 'rug';
+  const q = (u, v) => P(r.cx + u * r.w, 1, r.cz + v * r.d);
+  c.fillStyle = rgba(pal.warm, 0.07 + 0.05 * S.rug);
+  fillPoly([q(-1, -1), q(1, -1), q(1, 1), q(-1, 1)]);
+  c.strokeStyle = rgba(pal.warm, hot ? 0.95 : 0.7);
+  c.lineWidth = hot ? 2 : 1.4;
+  line([q(-1, -1), q(1, -1), q(1, 1), q(-1, 1)], true);
+  // our own pattern: two inner borders and a diamond
+  c.lineWidth = 1;
+  c.strokeStyle = rgba(pal.warm, 0.45);
+  line([q(-0.82, -0.78), q(0.82, -0.78), q(0.82, 0.78), q(-0.82, 0.78)], true);
+  c.strokeStyle = rgba(pal.acc, 0.35);
+  line([q(0, -0.55), q(0.5, 0), q(0, 0.55), q(-0.5, 0)], true);
+  // fringe at the front and the back
+  c.strokeStyle = rgba(pal.warm, 0.4);
+  for (let i = 0; i <= 14; i++) {
+    const u = lerp(-0.95, 0.95, i / 14);
+    line([q(u, -1), q(u, -1.12)]);
+    line([q(u, 1), q(u, 1.1)]);
+  }
+  // the handle: the front-right corner
+  const h = q(1, -1);
+  c.strokeStyle = rgba(pal.line, hot ? 1 : 0.8);
+  c.lineWidth = 1.6;
+  c.beginPath(); c.arc(h[0], h[1], 7, 0, Math.PI * 2); c.stroke();
+  c.lineWidth = 1.3;
+}
+
+function doorPts() {
+  const L = G.L, a = doorAngle();
+  const hx = DOOR.x0, fx = DOOR.x0 + DOOR.w * Math.cos(a), fz = L - Math.sin(a) * Math.min(1.4, L * 0.32);
+  return { frame: [P(hx, DOOR.y0, L), P(hx + DOOR.w, DOOR.y0, L), P(hx + DOOR.w, 1, L), P(hx, 1, L)], panel: [P(hx, DOOR.y0, L), P(fx, DOOR.y0, fz), P(fx, 1, fz), P(hx, 1, L)] };
+}
+function drawDoor(t, dt) {
+  const d = doorPts(), hot = vis.hot === 'door', o = S.door;
+  // through the gap: the rest of the song, a soft glow
+  c.fillStyle = rgba(pal.night, 0.15 + 0.55 * sstep(0, 0.6, o));
+  fillPoly(d.frame);
+  c.fillStyle = rgba(pal.acc, 0.12 * sstep(0, 0.6, o) * (0.75 + 0.25 * Math.sin(t * 2)));
+  fillPoly(d.frame);
+  c.strokeStyle = rgba(pal.neon, 0.8);
+  c.lineWidth = 1.4;
+  line(d.frame, true);
+  // the door itself
+  c.fillStyle = rgba(pal.bg, 0.92);
+  fillPoly(d.panel);
+  c.strokeStyle = rgba(pal.neon, hot ? 1 : 0.85);
+  c.lineWidth = hot ? 2.2 : 1.6;
+  line(d.panel, true);
+  // knob
+  const k = [lerp(d.panel[1][0], d.panel[0][0], 0.14), lerp(d.panel[1][1], d.panel[2][1], 0.45)];
+  c.fillStyle = rgba(pal.acc, 0.9);
+  c.beginPath(); c.arc(k[0], k[1], 2.5 + 2 * sc(G.L) , 0, Math.PI * 2); c.fill();
+  c.lineWidth = 1.3;
+}
+
+function mirrorPts() {
+  const z = mirrorZ(), turn = lerp(0.55, 1.25, S.mirror), pts = [];
+  for (let i = 0; i < 48; i++) {
+    const th = (i / 48) * Math.PI * 2;
+    pts.push(P(1, MIRROR.y + Math.sin(th) * MIRROR.ry, z + Math.cos(th) * MIRROR.rz * turn));
+  }
+  return pts;
+}
+function drawMirror(t) {
+  const pts = mirrorPts(), hot = vis.hot === 'mirror';
+  c.fillStyle = rgba(pal.night, 0.35);
+  fillPoly(pts);
+  // the reflection: Mica, mirrored; her back when the tape plays backwards
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2;
+  c.save();
+  c.beginPath(); pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.clip();
+  const u = (Math.max(...ys) - Math.min(...ys)) * 0.42;
+  c.translate(cx, cy + u * 0.75);
+  c.scale(-lerp(0.6, 1, S.mirror), 1);
+  drawMicaShape(u, t, S.rev, 0.6);
+  c.restore();
+  // shine
+  c.strokeStyle = rgba(pal.frost, 0.25);
+  line([[lerp(Math.min(...xs), cx, 0.35), lerp(Math.min(...ys), cy, 0.5)], [lerp(Math.min(...xs), cx, 0.75), lerp(Math.min(...ys), cy, 0.15)]]);
+  c.strokeStyle = rgba(S.rev ? pal.acc : pal.neon, hot ? 1 : 0.85);
+  c.lineWidth = hot ? 2.4 : 1.8;
+  line(pts, true);
+  if (S.rev) {
+    c.fillStyle = rgba(pal.acc, 0.9);
+    c.font = `600 ${Math.round(u * 0.35)}px ${getComputedStyle(root).getPropertyValue('--fwm-font-ui') || 'sans-serif'}`;
+    c.textAlign = 'center';
+    c.fillText('◀◀', cx, Math.min(...ys) - 6);
+  }
+  c.lineWidth = 1.3;
+}
+
+function drawMicaShape(u, t, back, alpha) {
+  const B = MICA_SHAPE.map(([a, b]) => [a * u, b * u]);
+  c.fillStyle = rgba(pal.micaFill, 0.95 * alpha + 0.05);
+  c.strokeStyle = rgba(pal.mica, alpha);
+  c.lineWidth = 1.4;
+  c.beginPath(); B.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.fill(); c.stroke();
+  if (back) {
+    // her back: no face, a little crystal seam
+    c.strokeStyle = rgba(pal.mica, alpha * 0.6);
+    line([[0, -1.2 * u], [0, -0.25 * u]]);
+    return;
+  }
+  const blink = (t % 4) < 0.12 ? 0.15 : 1;
+  c.fillStyle = rgba(pal.ink, alpha);
+  for (const s of [-1, 1]) { c.beginPath(); c.ellipse(s * 0.15 * u, -0.78 * u, 0.045 * u, 0.06 * u * blink, 0, 0, Math.PI * 2); c.fill(); }
+  const m = vis.sing;
+  c.strokeStyle = rgba(pal.ink, alpha);
+  c.beginPath();
+  if (m > 0.05) c.ellipse(0, -0.6 * u, 0.06 * u, 0.03 * u + 0.07 * u * m, 0, 0, Math.PI * 2);
+  else c.arc(0, -0.64 * u, 0.06 * u, 0.2, Math.PI - 0.2);
+  c.stroke();
+}
+function drawMica(t, dt, x, z, alpha) {
+  const f = P(x, 1, z), u = Math.min(W, H) * 0.2 * sc(z);
+  vis.sing = Math.max(0, vis.sing - dt * 3);
+  c.save();
+  c.translate(f[0], f[1] - u * 0.05 - vis.sing * u * 0.04);
+  c.strokeStyle = rgba(pal.mica, alpha);
+  line([[-0.12 * u, -0.2 * u], [-0.14 * u, 0]]); line([[0.12 * u, -0.2 * u], [0.14 * u, 0]]);
+  drawMicaShape(u, t, false, alpha);
+  c.restore();
+}
+
+function drawWaves(t, dt) {
+  // rings from Mica across the floor; over the rug they go soft (it soaks them up)
+  const r = rugBox();
+  const life = lerp(0.6, 3, S.room) * lerp(1, 0.6, S.rug);
+  c.lineWidth = 2;
+  vis.rings = vis.rings.filter((g) => {
+    g.t += dt; g.r += dt * lerp(0.6, 1.4, S.room);
+    const a = g.a * (1 - g.t / life);
+    if (a <= 0) return false;
+    c.beginPath();
+    for (let i = 0; i <= 64; i++) {
+      const th = (i / 64) * Math.PI * 2;
+      const x = MICA.x + Math.cos(th) * g.r, z = MICA.z + Math.sin(th) * g.r * 0.9;
+      const p = P(x, 1, z);
+      if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]);
+    }
+    c.strokeStyle = `hsla(${g.h},90%,66%,${a * lerp(1, 0.45, S.rug * sstep(0, 0.5, r.w - g.r + 0.3))})`;
+    c.stroke();
+    return true;
+  });
+  // echoes: to the back wall and back, once per repeat; duller (smoother, fainter) on a bigger rug
+  const T2 = 0.45, back = G.L - 0.05;
+  vis.echoes = vis.echoes.filter((e) => {
+    const trip = (t - e.born) / T2, k = Math.floor(trip), f = trip - k;
+    const amp = Math.pow(0.55 * lerp(1, 0.6, S.rug), k) * S.echo * 1.6;
+    if (amp < 0.03 || k > 30) return false;
+    const Z = f < 0.5 ? lerp(MICA.z, back, f * 2) : lerp(back, MICA.z, (f - 0.5) * 2);
+    const sharp = Math.pow(lerp(1, 0.35, S.rug), k);
+    c.strokeStyle = `hsla(${e.h},90%,66%,${Math.min(1, amp)})`;
+    c.beginPath();
+    for (let i = 0; i <= 60; i++) {
+      const uu = i / 60, w = Math.sin(uu * Math.PI * 18 + t * 6) * 0.2 * amp * sharp;
+      const p = P(lerp(-0.92, 0.92, uu), 1 - 0.05 - Math.abs(w), Z);
+      if (i) c.lineTo(p[0], p[1]); else c.moveTo(p[0], p[1]);
+    }
+    c.stroke();
+    return true;
+  });
+  // through the open door: waves leak out into the dark
+  const dp = doorPts().frame;
+  const cx = (dp[0][0] + dp[1][0]) / 2, cy = (dp[0][1] + dp[2][1]) / 2, dw = dp[1][0] - dp[0][0];
+  vis.leaks = vis.leaks.filter((l) => {
+    l.t += dt;
+    const a = (1 - l.t / 1.6) * sstep(0, 0.5, S.door) * 0.8;
+    if (a <= 0) return false;
+    c.strokeStyle = `hsla(${l.h},90%,70%,${a})`;
+    c.save(); c.beginPath(); dp.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y))); c.closePath(); c.clip();
+    c.beginPath(); c.ellipse(cx, cy, dw * 0.25 * (1 + l.t * 1.5), dw * 0.6 * (1 + l.t), 0, 0, Math.PI * 2); c.stroke();
+    c.restore();
+    return true;
+  });
+  c.lineWidth = 1.3;
+}
+
+// ---------- pointer: hit tests and drags ----------
+function inPoly(px, py, pts, pad = 8) {
+  const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+  return px > Math.min(...xs) - pad && px < Math.max(...xs) + pad && py > Math.min(...ys) - pad && py < Math.max(...ys) + pad;
+}
+function hit(px, py) {
+  const r = rugBox(), h = P(r.cx + r.w, 1, r.cz - r.d);
+  if (Math.hypot(px - h[0], py - h[1]) < 18) return 'rug';
+  if (inPoly(px, py, mirrorPts())) return 'mirror';
+  const d = doorPts();
+  if (inPoly(px, py, [...d.frame, ...d.panel])) return 'door';
+  const q = (u, v) => P(r.cx + u * r.w, 1, r.cz + v * r.d);
+  if (inPoly(px, py, [q(-1, -1), q(1, -1), q(1, 1), q(-1, 1)], 0)) return 'rug';
+  return null;
+}
+const tag = document.getElementById('tag');
+function showTag(id, px, py) {
+  if (!id) { tag.classList.remove('on'); return; }
+  const txt = {
+    rug: `Rug <b>${pct(S.rug)}</b> · tail ${K.decay().toFixed(1)} s, ${fmtHz(K.damp())} · echo ${fmtHz(K.etone())}`,
+    door: `Door <b>${pct(S.door)}</b> open · Reverb send ${pct(K.sendRev())} · Delay send ${pct(K.sendDly())}`,
+    mirror: `Mirror · width <b>${pct(K.width())}</b> · tape ${S.rev ? 'backwards' : 'forwards'} (click to flip)`,
+  }[id];
+  tag.innerHTML = txt;
+  tag.style.left = px + 'px';
+  tag.style.top = (py - 14) + 'px';
+  tag.classList.add('on');
+}
+cv.addEventListener('pointermove', (e) => {
+  if (e.buttons) return;
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, id = hit(px, py);
+  vis.hot = id;
+  cv.style.cursor = id === 'rug' ? 'nwse-resize' : id ? 'ns-resize' : '';
+  showTag(id, px, py);
+});
+cv.addEventListener('pointerleave', () => { vis.hot = null; showTag(null); });
+cv.addEventListener('pointerdown', (e) => {
+  const r = cv.getBoundingClientRect(), px = e.clientX - r.left, py = e.clientY - r.top, id = hit(px, py);
+  if (!id) return;
+  cv.setPointerCapture(e.pointerId);
+  document.getElementById('hint').style.opacity = 0;
+  const y0 = e.clientY, x0 = e.clientX, v0 = S[id];
+  let moved = false;
+  const mv = (ev) => {
+    const qx = ev.clientX - r.left, qy = ev.clientY - r.top;
+    if (Math.hypot(ev.clientX - x0, ev.clientY - y0) > 4) moved = true;
+    if (id === 'rug') {
+      // the corner follows the finger across the floor
+      const f = floorAt(qx, qy), b = rugBox();
+      if (f) set('rug', clamp((Math.abs(f.x - b.cx) - 0.2) / (0.78 - 0.2)));
+    } else set(id, clamp(v0 + (y0 - ev.clientY) / 220));
+    showTag(id, qx, qy);
+  };
+  const up = () => {
+    cv.removeEventListener('pointermove', mv);
+    if (id === 'mirror' && !moved) flip();
+  };
+  cv.addEventListener('pointermove', mv);
+  cv.addEventListener('pointerup', up, { once: true });
+});
+
+// ---------- cards ----------
+const ids = ['rug', 'door', 'mirror', 'room', 'echo'];
+function set(id, v) {
+  S[id] = v;
+  const el = document.getElementById('s-' + id);
+  if (el && Number(el.value) !== v) el.value = v;
+  paintCards();
+  sound.update();
+}
+function flip() {
+  S.rev = !S.rev;
+  const b = document.getElementById('flip');
+  b.setAttribute('aria-pressed', S.rev);
+  b.textContent = S.rev ? 'Tape: backwards' : 'Tape: forwards';
+  paintCards();
+}
+document.getElementById('flip').addEventListener('click', flip);
+if (S.rev) { S.rev = false; flip(); }
+for (const id of ids) {
+  const el = document.getElementById('s-' + id);
+  el.value = S[id];
+  el.addEventListener('input', () => set(id, Number(el.value)));
+}
+function knobs(el, rows) { el.innerHTML = rows.map(([a, b]) => `<span>${a}</span><span>${b}</span>`).join(''); }
+function paintCards() {
+  document.getElementById('v-rug').textContent = pct(S.rug);
+  document.getElementById('v-door').textContent = pct(S.door) + ' open';
+  document.getElementById('v-mirror').textContent = pct(K.width()) + ' wide';
+  knobs(document.getElementById('k-rug'), [['Reverb tail', K.decay().toFixed(1) + ' s'], ['Tail tone', fmtHz(K.damp())], ['Slap-backs', pct(K.er())], ['Echo repeats tone', fmtHz(K.etone())]]);
+  knobs(document.getElementById('k-door'), [['Reverb send', pct(K.sendRev())], ['Delay send', pct(K.sendDly())]]);
+  knobs(document.getElementById('k-mirror'), [['Stereo width', pct(K.width())], ['Tape', S.rev ? 'backwards' : 'forwards']]);
+}
+paintCards();
+
+// ---------- sound: a little phrase through Geode's own room, echo and width, plus the song's sends ----------
+const PHRASE = [[0, 60, 1.5], [1.5, 67, 0.5], [2, 64, 1], [3, 72, 1], [4, 71, 1.5], [5.5, 67, 0.5], [6, 62, 2]]; // [beat, note, beats]
+const BPM = 96, BEAT = 60 / BPM, LOOP = 8 * BEAT;
+
+function noiseIR(ctx, secs, tone, er, seed) {
+  const sr = ctx.sampleRate, n = Math.max(1, Math.round(secs * sr)), b = ctx.createBuffer(2, n, sr);
+  let s = seed >>> 0;
+  const rnd = () => ((s = (s * 1664525 + 1013904223) >>> 0) / 4294967296) * 2 - 1;
+  const k = Math.exp((-2 * Math.PI * tone) / sr);
+  for (let ch = 0; ch < 2; ch++) {
+    const d = b.getChannelData(ch);
+    let lp = 0;
+    for (let i = 0; i < n; i++) {
+      lp = lp * k + rnd() * (1 - k);
+      d[i] = lp * Math.exp((-6.9 * i) / n) * 2.2;
+    }
+    // early reflections: a few taps (softer with the rug)
+    for (const [ms, g] of [[11, 0.8], [17, 0.6], [23, 0.55], [31, 0.4], [43, 0.3]]) {
+      const i = Math.round(((ms + ch * 3) / 1000) * sr);
+      if (i < n) d[i] += g * er;
+    }
+  }
+  return b;
+}
+
+function build(ctx, dest) {
+  const N = {};
+  const out = ctx.createGain();
+  out.gain.value = 0.7; // headroom: the room, the echo and the sends add up
+  out.connect(dest);
+  N.voice = ctx.createGain();
+  // width: L straight, R through a short moving delay; then a mid / side matrix
+  N.dl = ctx.createDelay(0.05); N.dl.delayTime.value = 0.011;
+  N.lfo = ctx.createOscillator(); N.lfo.frequency.value = 0.3;
+  N.lfoG = ctx.createGain(); N.lfoG.gain.value = 0.002;
+  N.lfo.connect(N.lfoG).connect(N.dl.delayTime); N.lfo.start();
+  N.voice.connect(N.dl);
+  N.merge = ctx.createChannelMerger(2);
+  const g = () => ctx.createGain();
+  N.LL = g(); N.RL = g(); N.LR = g(); N.RR = g();
+  N.voice.connect(N.LL).connect(N.merge, 0, 0); N.dl.connect(N.RL).connect(N.merge, 0, 0);
+  N.voice.connect(N.LR).connect(N.merge, 0, 1); N.dl.connect(N.RR).connect(N.merge, 0, 1);
+  N.st = N.merge;
+  // Geode's own room
+  N.rev = ctx.createConvolver(); N.revG = g();
+  N.st.connect(N.rev).connect(N.revG).connect(out);
+  // echo with a low-pass in its loop (the rug dulls each repeat)
+  N.ed = ctx.createDelay(2); N.ed.delayTime.value = BEAT * 0.75;
+  N.efb = g(); N.elp = ctx.createBiquadFilter(); N.elp.type = 'lowpass'; N.eG = g();
+  N.st.connect(N.ed); N.ed.connect(N.elp).connect(N.efb).connect(N.ed);
+  N.elp.connect(N.eG).connect(out); N.eG.connect(N.rev);
+  // dry
+  N.dry = g(); N.dry.gain.value = 0.8; N.st.connect(N.dry).connect(out);
+  // the door: sends to the song's shared Reverb and Delay (a big dark hall and a dotted delay)
+  N.sR = g(); N.sD = g();
+  N.hall = ctx.createConvolver(); N.hall.buffer = noiseIR(ctx, 4, 2600, 0.2, 7);
+  N.hallG = g(); N.hallG.gain.value = 0.9;
+  N.st.connect(N.sR).connect(N.hall).connect(N.hallG).connect(out);
+  N.md = ctx.createDelay(2); N.md.delayTime.value = BEAT * 1.5; N.mfb = g(); N.mfb.gain.value = 0.42;
+  N.st.connect(N.sD).connect(N.md); N.md.connect(N.mfb).connect(N.md); N.md.connect(out);
+  return N;
+}
+function apply(ctx, N, now) {
+  const w = K.width(), T = (p, v) => p.setTargetAtTime(v, now, 0.05);
+  T(N.LL.gain, 0.5 * (1 + w)); T(N.RL.gain, 0.5 * (1 - w)); T(N.LR.gain, 0.5 * (1 - w)); T(N.RR.gain, 0.5 * (1 + w));
+  T(N.revG.gain, 0.55); T(N.eG.gain, 0.75 * S.echo); T(N.efb.gain, 0.5 * S.echo + 0.1); T(N.elp.frequency, K.etone());
+  T(N.sR.gain, K.sendRev()); T(N.sD.gain, K.sendDly() * 0.6);
+}
+let irKey = '';
+function applyIR(ctx, N) {
+  const key = [K.decay().toFixed(2), Math.round(K.damp()), K.er().toFixed(2)].join();
+  if (key === irKey) return;
+  irKey = key;
+  N.rev.buffer = noiseIR(ctx, K.decay(), K.damp(), K.er(), 3);
+}
+function note(ctx, N, at, m, len, rev) {
+  const f = 440 * 2 ** ((m - 69) / 12), o1 = ctx.createOscillator(), o2 = ctx.createOscillator(), lp = ctx.createBiquadFilter(), a = ctx.createGain();
+  o1.type = 'sawtooth'; o2.type = 'triangle'; o1.frequency.value = f; o2.frequency.value = f * 1.003;
+  lp.type = 'lowpass'; lp.frequency.value = 2400; lp.Q.value = 0.7;
+  const dur = len * BEAT;
+  a.gain.setValueAtTime(0, at);
+  if (rev) {
+    // a tape played backwards: the sound swells, then stops dead
+    a.gain.linearRampToValueAtTime(0.0001, at + 0.002);
+    a.gain.exponentialRampToValueAtTime(0.32, at + dur * 0.97);
+    a.gain.linearRampToValueAtTime(0, at + dur);
+  } else {
+    a.gain.linearRampToValueAtTime(0.32, at + 0.004);
+    a.gain.exponentialRampToValueAtTime(0.05, at + dur * 0.8);
+    a.gain.linearRampToValueAtTime(0, at + dur);
+  }
+  o1.connect(lp); o2.connect(lp); lp.connect(a).connect(N.voice);
+  o1.start(at); o2.start(at); o1.stop(at + dur + 0.05); o2.stop(at + dur + 0.05);
+}
+
+const sound = {
+  ctx: null, N: null, next: 0, timer: 0, irT: 0,
+  async start() {
+    const ctx = new AudioContext();
+    const comp = ctx.createDynamicsCompressor();
+    comp.connect(ctx.destination);
+    this.ctx = ctx; this.N = build(ctx, comp);
+    irKey = ''; applyIR(ctx, this.N); apply(ctx, this.N, ctx.currentTime);
+    this.next = ctx.currentTime + 0.1;
+    const tick = () => {
+      while (this.next < ctx.currentTime + 0.3) {
+        const t0 = this.next;
+        for (const [b, m, l] of PHRASE) {
+          const at = t0 + b * BEAT;
+          note(ctx, this.N, at, m, l, S.rev);
+          const delay = (at - ctx.currentTime) * 1000 + (S.rev ? l * BEAT * 900 : 0);
+          setTimeout(() => {
+            const h = ((m % 12) * 30 + 190) % 360, now = performance.now() / 1000;
+            vis.rings.push({ r: 0.05, t: 0, a: 1, h });
+            vis.sing = 1;
+            if (S.echo > 0.02) vis.echoes.push({ born: now, h });
+            if (S.door > 0.05) vis.leaks.push({ t: 0, h });
+          }, Math.max(0, delay));
+        }
+        this.next += LOOP;
+      }
+    };
+    tick();
+    this.timer = setInterval(tick, 100);
+  },
+  stop() { clearInterval(this.timer); this.ctx?.close(); this.ctx = null; this.N = null; },
+  update() {
+    if (!this.ctx) return;
+    apply(this.ctx, this.N, this.ctx.currentTime);
+    clearTimeout(this.irT);
+    this.irT = setTimeout(() => this.ctx && applyIR(this.ctx, this.N), 120);
+  },
+};
+document.getElementById('snd').addEventListener('click', async (e) => {
+  const b = e.currentTarget;
+  if (sound.ctx) { sound.stop(); b.textContent = 'Sound: off'; b.setAttribute('aria-pressed', 'false'); }
+  else { await sound.start(); b.textContent = 'Sound: on'; b.setAttribute('aria-pressed', 'true'); }
+});
+
+// ---------- loop ----------
+size();
+addEventListener('resize', size);
+let last = performance.now();
+const reduce = matchMedia('(prefers-reduced-motion: reduce)').matches;
+function frame(now) {
+  const dt = Math.min(0.05, (now - last) / 1000);
+  last = now;
+  drawRoom(now / 1000, reduce ? 0 : dt);
+  requestAnimationFrame(frame);
+}
+drawRoom(0, 0);
+requestAnimationFrame(frame);
+// without sound, Mica still hums a little so the rings and the door can be seen
+setInterval(() => {
+  if (sound.ctx) return;
+  const h = ((Math.random() * 12 | 0) * 30 + 190) % 360, now = performance.now() / 1000;
+  vis.rings.push({ r: 0.05, t: 0, a: 0.8, h });
+  if (S.echo > 0.02) vis.echoes.push({ born: now, h });
+  if (S.door > 0.05) vis.leaks.push({ t: 0, h });
+}, 1400);
+
+// ---------- ?selftest: render the sound offline at 44.1 and 48 kHz, every object at its extremes ----------
+if (location.search.includes('selftest')) {
+  (async () => {
+    const out = [];
+    for (const sr of [44100, 48000]) {
+      for (const [rug, door, mirror, rev] of [[0, 0, 0, false], [1, 1, 1, true], [0.5, 0.5, 0.5, false]]) {
+        Object.assign(S, { rug, door, mirror, rev, room: 0.8, echo: 1 });
+        const ctx = new OfflineAudioContext(2, sr * 6, sr);
+        const N = build(ctx, ctx.destination);
+        irKey = ''; applyIR(ctx, N); apply(ctx, N, 0);
+        for (const [b, m, l] of PHRASE) note(ctx, N, 0.05 + b * BEAT, m, l, rev);
+        const buf = await ctx.startRendering();
+        let peak = 0, bad = 0, side = 0;
+        const L = buf.getChannelData(0), R = buf.getChannelData(1);
+        for (let i = 0; i < L.length; i++) { const a = Math.abs(L[i]), b = Math.abs(R[i]); if (!Number.isFinite(L[i] + R[i])) bad++; peak = Math.max(peak, a, b); side += Math.abs(L[i] - R[i]); }
+        out.push(`${sr} rug ${rug} door ${door} mirror ${mirror}${rev ? ' rev' : ''}: peak ${peak.toFixed(2)}, side ${(side / L.length).toFixed(4)}, bad ${bad} ${peak > 0.02 && peak < 4 && !bad ? 'PASS' : 'FAIL'}`);
+      }
+    }
+    document.getElementById('selftest').textContent = out.join(' · ');
+    console.log(out.join('\n'));
+    if (location.search.includes('post')) fetch('/log', { method: 'POST', body: out.join('\n') + '\n' });
+  })();
+}
+</script>
+</body>
+</html>
