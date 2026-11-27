@@ -738,6 +738,30 @@
       "min": 5,
       "max": 250,
       "mod": true
+    },
+    {
+      "id": "rug",
+      "label": "Rug",
+      "section": "front",
+      "type": "float",
+      "default": 0,
+      "unit": "%",
+      "map": "lin",
+      "min": 0,
+      "max": 100,
+      "mod": true
+    },
+    {
+      "id": "width",
+      "label": "Width",
+      "section": "front",
+      "type": "float",
+      "default": 0.5,
+      "unit": "%",
+      "map": "lin",
+      "min": 0,
+      "max": 100,
+      "mod": true
     }
   ],
   "modSources": [

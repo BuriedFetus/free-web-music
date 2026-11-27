@@ -23,6 +23,20 @@ const DIVS = [1 / 16, 1 / 8, 3 / 16, 1 / 4, 1 / 2];
 const BANDS = ['FREEZING', 'CHILL', 'WARM', 'HOT'];
 const MT = [['Window', 1], ['Pitch', 2], ['Pan', 4], ['Grain position', 8], ['Echo', 16], ['Room', 32], ['Crunch', 64]] as const;
 const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
+/** Pointer capture, when the pointer is a real one (tests send synthetic pointers). */
+const capture = (ev: { currentTarget: Element; pointerId: number }) => {
+  try {
+    ev.currentTarget.setPointerCapture(ev.pointerId);
+  } catch {
+    /* not an active pointer */
+  }
+};
+const sstep01 = (a: number, b: number, x: number) => {
+  const t = clamp((x - a) / (b - a));
+  return t * t * (3 - 2 * t);
+};
+/** The door, fully open: the Reverb and Delay sends it sets (the Delay joins from a quarter open). */
+const DOOR_REV = 0.8, DOOR_DLY = 0.5;
 const placeX = (v: number) => (clamp(v) * 2 - 1) * 0.85;
 const placeZ = (v: number) => 0.25 + clamp(v) * 1.95;
 
@@ -174,8 +188,18 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
   const cv = useRef<HTMLCanvasElement>(null);
   const painter = useRef<RoomPainter | null>(null);
   const pal = useRef<Palette | null>(null);
-  const live$ = useRef({ params: state.params, zoom, rec, peaks, tape, drag: null as null | { x: number; z: number }, engine: live, slot, lastTick: null as unknown });
-  live$.current = { ...live$.current, params: state.params, zoom, rec, peaks, tape, engine: live, slot };
+  // the door is the SEND knobs (the song's shared Reverb and Delay); without a host it is only a picture
+  const [doorLocal, setDoorLocal] = useState(0);
+  const door = host?.sends ? clamp(host.sends.rev / DOOR_REV) : doorLocal;
+  const setDoor = (v: number) => {
+    const d = clamp(v);
+    if (host?.sends) {
+      host.sends.set('rev', d * DOOR_REV);
+      host.sends.set('dly', sstep01(0.25, 1, d) * DOOR_DLY);
+    } else setDoorLocal(d);
+  };
+  const live$ = useRef({ params: state.params, zoom, rec, peaks, tape, door, drag: null as null | { x: number; z: number }, engine: live, slot, lastTick: null as unknown });
+  live$.current = { ...live$.current, params: state.params, zoom, rec, peaks, tape, door, engine: live, slot };
   const hud = useRef<{ t: HTMLElement | null; r: HTMLElement | null; th: SVGRectElement | null; bulb: SVGCircleElement | null }>({ t: null, r: null, th: null, bulb: null });
   useEffect(() => {
     const canvas = cv.current;
@@ -184,6 +208,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     pal.current = readPalette(el);
     const pt = new RoomPainter(canvas, pal.current);
     painter.current = pt;
+    (canvas as HTMLCanvasElement & { fwmRoom?: RoomPainter }).fwmRoom = pt; // tests find the objects through it
     const ro = typeof ResizeObserver !== 'undefined' ? new ResizeObserver(() => pt.size()) : null;
     ro?.observe(canvas);
     pt.size();
@@ -229,6 +254,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
         tape: L.peaks && L.tape ? { peaks: L.peaks, name: L.tape.name, secs: L.tape.frames / L.tape.sr } : null,
         rec: L.rec ? { phase: L.rec.phase, secs: L.rec.secs } : null,
         zoom: L.zoom, reduceMotion: !!reduce?.matches,
+        rug: val('rug'), width: val('width'), door: L.door, rev: Math.round(L.params.mode ?? 0) === 1,
       };
       pt.frame(input, now / 1000, dt);
       // HUD and the thermometer follow the eased values
@@ -268,7 +294,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     const r = ev.currentTarget.getBoundingClientRect();
     const px = ev.clientX - r.left, py = ev.clientY - r.top;
     if (pt.hitMica(px, py)) {
-      ev.currentTarget.setPointerCapture(ev.pointerId);
+      capture(ev);
       ev.currentTarget.style.cursor = 'grabbing';
       touch('px');
       const x0 = ev.clientX, y0 = ev.clientY;
@@ -306,7 +332,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     }
     const u = pt.wallU(px, py);
     if (u != null) {
-      ev.currentTarget.setPointerCapture(ev.pointerId);
+      capture(ev);
       touch('pos');
       const seek = (uu: number) => {
         const s = pv('start'), e = Math.max(s + 0.02, pv('end'));
@@ -323,10 +349,55 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
       c.addEventListener('pointerup', () => { c.removeEventListener('pointermove', mv); touch(null); }, { once: true });
       return;
     }
+    // the mirror: drag left / right to turn it (width); a click flips the tape (backwards / forwards)
+    if (pt.hitMirror(px, py)) {
+      capture(ev);
+      touch('width');
+      const x0 = ev.clientX, v0 = pv('width');
+      let moved = false;
+      const c = ev.currentTarget;
+      const mv = (e: PointerEvent) => {
+        if (Math.abs(e.clientX - x0) > 4) moved = true;
+        if (moved) set('width', clamp(v0 + (e.clientX - x0) / 200));
+      };
+      c.addEventListener('pointermove', mv);
+      c.addEventListener('pointerup', () => {
+        c.removeEventListener('pointermove', mv);
+        touch(null);
+        if (!moved) set('mode', Math.round(pv('mode')) === 1 ? 0 : 1);
+      }, { once: true });
+      if (pop) setPop(null);
+      return;
+    }
+    // the door: pull it left and it swings open into the room (its edge follows the finger)
+    if (pt.hitDoor(px, py)) {
+      capture(ev);
+      const x0 = ev.clientX, v0 = door, w = pt.doorPx();
+      const c = ev.currentTarget;
+      const mv = (e: PointerEvent) => setDoor(v0 + (x0 - e.clientX) / w);
+      c.addEventListener('pointermove', mv);
+      c.addEventListener('pointerup', () => c.removeEventListener('pointermove', mv), { once: true });
+      if (pop) setPop(null);
+      return;
+    }
+    // the rug: its corner follows the finger across the floor
+    if (pt.hitRug(px, py)) {
+      capture(ev);
+      touch('rug');
+      const c = ev.currentTarget;
+      const mv = (e: PointerEvent) => {
+        const v = pt.rugAt(e.clientX - r.left, e.clientY - r.top);
+        if (v != null) set('rug', v);
+      };
+      c.addEventListener('pointermove', mv);
+      c.addEventListener('pointerup', () => { c.removeEventListener('pointermove', mv); touch(null); }, { once: true });
+      if (pop) setPop(null);
+      return;
+    }
     // the lamp (Light) and the window (Air): drag up = brighter / more open, drag down = dimmer / closed
     const knob = pt.hitLamp(px, py) ? { id: 'light', span: 220 } : pt.hitWindow(px, py) ? { id: 'air', span: pt.windowPx() /* the sash follows the finger: the window's own size */ } : null;
     if (knob) {
-      ev.currentTarget.setPointerCapture(ev.pointerId);
+      capture(ev);
       touch(knob.id);
       const y0 = ev.clientY, v0 = pv(knob.id);
       const c = ev.currentTarget;
@@ -338,7 +409,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     }
     if (pt.hitBackWall(px, py)) {
       // push the back wall away (drag up) for a bigger room, pull it closer (drag down) for a smaller one
-      ev.currentTarget.setPointerCapture(ev.pointerId);
+      capture(ev);
       touch('room');
       const y0 = ev.clientY, r0 = pv('room');
       const c = ev.currentTarget;
@@ -355,7 +426,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
     if (!pt || ev.buttons) return;
     const r = ev.currentTarget.getBoundingClientRect();
     const px = ev.clientX - r.left, py = ev.clientY - r.top;
-    ev.currentTarget.style.cursor = pt.hitMica(px, py) ? 'grab' : pt.wallU(px, py) != null ? 'ew-resize' : pt.hitLamp(px, py) || pt.hitWindow(px, py) || pt.hitBackWall(px, py) ? 'ns-resize' : '';
+    ev.currentTarget.style.cursor = pt.hitMica(px, py) ? 'grab' : pt.wallU(px, py) != null || pt.hitMirror(px, py) || pt.hitDoor(px, py) ? 'ew-resize' : pt.hitRug(px, py) ? 'nwse-resize' : pt.hitLamp(px, py) || pt.hitWindow(px, py) || pt.hitBackWall(px, py) ? 'ns-resize' : '';
   };
 
   // ---- dock icons: drag up / down sets the icon's main amount (0–100% over ~250 px, so small moves stay small) ----
@@ -462,7 +533,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
   const POPS: Record<string, () => ReactNode> = {
     temp: () => thermo,
     fan: () => (<><h3>Air · the window</h3>{row('air', 'Window')}<p>More open: a brighter filter, a whistle, and the blinds (and the sound) sway more.</p></>),
-    room: () => (<><h3>Room</h3>{row('room', 'Size')}{row('wet', 'Wet')}<p>Geode's own reverb. The room stretches into the distance as it grows.</p></>),
+    room: () => (<><h3>Room</h3>{row('room', 'Size')}{row('wet', 'Wet')}{row('rug', 'Rug')}<p>Geode's own reverb. The room stretches into the distance as it grows. The rug soaks it up: a darker, shorter tail and duller echoes (drag its corner in the room).</p></>),
     echo: () => (<><h3>Echo</h3>{seg('div', 'Time', spec('div').options!)}{row('fb', 'Bounces')}{row('ewet', 'Wet')}<p>Mica's voice bounces off the back wall: one round trip per repeat, in time with the song.</p></>),
     breath: () => (<><h3>Breath</h3>{row('breath', 'Pluck … Swell')}{['atk', 'dec', 'sus', 'rel'].map((id) => row(id, spec(id).label, true))}<p>The big slider moves all four; the four set your own shape (the numbers show what you hear). Mica's mouth follows it.</p></>),
     motion: () => (

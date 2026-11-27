@@ -199,6 +199,15 @@ export const MANUAL: Chapter[] = [
         ],
       },
       {
+        title: 'Rug, door, mirror',
+        body: ['Three things in the room you can grab.'],
+        spots: [
+          { at: '.fwm-geode__screen@0.6,0.8', title: 'The rug', text: 'Drag its corner across the floor. A bigger rug soaks up the room: the reverb tail gets darker and shorter, the slap-backs softer, and every echo a little duller.' },
+          { at: '.fwm-geode__screen@0.57,0.5', title: 'The door', text: 'Pull it left to open it into the room: Geode goes out to the rest of the song (its Reverb and Delay SEND knobs). Push it back to close it.' },
+          { at: '.fwm-geode__screen@0.86,0.6', title: 'The mirror', text: 'Drag it right to turn it toward the room: a wider stereo sound; left: narrower. Click it to play the tape backwards: Mica\'s reflection turns her back.' },
+        ],
+      },
+      {
         title: 'Breath, grains, crunch, motion',
         body: ['How each note is shaped, and what moves by itself.'],
         spots: [

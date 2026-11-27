@@ -99,7 +99,11 @@ pub mod p {
     /// Classic / Reverse: play the tape once (0) or loop it (1); each new pass fades in over LFADE.
     pub const LOOP: usize = 59;
     pub const LFADE: usize = 60;
-    pub const COUNT: usize = 61;
+    /// The rug (a macro): soaks up the room: darker, shorter reverb tail, softer slap-backs, duller echo repeats.
+    pub const RUG: usize = 61;
+    /// The mirror: stereo width (0 = narrow, 0.5 = as it is, 1 = 180% wide).
+    pub const WIDTH: usize = 62;
+    pub const COUNT: usize = 63;
 }
 
 /// Parameter ids, in index order (they match `devices/geode.json`).
@@ -108,7 +112,7 @@ pub const IDS: [&str; p::COUNT] = [
     "start", "end", "lvl", "px", "pz", "walk", "wbars", "mshape", "mrate", "mdepth", "mto", "drive", "tone", "body", "thin", "gpitch",
     "gspeed", "spread", "chorus", "damp", "cut", "res", "sway", "airn", "atk", "dec", "sus", "rel", "decay", "pre", "er", "s_drive",
     "s_tone", "s_body", "s_thin", "s_gpitch", "s_gspeed", "s_spread", "s_chorus", "s_damp", "cth", "cratio", "cmake", "loop",
-    "lfade",
+    "lfade", "rug", "width",
 ];
 
 pub fn defaults() -> [f32; p::COUNT] {
@@ -116,7 +120,7 @@ pub fn defaults() -> [f32; p::COUNT] {
         0.62, 0.15, 0.35, 0.35, 2.0, 0.45, 0.3, 0.4, 1.0, 0.8, 0.35, 0.5, 0.0, 0.0, 2.0 / 3.0, 0.0, //
         0.0, 1.0, 0.7, 0.5, 0.154, 0.0, 1.0, 0.0, 3.0, 0.0, 1.0, 0.15, 0.7, 0.5, 0.05, 0.5, //
         0.5, 0.3, 0.3, 0.5, 0.35, 0.15, 0.0, 0.0, 0.15, 0.4, 0.75, 0.4, 0.3, 0.2, 0.5, 1.0, //
-        1.0, 1.0, 1.0, 1.0, 0.7, 1.0, 1.0, 1.0, 0.5, 3.0 / 19.0, 5.0 / 18.0, 0.0, 0.18,
+        1.0, 1.0, 1.0, 1.0, 0.7, 1.0, 1.0, 1.0, 0.5, 3.0 / 19.0, 5.0 / 18.0, 0.0, 0.18, 0.0, 0.5,
     ]
 }
 
@@ -357,6 +361,8 @@ struct Ctl {
     chorus_w: f32,
     echo_w: f32,
     room_w: f32,
+    /// Stereo width from the mirror (side gain: 0.15..1.8, 1 = untouched).
+    width: f32,
     er: f32,
     dist: f32,
     /// Place pan then motion pan: (left gain, right gain, true when panning left), see `pan_gains`.
@@ -727,6 +733,7 @@ impl Geode {
         let breath = at(&self.sm, p::BREATH);
         // Breath pulls hard as soon as it is in Pluck (< 0.2) or Swell (> 0.8); gently around the middle
         let bw = sstep(0.0, 0.6, libm::fabsf(breath - 0.5) * 2.0);
+        let rug = at(&self.sm, p::RUG);
         for i in 0..p::COUNT {
             if i < p::DRIVE || i > p::ER {
                 self.eff[i] = if discrete_max(i).is_some() { self.params[i] } else { at(&self.sm, i) };
@@ -748,9 +755,16 @@ impl Geode {
                 p::SWAY => wish(aw, a),
                 p::AIRN => wish(aw, a * 0.7),
                 p::TONE => wish(aw * 0.5, 1.0), // an open window brightens a little: HOT + open = in between
-                p::DECAY => wish(0.9, room),
+                p::DECAY => {
+                    wish(0.9, room);
+                    wish(rug * 0.7, room * 0.45); // the rug soaks up the tail
+                }
                 p::PRE => wish(0.9, room * 0.9),
-                p::ER => wish(0.9, lerp(0.85, 0.25, room)),
+                p::ER => {
+                    wish(0.9, lerp(0.85, 0.25, room));
+                    wish(rug * 0.9, 0.1); // and the slap-backs
+                }
+                p::DAMP => wish(rug * 0.85, 0.05), // a darker tail
                 p::ATK => wish(bw, lerp(0.02, 0.75, breath)),
                 p::DEC => wish(bw, lerp(0.18, 0.7, breath)),
                 p::SUS => wish(bw, sstep(0.15, 0.85, breath)), // a pluck dies away even while the key is held
@@ -851,6 +865,8 @@ impl Geode {
         c.dist = 1.0 - d * 0.4;
         c.room_w = e[p::WET] * 0.8 * (1.0 + d * 0.9) * if on(mt::ROOM) { 1.0 + m } else { 1.0 };
         c.er = e[p::ER];
+        let mw = e[p::WIDTH];
+        c.width = if mw < 0.5 { lerp(0.15, 1.0, mw * 2.0) } else { lerp(1.0, 1.8, (mw - 0.5) * 2.0) };
         c.pan = [pan_gains(self.wx / 0.85 * 0.9), pan_gains(if on(mt::PAN) { m * 0.9 } else { 0.0 })];
         self.ch_ph = wrap(self.ch_ph + dt, 100.0);
         c.ch_s = [sinf(TAU * self.ch_ph * 0.35), sinf(TAU * self.ch_ph * 0.62)];
@@ -874,7 +890,8 @@ impl Geode {
     fn update_fx(&mut self) {
         let e = &self.eff;
         let time = DIVS[self.params[p::DIV] as usize] * 4.0 * 60.0 / self.bpm.clamp(20.0, 300.0);
-        let tone_hz = lerp(2500.0, 9000.0, 1.0 - self.temp);
+        // cold repeats brighter, hot darker; the rug dulls them more
+        let tone_hz = lerp(2500.0, 9000.0, 1.0 - self.temp) * lerp(1.0, 0.3, e[p::RUG]);
         let tone = libm::logf(tone_hz / 500.0) / libm::logf(28.0);
         let (fb, dl) = (e[p::FB], &mut self.echo);
         if libm::fabsf(dl.time - time) > 1e-4 || libm::fabsf(dl.feedback - fb) > 1e-4 || libm::fabsf(dl.tone - tone) > 2e-3 {
@@ -1268,6 +1285,10 @@ impl Device for Geode {
                 }
                 let mut l = x + (self.wet_l[i] + el) * rw;
                 let mut r = y + (self.wet_r[i] + erv) * rw;
+                // the mirror: stereo width (mid stays, the sides grow or shrink)
+                let (mid, side) = ((l + r) * 0.5, (l - r) * 0.5 * c.width);
+                l = mid + side;
+                r = mid - side;
                 // glue compressor (linked, soft knee) + make-up, then a fast safety limiter
                 let det = libm::fabsf(l).max(libm::fabsf(r));
                 let lvl = 20.0 * libm::log10f(det + 1e-9);

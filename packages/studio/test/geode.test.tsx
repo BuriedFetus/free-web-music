@@ -38,6 +38,14 @@ describe('<Geode>', () => {
     expect(store.getState().params.room).toBeCloseTo(Math.max(0, Math.min(1, r0 + 0.1) - 0.2));
   });
 
+  it('the Room pop-up has the rug (it soaks up the room)', () => {
+    const store = mount();
+    fireEvent.click(screen.getByRole('button', { name: 'Room' }));
+    const rug = screen.getByRole('slider', { name: 'Rug' });
+    fireEvent.change(rug, { target: { value: '0.8' } });
+    expect(store.getState().params.rug).toBeCloseTo(0.8);
+  });
+
   it('the thermometer sets the temperature (arrow keys)', () => {
     const store = mount();
     fireEvent.click(screen.getByRole('button', { name: 'Temp' }));

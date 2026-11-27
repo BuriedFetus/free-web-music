@@ -66,6 +66,14 @@ export interface RoomInput {
   /** Zoomed into Mica's head (her menu). */
   zoom: boolean;
   reduceMotion: boolean;
+  /** The rug's size (0..1): it soaks up the room. */
+  rug: number;
+  /** How far the door is open (0..1): the SEND knobs. */
+  door: number;
+  /** The mirror's turn (0..1): stereo width. */
+  width: number;
+  /** The tape plays backwards (the mirror flipped it). */
+  rev: boolean;
 }
 
 const clamp = (x: number, a = 0, b = 1) => Math.max(a, Math.min(b, x));
@@ -132,7 +140,7 @@ export class RoomPainter {
   private H = 0;
   private dpr = 1;
   private G = { vx: 0, vy: 0, hw: 1, top: 1, bot: 1, L: 2, D: 1.5, zoom: 1 };
-  private S = { temp: 0.6, tv: 0, air: 0, av: 0, room: 0.35, z: 0, zv: 0, x: 0, z0: 0.55 };
+  private S = { temp: 0.6, tv: 0, air: 0, av: 0, room: 0.35, z: 0, zv: 0, x: 0, z0: 0.55, rug: 0, door: 0, width: 0.5 };
   private vis = {
     rings: [] as Ring[], echoes: [] as Echo[], sparks: [] as Spark[], grains: [] as { x: number; t: number }[],
     drops: [] as { x: number; y: number; v: number }[],
@@ -202,6 +210,63 @@ export class RoomPainter {
     const shut = this.P(-1, 0.02, zm), open = this.P(-1, lerp(0.02, -0.62 + 0.08, 0.85), zm);
     return Math.max(20, shut[1] - open[1]);
   }
+  // ---- the rug, the door and the mirror ----
+  rugBox() {
+    const L = this.G.L;
+    return { cx: 0, cz: Math.min(0.75, L * 0.35), w: lerp(0.36, 0.82, this.S.rug), d: lerp(0.2, Math.min(0.6, L * 0.25), this.S.rug) };
+  }
+  /** The rug's corner handle (drag it across the floor to size the rug). */
+  hitRug(px: number, py: number) {
+    if (!this.W) return false;
+    const r = this.rugBox(), h = this.P(r.cx + r.w, 1, r.cz - r.d);
+    return Math.hypot(px - h[0], py - h[1]) < 18;
+  }
+  /** Rug size (0..1) for a point on the floor. */
+  rugAt(px: number, py: number): number | null {
+    const f = this.floorAt(px, py);
+    return f ? clamp((Math.abs(f.x) - 0.36) / 0.46) : null;
+  }
+  private doorPts() {
+    const L = this.G.L, a = this.S.door * 1.45, x0 = 0.3, w = 0.4, y0 = -0.12;
+    const fx = x0 + w * Math.cos(a), fz = L - Math.sin(a) * Math.min(1.4, L * 0.32); // it swings into the room
+    const P = this.P.bind(this);
+    return { frame: [P(x0, y0, L), P(x0 + w, y0, L), P(x0 + w, 1, L), P(x0, 1, L)], panel: [P(x0, y0, L), P(fx, y0, fz), P(fx, 1, fz), P(x0, 1, L)] };
+  }
+  private bbox(pts: [number, number][], px: number, py: number, pad = 8) {
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    return px > Math.min(...xs) - pad && px < Math.max(...xs) + pad && py > Math.min(...ys) - pad && py < Math.max(...ys) + pad;
+  }
+  hitDoor(px: number, py: number) {
+    if (!this.W || this.S.room > 0.85) return false; // the back wall is out of sight
+    const d = this.doorPts();
+    return this.bbox([...d.frame, ...d.panel], px, py);
+  }
+  /** The door's width on screen: a drag that long opens it fully. */
+  doorPx() {
+    const f = this.doorPts().frame;
+    return Math.max(30, f[1][0] - f[0][0]);
+  }
+  private mirrorPts() {
+    const z = Math.min(0.78, this.G.L * 0.4), turn = lerp(0.55, 1.25, this.S.width), pts: [number, number][] = [];
+    for (let i = 0; i < 40; i++) {
+      const th = (i / 40) * Math.PI * 2;
+      pts.push(this.P(1, 0.28 + Math.sin(th) * 0.3, z + Math.cos(th) * 0.2 * turn));
+    }
+    return pts;
+  }
+  hitMirror(px: number, py: number) {
+    return !!this.W && this.bbox(this.mirrorPts(), px, py, 6);
+  }
+  /** Where the rug's corner, the door's edge and the mirror are on screen (CSS px), for tests and the manual. */
+  spots() {
+    const r = this.rugBox(), d = this.doorPts(), m = this.mirrorPts();
+    const mx = m.reduce((a, p) => a + p[0], 0) / m.length, my = m.reduce((a, p) => a + p[1], 0) / m.length;
+    return {
+      rug: this.P(r.cx + r.w, 1, r.cz - r.d),
+      door: [lerp(d.panel[0][0], d.panel[1][0], 0.8), lerp(d.panel[1][1], d.panel[2][1], 0.5)] as [number, number],
+      mirror: [mx, my] as [number, number],
+    };
+  }
   hitMica(px: number, py: number) {
     const m = this.mica;
     return !!m && Math.abs(px - m.x) < m.u * 0.65 && py > m.y - m.u * 1.4 && py < m.y + m.u * 0.15;
@@ -234,6 +299,11 @@ export class RoomPainter {
       S[v] += a * dt;
       S[k] += S[v] * dt;
     };
+    // the objects follow their values quickly (a drag feels direct, another person's change still glides)
+    const q = !this.primed || I.reduceMotion ? 1 : Math.min(1, dt * 18);
+    S.rug += (I.rug - S.rug) * q;
+    S.door += (I.door - S.door) * q;
+    S.width += (I.width - S.width) * q;
     if (!this.primed || I.reduceMotion) {
       S.temp = I.temp;
       S.air = I.air;
@@ -352,6 +422,9 @@ export class RoomPainter {
     this.drawWindow(c, I, t, lit, nc);
     this.drawMemoryWall(c, I, lit, nc, dt);
     this.drawLamp(c, I, nc);
+    this.drawDoor(c, I, t, nc, fade);
+    this.drawMirror(c, I, t, nc);
+    this.drawRug(c, nc);
     c.save();
     {
       const f = corners(0);
@@ -446,6 +519,140 @@ export class RoomPainter {
     });
   }
 
+  private drawRug(c: CanvasRenderingContext2D, nc: RGB) {
+    // a flat rug on the floor, our own pattern; its corner is the handle
+    const pal = this.pal, r = this.rugBox(), wc = pal.temp[2];
+    const q = (u: number, v: number) => this.P(r.cx + u * r.w, 1, r.cz + v * r.d);
+    const poly = (pts: [number, number][]) => {
+      c.beginPath();
+      pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+      c.closePath();
+    };
+    c.fillStyle = rgba(wc, 0.06 + 0.05 * this.S.rug);
+    poly([q(-1, -1), q(1, -1), q(1, 1), q(-1, 1)]);
+    c.fill();
+    c.lineWidth = 1.3;
+    c.strokeStyle = rgba(wc, 0.7);
+    this.line(c, [q(-1, -1), q(1, -1), q(1, 1), q(-1, 1)], true);
+    c.lineWidth = 1;
+    c.strokeStyle = rgba(wc, 0.4);
+    this.line(c, [q(-0.82, -0.78), q(0.82, -0.78), q(0.82, 0.78), q(-0.82, 0.78)], true);
+    c.strokeStyle = rgba(pal.accent, 0.3);
+    this.line(c, [q(0, -0.55), q(0.5, 0), q(0, 0.55), q(-0.5, 0)], true);
+    c.strokeStyle = rgba(wc, 0.35);
+    for (let i = 0; i <= 14; i++) {
+      const u = lerp(-0.95, 0.95, i / 14);
+      this.line(c, [q(u, -1), q(u, -1.12)]);
+      this.line(c, [q(u, 1), q(u, 1.1)]);
+    }
+    const h = q(1, -1);
+    c.strokeStyle = rgba(nc, 0.75);
+    c.lineWidth = 1.4;
+    c.beginPath();
+    c.arc(h[0], h[1], 6, 0, Math.PI * 2);
+    c.stroke();
+    c.lineWidth = 1.3;
+  }
+
+  private drawDoor(c: CanvasRenderingContext2D, I: RoomInput, t: number, nc: RGB, fade: number) {
+    // a door in the back wall: open, it lets Geode out to the rest of the song (the SEND knobs)
+    if (fade < 0.05) return;
+    const pal = this.pal, d = this.doorPts(), o = this.S.door;
+    const poly = (pts: [number, number][]) => {
+      c.beginPath();
+      pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+      c.closePath();
+    };
+    c.globalAlpha = fade;
+    c.fillStyle = rgba(pal.night, 0.15 + 0.55 * sstep(0, 0.6, o));
+    poly(d.frame);
+    c.fill();
+    c.fillStyle = rgba(pal.accent, 0.12 * sstep(0, 0.6, o) * (0.75 + 0.25 * Math.sin(t * 2)));
+    c.fill();
+    // waves leaking out while Mica sings
+    const singing = I.voices.some(([n, e]) => n >= 0 && e > 0.02);
+    if (singing && o > 0.05) {
+      const cx = (d.frame[0][0] + d.frame[1][0]) / 2, cy = (d.frame[0][1] + d.frame[2][1]) / 2, dw = d.frame[1][0] - d.frame[0][0];
+      c.save();
+      poly(d.frame);
+      c.clip();
+      for (let k = 0; k < 3; k++) {
+        const f = (t * 0.7 + k / 3) % 1;
+        c.strokeStyle = rgba(pal.accent, (1 - f) * 0.6 * sstep(0, 0.5, o));
+        c.beginPath();
+        c.ellipse(cx, cy, dw * 0.25 * (1 + f * 1.5), dw * 0.6 * (1 + f), 0, 0, Math.PI * 2);
+        c.stroke();
+      }
+      c.restore();
+    }
+    c.strokeStyle = rgba(nc, 0.8);
+    c.lineWidth = 1.4;
+    this.line(c, d.frame, true);
+    c.fillStyle = rgba(pal.bg, 0.92);
+    poly(d.panel);
+    c.fill();
+    c.strokeStyle = rgba(nc, 0.85);
+    c.lineWidth = 1.6;
+    this.line(c, d.panel, true);
+    const k = [lerp(d.panel[1][0], d.panel[0][0], 0.14), lerp(d.panel[1][1], d.panel[2][1], 0.45)];
+    c.fillStyle = rgba(pal.accent, 0.9);
+    c.beginPath();
+    c.arc(k[0], k[1], 2.5 + 2 * this.sc(this.G.L), 0, Math.PI * 2);
+    c.fill();
+    c.globalAlpha = 1;
+    c.lineWidth = 1.3;
+  }
+
+  private drawMirror(c: CanvasRenderingContext2D, I: RoomInput, t: number, nc: RGB) {
+    // an oval mirror on the right wall: turned toward the room = wider; Mica's reflection shows her back when the tape plays backwards
+    const pal = this.pal, pts = this.mirrorPts();
+    const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
+    const cx = (Math.min(...xs) + Math.max(...xs)) / 2, cy = (Math.min(...ys) + Math.max(...ys)) / 2, h = Math.max(...ys) - Math.min(...ys);
+    c.beginPath();
+    pts.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+    c.closePath();
+    c.fillStyle = rgba(pal.night, 0.35);
+    c.fill();
+    c.save();
+    c.clip();
+    const u = h * 0.42;
+    c.translate(cx, cy + u * 0.75);
+    c.scale(-lerp(0.6, 1, this.S.width), 1);
+    const B = MICA_SHAPE.map(([a, b]) => [a * u, b * u] as [number, number]);
+    c.fillStyle = rgba(pal.micaFill, 0.9);
+    c.strokeStyle = rgba(pal.mica, 0.6);
+    c.lineWidth = 1.2;
+    c.beginPath();
+    B.forEach(([x, y], i) => (i ? c.lineTo(x, y) : c.moveTo(x, y)));
+    c.closePath();
+    c.fill();
+    c.stroke();
+    if (I.rev) {
+      this.line(c, [[0, -1.2 * u], [0, -0.25 * u]]); // her back: a crystal seam, no face
+    } else {
+      c.fillStyle = rgba(pal.ink, 0.6);
+      const blink = t % 4 < 0.12 ? 0.15 : 1;
+      for (const sx of [-1, 1]) {
+        c.beginPath();
+        c.ellipse(sx * 0.15 * u, -0.78 * u, 0.045 * u, 0.06 * u * blink, 0, 0, Math.PI * 2);
+        c.fill();
+      }
+    }
+    c.restore();
+    c.strokeStyle = rgba(pal.frost, 0.25);
+    this.line(c, [[lerp(Math.min(...xs), cx, 0.35), lerp(Math.min(...ys), cy, 0.5)], [lerp(Math.min(...xs), cx, 0.75), lerp(Math.min(...ys), cy, 0.15)]]);
+    c.strokeStyle = I.rev ? rgba(pal.accent, 0.95) : rgba(nc, 0.85);
+    c.lineWidth = 1.7;
+    this.line(c, pts, true);
+    if (I.rev) {
+      c.fillStyle = rgba(pal.accent, 0.95);
+      c.font = `600 ${Math.max(10, Math.round(u * 0.35))}px ${pal.font}`;
+      c.textAlign = 'center';
+      c.fillText('◀◀', cx, Math.min(...ys) - 6);
+    }
+    c.lineWidth = 1.3;
+  }
+
   private drawLamp(c: CanvasRenderingContext2D, I: RoomInput, nc: RGB) {
     // a neon tube on the ceiling that dims with the Light (no light cone)
     const P = this.P.bind(this), pal = this.pal;
@@ -500,7 +707,7 @@ export class RoomPainter {
     v.rings = v.rings.filter((g) => {
       g.t += dt;
       g.r += dt * lerp(0.6, 1.4, S.room);
-      const a = g.a * (1 - g.t / life) * (1 - sstep(0.7, 1.1, g.r));
+      const a = g.a * (1 - g.t / life) * (1 - sstep(0.7, 1.1, g.r)) * lerp(1, 0.55, this.S.rug); // the rug soaks them up
       if (a <= 0) return false;
       c.strokeStyle = this.hue(g.n);
       c.globalAlpha = a * lit;
@@ -524,7 +731,7 @@ export class RoomPainter {
       c.globalAlpha = Math.min(1, amp) * lit;
       c.beginPath();
       for (let i = 0; i <= 60; i++) {
-        const u = i / 60, [px, py] = P(lerp(-0.92, 0.92, u), 1 - 0.05 - Math.abs(this.wobble(I, u, 0.25 * amp, t)), Z);
+        const u = i / 60, [px, py] = P(lerp(-0.92, 0.92, u), 1 - 0.05 - Math.abs(this.wobble(I, u, 0.25 * amp * Math.pow(lerp(1, 0.35, this.S.rug), k), t)), Z); // duller each bounce on a rug
         if (i) c.lineTo(px, py);
         else c.moveTo(px, py);
       }

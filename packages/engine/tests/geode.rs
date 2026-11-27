@@ -415,3 +415,54 @@ fn pluck_dies_away_while_the_key_is_held() {
     assert!(pluck < 0.003 && edge < 0.006, "a pluck keeps going: {pluck} / {edge}");
     assert!(swell > 0.05, "a swell keeps singing");
 }
+
+#[test]
+fn the_rug_soaks_up_the_room_and_dulls_the_echo() {
+    let fs = 48_000.0;
+    let tail = |rug: f32| {
+        let mut g = geode(fs);
+        plain(&mut g);
+        for (i, v) in [(p::WET, 1.0), (p::ROOM, 0.7), (p::EWET, 0.0), (p::RUG, rug), (p::DEC, 0.0), (p::SUS, 0.0), (p::REL, 0.0)] {
+            g.set_param(i, v);
+        }
+        let mut click = vec![0.0f32; 48_000];
+        for (i, x) in click.iter_mut().take(480).enumerate() {
+            *x = (i as f32 * 0.37).sin() * (1.0 - i as f32 / 480.0);
+        }
+        g.load(&click, None);
+        render(&mut g, 4800); // let the macros settle
+        g.note_on(60, 1.0);
+        render(&mut g, 64);
+        g.note_off(60);
+        let (l, r) = render(&mut g, 96_000);
+        let e = g.effective().to_vec();
+        (rms(&l[24_000..72_000]) + rms(&r[24_000..72_000]), e[p::DAMP], e[p::DECAY], e[p::ER])
+    };
+    let (bare, d0, t0, er0) = tail(0.0);
+    let (rugged, d1, t1, er1) = tail(1.0);
+    println!("tail 0.5-1.5 s: no rug {bare:.5}, big rug {rugged:.5}; damp {d0:.2}->{d1:.2}, decay {t0:.2}->{t1:.2}, er {er0:.2}->{er1:.2}");
+    assert!(rugged < bare * 0.7, "a big rug soaks up the tail");
+    assert!(d1 < d0 && t1 < t0 && er1 < er0, "darker, shorter, softer slap-backs");
+}
+
+#[test]
+fn the_mirror_sets_the_stereo_width() {
+    let fs = 48_000.0;
+    let side = |w: f32| {
+        let mut g = geode(fs);
+        plain(&mut g);
+        for (i, v) in [(p::WIDTH, w), (p::CHORUS, 0.8)] {
+            g.set_param(i, v);
+        }
+        g.load(&sine(fs, 330.0, 1.0), None);
+        render(&mut g, 4800);
+        g.note_on(60, 1.0);
+        let (l, r) = render(&mut g, 24_000);
+        let s: Vec<f32> = l.iter().zip(&r).map(|(a, b)| a - b).collect();
+        let m: Vec<f32> = l.iter().zip(&r).map(|(a, b)| a + b).collect();
+        rms(&s[4800..]) / rms(&m[4800..]).max(1e-9)
+    };
+    let (narrow, normal, wide) = (side(0.0), side(0.5), side(1.0));
+    println!("side / mid: narrow {narrow:.3}, as is {normal:.3}, wide {wide:.3}");
+    assert!(narrow < normal * 0.4 && wide > normal * 1.4, "narrow < as it is < wide");
+}

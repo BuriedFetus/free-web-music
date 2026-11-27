@@ -48,6 +48,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'quartz') return runQuartz(p, engineRef, ok, out);
   if (role === 'ga' || role === 'gb') return runGeode(role, p, s.doc, engineRef, ok, out);
   if (role === 'gp') return runGeodeKeep(p, engineRef, ok, out);
+  if (role === 'gobj') return runGeodeObjects(p, ok, out);
   if (role === 'manual') return runManual(ok, out);
   if (role === 'look') return runLook(s.doc, ok, out);
   if (role === 'arrange') return runArrange(p, ok, out);
@@ -1664,6 +1665,55 @@ async function runGeodeKeep(p: Project, engineRef: { current: Engine | null }, o
     ok(pk > 0.02, `after a reload the tape comes back from this browser, alone in the room (peak ${pk.toFixed(3)})`);
   } catch (e) {
     out.push(`FAIL gp: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** Geode's rug, door and mirror: drag them in the room (real pointer events on the canvas). */
+async function runGeodeObjects(p: Project, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  try {
+    await sleep(400);
+    await addInst('Geode');
+    await sleep(600);
+    const gid = p.tracks().find((t) => t.device === 'geode')!.id;
+    const store = () => p.deviceStore(gid, deviceEntry('geode')!.manifest!)!.getState().params;
+    const cv = $('.fwm-devwrap canvas[aria-label="Mica\'s room"]') as HTMLCanvasElement & { fwmRoom?: { spots(): Record<string, [number, number]> } };
+    await until('the room', () => !!cv.fwmRoom && cv.clientWidth > 0, 3000);
+    const at = (k: string) => {
+      const r = cv.getBoundingClientRect(), [x, y] = cv.fwmRoom!.spots()[k];
+      return [r.left + x, r.top + y];
+    };
+    const drag = async (k: string, dx: number, dy: number) => {
+      const [x, y] = at(k);
+      const ev = (type: string, cx: number, cy: number) => cv.dispatchEvent(new PointerEvent(type, { bubbles: true, clientX: cx, clientY: cy, pointerId: 7, button: 0, buttons: type === 'pointerup' ? 0 : 1 }));
+      ev('pointerdown', x, y);
+      for (let i = 1; i <= 6; i++) {
+        ev('pointermove', x + (dx * i) / 6, y + (dy * i) / 6);
+        await sleep(20);
+      }
+      ev('pointerup', x + dx, y + dy);
+      await sleep(150);
+    };
+    const r0 = store().rug ?? 0;
+    await drag('rug', 140, 30);
+    ok((store().rug ?? 0) > r0 + 0.2, `dragging the rug's corner out makes it bigger (${r0.toFixed(2)} → ${(store().rug ?? 0).toFixed(2)})`);
+    await drag('mirror', 120, 0);
+    ok((store().width ?? 0.5) > 0.9, `dragging the mirror right widens the sound (width ${(store().width ?? 0).toFixed(2)})`);
+    const m0 = Math.round(store().mode ?? 0);
+    await drag('mirror', 0, 0);
+    ok(Math.round(store().mode ?? 0) === 1 && m0 !== 1, 'a click on the mirror plays the tape backwards');
+    await drag('mirror', 0, 0);
+    ok(Math.round(store().mode ?? 0) === 0, 'another click: forwards again');
+    await drag('door', -400, 0);
+    const mix = p.mix(gid);
+    ok(mix.rev > 0.7 && mix.dly > 0.4, `pulling the door left opens it: the SEND knobs go up (reverb ${mix.rev.toFixed(2)}, delay ${mix.dly.toFixed(2)})`);
+    await drag('door', 400, 0);
+    ok(p.mix(gid).rev < 0.05, `pushing it back closes it (reverb ${p.mix(gid).rev.toFixed(2)})`);
+  } catch (e) {
+    out.push(`FAIL gobj: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
