@@ -39,6 +39,7 @@ export async function runE2E(role: string, s: { doc: Y.Doc; awareness: Awareness
   if (role === 'opal') return runOpal(p, engineRef, ok, out);
   if (role === 'quartz') return runQuartz(p, engineRef, ok, out);
   if (role === 'ga' || role === 'gb') return runGeode(role, p, s.doc, engineRef, ok, out);
+  if (role === 'gp') return runGeodeKeep(p, engineRef, ok, out);
   if (role === 'look') return runLook(s.doc, ok, out);
   if (role === 'arrange') return runArrange(p, ok, out);
   if (role === 'ta' || role === 'tb') return runTogether(role, p, s.awareness, engineRef, ok, out);
@@ -1609,6 +1610,47 @@ async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { curre
     }
   } catch (e) {
     out.push(`FAIL ${role}: ${String(e)}`);
+  }
+  ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
+  await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+}
+
+/** One tab, reloaded: a tape comes back from this browser (IndexedDB) with nobody else in the room. */
+async function runGeodeKeep(p: Project, engineRef: { current: Engine | null }, ok: (c: boolean, l: string) => void, out: string[]) {
+  const errs: string[] = [];
+  window.addEventListener('error', (e) => errs.push(String(e.message)));
+  try {
+    await sleep(400);
+    if (!sessionStorage.getItem('fwm.e2e.gp')) {
+      ($('[aria-label="Add Geode as a new track"]') as HTMLButtonElement).click();
+      await sleep(300);
+      ($('.fwm-geode__dock [data-id="mica"]') as HTMLButtonElement).click();
+      await sleep(200);
+      ($('[aria-label="Load the demo tape"]') as HTMLButtonElement).click();
+      const gid = p.tracks().find((t) => t.device === 'geode')!.id;
+      await until('tape', () => !!p.tape(gid), 3000);
+      await sleep(1200); // IndexedDB and the doc's local save
+      sessionStorage.setItem('fwm.e2e.gp', '1');
+      location.reload();
+      return;
+    }
+    sessionStorage.removeItem('fwm.e2e.gp');
+    btn('Sound')?.click();
+    await until('engine', () => !!engineRef.current?.last, 4000);
+    await until('geode slot', () => Object.values(engineRef.current!.last!.devices).some((d) => d.eff.length === 59), 4000);
+    const slot = Number(Object.entries(engineRef.current!.last!.devices).find(([, d]) => d.eff.length === 59)![0]);
+    await sleep(1200);
+    engineRef.current!.noteOn(slot, 60, 0.9);
+    let pk = 0;
+    const t0 = performance.now();
+    while (performance.now() - t0 < 700) {
+      pk = Math.max(pk, ...Array.from(engineRef.current!.last!.scope).map(Math.abs));
+      await sleep(25);
+    }
+    engineRef.current!.noteOff(slot, 60);
+    ok(pk > 0.02, `after a reload the tape comes back from this browser, alone in the room (peak ${pk.toFixed(3)})`);
+  } catch (e) {
+    out.push(`FAIL gp: ${String(e)}`);
   }
   ok(errs.length === 0, `no page errors (${errs.join(' | ')})`);
   await fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
