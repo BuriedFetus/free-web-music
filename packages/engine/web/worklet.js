@@ -84,6 +84,11 @@ export class Sequencer {
     this.row = 0; // index of the playing row
     this.rowStart = 0; // global position (steps) where it started
     this.pending = null; // id of the row to switch to when the playing one ends (cue with wait)
+    this.origin = 0; // steps already played when this computer started (joining mid-row); see `clock`
+  }
+  /** Steps since Play, never reset by a row looping (devices that move in time, like Geode's Motion and walks). */
+  get clock() {
+    return this.pos + this.origin;
   }
   setPat(slot, id, p) {
     if (!this.pats.has(slot)) this.pats.set(slot, new Map());
@@ -121,6 +126,7 @@ export class Sequencer {
     this.setTransport({ playing: false });
     this.setTransport({ playing: true, row });
     this.rowStart = -target;
+    this.origin = Math.max(0, target);
   }
   /** Move so that row `row` is `target` steps in right now, without touching the global position. */
   seek(row, target) {
@@ -179,6 +185,7 @@ export class Sequencer {
       this.anchorFrame = 0;
       this.anchorPos = 0;
       this.rowStart = 0;
+      this.origin = 0;
       this.pending = null;
       if (playing && row != null && this.song) this.row = Math.max(0, Math.min(this.song.rows.length - 1, row | 0));
       for (const t of this.tracks.values()) t.step = -1;
@@ -465,7 +472,7 @@ export class FwmEngine extends Processor {
     const frames = out[0].length;
     const x = this.x;
     const sq = this.seq;
-    x.fwm_tempo(sq.bpm, sq.song ? sq.pos - sq.rowStart : sq.pos, sq.playing ? 1 : 0);
+    x.fwm_tempo(sq.bpm, sq.clock, sq.playing ? 1 : 0);
     sq.advance(frames, this.emit);
     this.runTimed(currentFrame, frames);
     x.fwm_render(frames);

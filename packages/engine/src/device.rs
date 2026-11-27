@@ -43,8 +43,8 @@ pub trait Device {
     fn all_notes_off(&mut self);
     /// Adds nothing: overwrites `left`/`right` with this device's output.
     fn render(&mut self, left: &mut [f32], right: &mut [f32]);
-    /// The song's tempo and place, before every block: `pos` in 16th-note steps since the playing
-    /// song row started (or since Play, without a song). Devices that move in time with the song use it.
+    /// The song's tempo and place, before every block: `pos` in 16th-note steps since Play (it keeps
+    /// counting when a row loops). Devices that move in time with the song use it.
     fn tempo(&mut self, _bpm: f32, _pos: f64, _playing: bool) {}
     /// A few numbers for the panel's pictures, read ~60 times a second (drains event queues: call once per read).
     fn viz(&mut self) -> &[f32] {
