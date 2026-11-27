@@ -262,19 +262,25 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
       touch('px');
       const x0 = ev.clientX, y0 = ev.clientY;
       let moved = false;
+      let sentAt = 0;
+      const send = (f: { x: number; z: number }) => {
+        sentAt = performance.now();
+        set('px', clamp((f.x / 0.85 + 1) / 2));
+        set('pz', clamp((f.z - 0.25) / 1.95));
+      };
       const place = (e: PointerEvent) => {
         if (!moved && Math.hypot(e.clientX - x0, e.clientY - y0) < 5) return; // a click opens her memory; a drag moves her
         moved = true;
         const f = pt.floorAt(e.clientX - r.left, e.clientY - r.top);
         if (!f) return;
-        live$.current.drag = f;
-        set('px', clamp((f.x / 0.85 + 1) / 2));
-        set('pz', clamp((f.z - 0.25) / 1.95));
+        live$.current.drag = f; // she follows the pointer at once; the song (and everyone) gets ~25 updates a second
+        if (performance.now() - sentAt > 40) send(f);
       };
       const c = ev.currentTarget;
       const up = () => {
         c.removeEventListener('pointermove', place);
         c.style.cursor = '';
+        if (moved && live$.current.drag) send(live$.current.drag);
         live$.current.drag = null;
         touch(null);
         if (!moved) {
@@ -514,8 +520,10 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
                 {!rec && inputs.find((i) => i.id === inputId)?.muted && <b className="fwm-geode__warn"> {inputs.find((i) => i.id === inputId)!.name} is muted: unmute it to record.</b>}
                 {rec && rec.phase !== 'saving' && <i className="fwm-geode__lvl" style={{ '--lvl': String(Math.min(1, rec.level * 1.4)) } as CSSProperties} />}
               </div>
-              {seg('mode', 'Plays', spec('mode').options!)}
               <div className="fwm-geode__box">
+                {seg('mode', 'Plays', spec('mode').options!)}
+                {Math.round(pv('mode')) !== 2 && seg('loop', 'Tape', spec('loop').options!)}
+                {Math.round(pv('mode')) !== 2 && Math.round(pv('loop')) === 1 && row('lfade', 'Fade in')}
                 {row('speed', 'Speed')}
                 {row('pos', 'Position')}
               </div>

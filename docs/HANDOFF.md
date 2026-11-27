@@ -1,6 +1,12 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-27): Add instrument, the manual, one octave
+## START HERE (2026-11-27, later): Geode lighter, darker, plays once
+User: "performance … a bit lacking", the room "full of dust due to the constant reflection", wants a darker background, the light as a dimmer neon, and no auto-looping ("the looping needs a solid fade in for the next loop, not fade out"). Done, pushed:
+- Room drawing: no canvas blur anywhere (it was the costly part and the haze); a cheap neon only on the room's edges (a wide faint stroke under the thin one); a quiet grid; no back-wall gradient, no wind streaks; the lamp is a neon tube that dims (no light cone); `--dev-geode-bg` #010103.
+- Speed: the manual's pictures are memoised (they re-rendered on every knob turn in the studio); dragging Mica writes to the song ~25×/s (she still follows the pointer at once).
+- Tape: new params `loop` (Once / Loop, default Once) and `lfade` (5–250 ms, default ~49 ms). Once: Classic / Reverse play the trimmed part once and the note ends (grains go on while held). Loop: each new pass fades in; only a 1.5 ms de-click at a pass's very end. Tests `the_tape_plays_once_unless_looped`, `a_loop_fades_each_new_pass_in_and_never_clicks`. Mica's memory: one box for Plays / Tape / Fade in / Speed / Position, smaller round buttons, it scrolls if the room is short.
+
+## Earlier (2026-11-27): Add instrument, the manual, one octave
 User asked (after Geode): add instruments from the Device panel, not the Library; the Library should be a clickable manual of the instruments (many pages); and the keyboard's octave must match the panel's ("explains why the grains felt too high"). Done, pushed:
 - **+ Add instrument** in the Device panel's header (`studio/AddInstrument.tsx`, `addInstrument()` shared).
 - **Library = the manual** (`studio/views/LibraryView.tsx`, content in `studio/manual.ts`):

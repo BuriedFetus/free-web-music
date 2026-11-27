@@ -1,7 +1,7 @@
 // The Library is the manual: a picture of every instrument (the real panel, not playable here) to click,
 // then a few pages per instrument with numbered spots on the panel. Adding instruments to the song is
 // done from the Device panel (+ Add instrument), or with the Add button on an instrument's pages.
-import { useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
+import { memo, useEffect, useLayoutEffect, useMemo, useRef, useState } from 'react';
 import type { DeviceHost } from '../../devices/basalt/Basalt';
 import { LIBRARY, type DeviceEntry } from '../../devices/registry';
 import { createDeviceStore } from '../../model/deviceStore';
@@ -22,7 +22,8 @@ const PREVIEW_HOST: DeviceHost = {
   sends: { rev: 0.2, dly: 0.1, set: () => {} },
 };
 
-function Picture({ d }: { d: DeviceEntry }) {
+/** Memoised: a picture never needs to redraw when the studio does (every knob turn re-renders the studio). */
+const Picture = memo(function Picture({ d }: { d: DeviceEntry }) {
   const store = useMemo(() => createDeviceStore(d.manifest!, d.presets?.[0]), [d]);
   const C = d.Component!;
   return (
@@ -30,7 +31,7 @@ function Picture({ d }: { d: DeviceEntry }) {
       <C store={store} host={PREVIEW_HOST} slot={-1} computerKeys={false} />
     </div>
   );
-}
+});
 
 export function LibraryView() {
   const [open, setOpen] = useState<{ device: string; page: number } | null>(null);

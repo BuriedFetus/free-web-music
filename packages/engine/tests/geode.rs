@@ -350,16 +350,40 @@ fn cpu_budget() {
 
 
 #[test]
-fn a_classic_loop_never_clicks_at_its_seam() {
-    // a tape that ends far from where it starts: looping it would jump, the seam fade hides the jump
+fn the_tape_plays_once_unless_looped() {
+    // a 0.1 s tone: held for 0.5 s, it is heard once, then silence (and the voice ends)
     let fs = 48_000.0;
     let mut g = geode(fs);
     plain(&mut g);
-    let tape: Vec<f32> = (0..4800).map(|i| 0.8 * (i as f32 / 4800.0)).collect(); // a ramp: 0 → 0.8, then back to 0
+    g.load(&sine(fs, 300.0, 0.1), None);
+    g.note_on(60, 1.0);
+    let (l, _) = render(&mut g, 24_000);
+    println!("once: playing {:.4}, after {:.5}", rms(&l[0..4000]), rms(&l[8000..]));
+    assert!(rms(&l[0..4000]) > 0.02, "it plays");
+    assert!(rms(&l[8000..]) < 1e-3, "then it is over: {}", rms(&l[8000..]));
+    render(&mut g, 48_000 * 4); // the release tail
+    assert_eq!(g.active(), 0, "the note ended with the tape");
+}
+
+#[test]
+fn a_loop_fades_each_new_pass_in_and_never_clicks() {
+    let fs = 48_000.0;
+    let mut g = geode(fs);
+    plain(&mut g);
+    g.set_param(p::LOOP, 1.0);
+    g.set_param(p::LFADE, (0.05 - 0.005) / 0.245); // 50 ms
+    // 0.2 s of 310 Hz: not a whole number of cycles, so looping it would jump at every seam
+    let tape = sine(fs, 310.0, 0.2);
     g.load(&tape, None);
     g.note_on(60, 1.0);
     let (l, _) = render(&mut g, 48_000);
     let jump = l[2000..].windows(2).map(|w| (w[1] - w[0]).abs()).fold(0.0f32, f32::max);
-    println!("biggest step between samples: {jump:.4}");
-    assert!(jump < 0.05, "the loop seam clicks: {jump}");
+    assert!(jump < 0.05, "a seam clicks: {jump}");
+    // the second pass starts at 0.2 s: 10 ms in it is still quiet, 60 ms in it is back to full
+    let at = |t: f32| l[(t * fs) as usize - 64..(t * fs) as usize + 64].iter().fold(0.0f32, |m, x| m.max(x.abs()));
+    let (early, later, first_pass) = (at(0.2 + 0.01), at(0.2 + 0.06), at(0.06));
+    println!("second pass: 10 ms {early:.3}, 60 ms {later:.3} (first pass at 60 ms {first_pass:.3})");
+    assert!(early < later * 0.5, "the new pass fades in");
+    assert!((later - first_pass).abs() < first_pass * 0.25 + 0.01, "and reaches full level");
+    assert!(g.active() == 1, "a loop keeps going while held");
 }

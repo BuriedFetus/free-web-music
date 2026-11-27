@@ -715,6 +715,29 @@
       "map": "lin",
       "min": 0,
       "max": 18
+    },
+    {
+      "id": "loop",
+      "label": "Loop",
+      "section": "tape",
+      "type": "enum",
+      "default": 0,
+      "options": [
+        "Once",
+        "Loop"
+      ]
+    },
+    {
+      "id": "lfade",
+      "label": "Fade in",
+      "section": "tape",
+      "type": "float",
+      "default": 0.18,
+      "unit": "ms",
+      "map": "lin",
+      "min": 5,
+      "max": 250,
+      "mod": true
     }
   ],
   "modSources": [
@@ -742,7 +765,7 @@
   "notes": {
     "values": "Every param is stored normalised 0..1 (enums as their index; mto is a bit mask of Motion targets: 1 Window, 2 Pitch, 4 Pan, 8 Grain position, 16 Echo, 32 Room, 64 Crunch). map exp = min*(max/min)^v; sq = min + v*v*(max-min).",
     "macros": "Front controls wish values for the back knobs; each knob ends at the weighted average of its own value and the wishes (macro_mix), each Temperature link scaled by its s_* knob. Temperature and Air ease in like a slow spring, the same for everyone.",
-    "tape": "The tape is not a param: the page writes it with fwm_sample_alloc / fwm_sample_set (never in the song). px / pz place Mica (pan, distance); eff px / pz are where she is after walking.",
+    "tape": "The tape is not a param: the page writes it with fwm_sample_alloc / fwm_sample_set (never in the song). px / pz place Mica (pan, distance); eff px / pz are where she is after walking. Classic / Reverse play the trimmed part once; with loop = Loop it repeats and every new pass fades in over lfade.",
     "viz": "fwm_viz: [tape play position 0..1 or -1, motion, compressor dB, 8 × (note or -1, level), event count, events × (tape position 0..1, note)]."
   }
 }

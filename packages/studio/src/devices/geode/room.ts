@@ -135,7 +135,7 @@ export class RoomPainter {
   private S = { temp: 0.6, tv: 0, air: 0, av: 0, room: 0.35, z: 0, zv: 0, x: 0, z0: 0.55 };
   private vis = {
     rings: [] as Ring[], echoes: [] as Echo[], sparks: [] as Spark[], grains: [] as { x: number; t: number }[],
-    wind: [] as { y: number; z: number; x: number; t: number }[], drops: [] as { x: number; y: number; v: number }[],
+    drops: [] as { x: number; y: number; v: number }[],
     fog: [] as { x: number; y: number; r: number; t: number }[], blink: 0, ringT: 0, step: 0, speed: 0, dir: 1,
     prev: [] as [number, number][],
   };
@@ -287,45 +287,37 @@ export class RoomPainter {
     const nc = along(pal.neon, S.temp);
     const x = clamp(S.temp) * 3, gi = Math.min(2, Math.floor(x));
     const nb = lerp(GLOW[gi], GLOW[gi + 1], sstep(0, 1, x - gi)) * pal.glow;
-    c.lineWidth = (1 / zs + 0.4) * lerp(0.85, 1.35, S.temp);
-    c.strokeStyle = rgba(nc, 0.85 * lit);
-    c.shadowColor = rgba(nc);
-    c.shadowBlur = nb * lit;
-    // the room
+    // plain lines (no blur: it was costly and filled the room with haze); a neon look only on the room's edges,
+    // from a wide faint stroke under the thin one
+    const lw = (1 / zs + 0.4) * lerp(0.85, 1.35, S.temp);
+    c.lineWidth = lw;
+    c.shadowBlur = 0;
     const L = G.L, fade = 1 - sstep(0.72, 1, S.room);
     const corners = (Z: number) => [P(-1, -1, Z), P(1, -1, Z), P(1, 1, Z), P(-1, 1, Z)];
-    line(corners(0), true);
-    c.globalAlpha = fade;
-    line(corners(L), true);
-    c.globalAlpha = 1;
-    for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) {
-      const g = c.createLinearGradient(...P(a, b, 0), ...P(a, b, L));
-      g.addColorStop(0, rgba(nc, 0.85 * lit));
-      g.addColorStop(1, rgba(nc, 0.85 * lit * fade));
-      c.strokeStyle = g;
-      line([P(a, b, 0), P(a, b, L)]);
-    }
+    const glow = Math.min(0.22, nb / 70) * pal.glow * lit; // soft and wide when warm, sharp when cold
+    const edges = (alpha: number, width: number) => {
+      c.lineWidth = width;
+      c.strokeStyle = rgba(nc, alpha);
+      line(corners(0), true);
+      for (const [a, b] of [[-1, -1], [1, -1], [1, 1], [-1, 1]]) line([P(a, b, 0), P(a, b, L * (0.55 + 0.45 * fade))]);
+      c.globalAlpha = fade;
+      line(corners(L), true);
+      c.globalAlpha = 1;
+    };
+    if (glow > 0.01) edges(glow, lw * 5);
+    edges(0.85 * lit, lw);
+    // floor and ceiling: a quiet grid that fades into the dark
+    c.lineWidth = lw * 0.8;
     for (let i = 1; i < 40; i++) {
       const Z = i * 0.35;
       if (Z >= L) break;
-      c.strokeStyle = rgba(nc, (1 - (Z / L) * (1 - fade)) * 0.35 * lit * (1 - sstep(L * 0.6, L, Z) * (1 - fade)));
+      c.strokeStyle = rgba(nc, 0.16 * lit * (1 - Z / (L + 0.5)));
       line([P(-1, 1, Z), P(1, 1, Z)]);
       line([P(-1, -1, Z), P(1, -1, Z)]);
     }
-    for (let i = -4; i <= 4; i++) {
-      const g = c.createLinearGradient(...P(i / 5, 1, 0), ...P(i / 5, 1, L));
-      g.addColorStop(0, rgba(nc, 0.3 * lit));
-      g.addColorStop(1, rgba(nc, 0.3 * lit * fade));
-      c.strokeStyle = g;
-      line([P(i / 5, 1, 0), P(i / 5, 1, L)]);
-    }
-    const bk = P(0, 0, L);
-    const rg = c.createRadialGradient(bk[0], G.vy, 0, bk[0], G.vy, G.hw * 0.7);
-    rg.addColorStop(0, rgba(pal.bg, sstep(0.4, 1, S.room)));
-    rg.addColorStop(1, rgba(pal.bg, 0));
-    c.fillStyle = rg;
-    c.fillRect(0, 0, W, H);
-    c.shadowBlur = nb * 0.7 * lit;
+    c.strokeStyle = rgba(nc, 0.12 * lit);
+    for (let i = -4; i <= 4; i++) line([P(i / 5, 1, 0), P(i / 5, 1, L * (0.55 + 0.45 * fade))]);
+    c.lineWidth = lw;
     this.drawWindow(c, I, t, lit, nc);
     this.drawMemoryWall(c, I, lit, nc, dt);
     this.drawLamp(c, I, nc);
@@ -370,18 +362,6 @@ export class RoomPainter {
       const a = P(-1 + 0.02 + Math.abs(ph) * 0.06, y - tilt, z0 + 0.02), b = P(-1 + 0.02 + Math.abs(ph) * 0.06, y + tilt * 0.3, z1 - 0.02);
       line([a, b]);
     }
-    const v = this.vis;
-    if (!I.reduceMotion && open > 0.03 && Math.random() < open * 0.6) v.wind.push({ y: lerp(so, y1, Math.random()), z: lerp(z0, z1, Math.random()), x: -0.98, t: 0 });
-    c.strokeStyle = rgba(pal.frost, 0.35 * lit);
-    v.wind = v.wind.filter((w) => {
-      w.t += 0.016;
-      w.x += 0.02 * (0.4 + open);
-      w.z += Math.sin(w.t * 3) * 0.003;
-      c.globalAlpha = 1 - w.t / 1.6;
-      line([P(w.x, w.y, w.z), P(w.x + 0.07, w.y, w.z)]);
-      c.globalAlpha = 1;
-      return w.t < 1.6;
-    });
   }
 
   private drawMemoryWall(c: CanvasRenderingContext2D, I: RoomInput, lit: number, nc: RGB, dt: number) {
@@ -438,23 +418,25 @@ export class RoomPainter {
   }
 
   private drawLamp(c: CanvasRenderingContext2D, I: RoomInput, nc: RGB) {
+    // a neon tube on the ceiling that dims with the Light (no light cone)
     const P = this.P.bind(this), pal = this.pal;
-    const line = (pts: [number, number][], close = false) => this.line(c, pts, close);
-    const top = P(0, -1, 0.75), shade = P(0, -0.72, 0.75), s = this.sc(0.75) * this.G.hw * 0.12, on = I.light;
-    c.strokeStyle = rgba(nc, 0.8);
-    line([top, shade]);
-    line([[shade[0] - s * 0.5, shade[1]], [shade[0] + s * 0.5, shade[1]], [shade[0] + s, shade[1] + s * 0.55], [shade[0] - s, shade[1] + s * 0.55]], true);
-    if (on > 0.02) {
-      const g = c.createRadialGradient(shade[0], shade[1] + s * 0.6, 0, shade[0], shade[1] + s * 0.6, this.G.hw * 0.9);
-      g.addColorStop(0, rgba(pal.lamp, 0.16 * on));
-      g.addColorStop(1, rgba(pal.lamp, 0));
-      c.fillStyle = g;
-      c.fillRect(0, 0, this.W, this.H);
-      c.fillStyle = rgba(pal.lamp, 0.9 * on);
-      c.beginPath();
-      c.arc(shade[0], shade[1] + s * 0.6, s * 0.18, 0, 7);
-      c.fill();
-    }
+    const line = (pts: [number, number][]) => this.line(c, pts);
+    const on = I.light;
+    const a = P(-0.18, -0.88, 0.75), b = P(0.18, -0.88, 0.75);
+    c.strokeStyle = rgba(nc, 0.5);
+    c.lineWidth = 1;
+    line([P(-0.13, -1, 0.75), P(-0.13, -0.88, 0.75)]);
+    line([P(0.13, -1, 0.75), P(0.13, -0.88, 0.75)]);
+    const w = this.sc(0.75) * this.G.hw * 0.022;
+    c.lineCap = 'round';
+    c.lineWidth = w * 2.6;
+    c.strokeStyle = rgba(pal.lamp, 0.12 * on * pal.glow);
+    line([a, b]);
+    c.lineWidth = w;
+    c.strokeStyle = rgba(pal.lamp, 0.12 + 0.88 * on);
+    line([a, b]);
+    c.lineCap = 'butt';
+    c.lineWidth = 1.3;
   }
 
   private wobble(I: RoomInput, u: number, amp: number, t: number) {
@@ -565,7 +547,7 @@ export class RoomPainter {
     c.lineWidth = 1.6;
     c.strokeStyle = col;
     c.shadowColor = rgba(pal.mica);
-    c.shadowBlur = 6 * lit * pal.glow;
+    c.shadowBlur = 0;
     const wk = Math.min(1, v.speed * 2.5), lg = Math.sin(v.step) * wk * u * 0.1, lift = (q: number) => Math.max(0, q) * 0.8;
     line([[-u * 0.18, -u * 0.2], [-u * 0.2 + lg, -lift(lg)], [-u * 0.32 + lg, -lift(lg)]]);
     line([[u * 0.18, -u * 0.2], [u * 0.2 - lg, -lift(-lg)], [u * 0.32 - lg, -lift(-lg)]]);
@@ -709,11 +691,11 @@ export class RoomPainter {
     c.fillStyle = rgba(pal.bg, 0.82);
     c.fillRect(0, 0, W, H);
     const rec = I.rec?.phase;
-    const cx = W / 2, cy = H * 0.2, r = Math.min(W, H) * 0.075, spin = rec === 'rec' || I.aud >= 0 ? t * 3 : rec === 'armed' ? t * 0.4 : 0;
+    const cx = W / 2, cy = H * 0.15, r = Math.min(W, H) * 0.058, spin = rec === 'rec' || I.aud >= 0 ? t * 3 : rec === 'armed' ? t * 0.4 : 0;
     c.strokeStyle = rgba(pal.ink);
     c.lineWidth = 1.5;
     c.shadowColor = rgba(pal.neon[1]);
-    c.shadowBlur = 6 * pal.glow;
+    c.shadowBlur = 0;
     for (const dx of [-1.6, 1.6]) {
       c.beginPath();
       c.arc(cx + dx * r, cy, r, 0, 7);

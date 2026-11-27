@@ -29,7 +29,7 @@
   --dev-guide-alt: #c9a6ff;    /* chord guide: the next chord's notes (purple) */
   --dev-guide-ink: #10131a;    /* text on the guide colours */
   /* Geode: Mica's room (drawn on a canvas from these) */
-  --dev-geode-bg: #04050a;         /* the room's darkness */
+  --dev-geode-bg: #010103;         /* the room's darkness */
   --dev-geode-neon-freeze: #beeeff; /* the room's neon lines at FREEZING … */
   --dev-geode-neon-chill: #6ecdff;
   --dev-geode-neon-warm: #ffc48c;

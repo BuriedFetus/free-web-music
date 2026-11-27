@@ -96,7 +96,10 @@ pub mod p {
     pub const CTH: usize = 56;
     pub const CRATIO: usize = 57;
     pub const CMAKE: usize = 58;
-    pub const COUNT: usize = 59;
+    /// Classic / Reverse: play the tape once (0) or loop it (1); each new pass fades in over LFADE.
+    pub const LOOP: usize = 59;
+    pub const LFADE: usize = 60;
+    pub const COUNT: usize = 61;
 }
 
 /// Parameter ids, in index order (they match `devices/geode.json`).
@@ -104,7 +107,8 @@ pub const IDS: [&str; p::COUNT] = [
     "temp", "air", "room", "wet", "div", "fb", "ewet", "breath", "light", "grains", "gsize", "gdens", "crunch", "mode", "speed", "pos",
     "start", "end", "lvl", "px", "pz", "walk", "wbars", "mshape", "mrate", "mdepth", "mto", "drive", "tone", "body", "thin", "gpitch",
     "gspeed", "spread", "chorus", "damp", "cut", "res", "sway", "airn", "atk", "dec", "sus", "rel", "decay", "pre", "er", "s_drive",
-    "s_tone", "s_body", "s_thin", "s_gpitch", "s_gspeed", "s_spread", "s_chorus", "s_damp", "cth", "cratio", "cmake",
+    "s_tone", "s_body", "s_thin", "s_gpitch", "s_gspeed", "s_spread", "s_chorus", "s_damp", "cth", "cratio", "cmake", "loop",
+    "lfade",
 ];
 
 pub fn defaults() -> [f32; p::COUNT] {
@@ -112,7 +116,7 @@ pub fn defaults() -> [f32; p::COUNT] {
         0.62, 0.15, 0.35, 0.35, 2.0, 0.45, 0.3, 0.4, 1.0, 0.8, 0.35, 0.5, 0.0, 0.0, 2.0 / 3.0, 0.0, //
         0.0, 1.0, 0.7, 0.5, 0.154, 0.0, 1.0, 0.0, 3.0, 0.0, 1.0, 0.15, 0.7, 0.5, 0.05, 0.5, //
         0.5, 0.3, 0.3, 0.5, 0.35, 0.15, 0.0, 0.0, 0.15, 0.4, 0.75, 0.4, 0.3, 0.2, 0.5, 1.0, //
-        1.0, 1.0, 1.0, 1.0, 0.7, 1.0, 1.0, 1.0, 0.5, 3.0 / 19.0, 5.0 / 18.0,
+        1.0, 1.0, 1.0, 1.0, 0.7, 1.0, 1.0, 1.0, 0.5, 3.0 / 19.0, 5.0 / 18.0, 0.0, 0.18,
     ]
 }
 
@@ -150,6 +154,7 @@ fn discrete_max(i: usize) -> Option<f32> {
     match i {
         p::DIV => Some(4.0),
         p::MODE => Some(2.0),
+        p::LOOP => Some(1.0),
         p::WALK => Some(4.0),
         p::WBARS | p::MSHAPE => Some(3.0),
         p::MRATE => Some(5.0),
@@ -191,6 +196,10 @@ pub fn macro_mix(base: f32, wishes: &[(f32, f32)]) -> f32 {
 /// Tape speed: 0.25× … 2× (exp), 1× at 2/3.
 pub fn speed_x(v: f32) -> f32 {
     0.25 * exp2(clamp01(v) * 3.0)
+}
+/// Fade-in of each new loop pass, seconds: 5 … 250 ms.
+pub fn loop_fade_s(v: f32) -> f32 {
+    lerp(0.005, 0.25, clamp01(v))
 }
 /// Grain length, seconds.
 pub fn grain_s(v: f32) -> f32 {
@@ -330,8 +339,10 @@ struct Ctl {
     spray: f32,
     gp: f32,
     jit: f32,
-    /// 1 / the loop seam's fade length, in samples.
-    seam: f32,
+    /// 1 / the fade-in of each new loop pass, and 1 / the end-of-pass de-click, in samples.
+    fadein: f32,
+    declick: f32,
+    looping: bool,
     crush: f32,
     drive: f32,
     drive_n: f32,
@@ -803,7 +814,9 @@ impl Geode {
         c.dens_t = fs / density(e[p::GDENS]);
         c.spray = lerp(0.01, 0.5, e[p::SPREAD]);
         c.jit = lerp(0.02, 0.4, e[p::SPREAD]);
-        c.seam = 1.0 / (0.004 * fs).min(c.span * 0.25).max(1.0);
+        c.looping = self.params[p::LOOP] >= 0.5;
+        c.fadein = 1.0 / (loop_fade_s(e[p::LFADE]) * fs).min(c.span * 0.5).max(1.0);
+        c.declick = 1.0 / (0.0015 * fs).min(c.span * 0.1).max(1.0);
         c.gp = lerp(-7.0, 9.0, e[p::GPITCH]);
         c.gsp = lerp(0.0, 2.0, e[p::GSPEED]);
         c.crush = if on(mt::CRUNCH) { clamp01(e[p::CRUNCH] + (raw * 0.5 + 0.5) * depth * 0.7) } else { e[p::CRUNCH] };
@@ -916,27 +929,43 @@ impl Geode {
                 let key = if mode == 2 { 1.0 } else { exp2((v.note as f32 - 60.0) / 12.0) };
                 let rate = key * exp2(c.bend / 12.0) * c.rate * c.spd;
                 if c.mix_dry > 0.001 {
-                    let x = match mode {
-                        1 => c.pos0 - v.pos,
-                        2 => {
-                            let w = c.span / SLICES as f32;
-                            if v.pos >= w - 1.0 && v.held {
+                    // Slices: one slice, then the note ends. Classic / Reverse: the trimmed part once (or looped:
+                    // every new pass fades in; only a 1.5 ms de-click at the very end of a pass)
+                    let (x, gain) = if mode == 2 {
+                        let w = c.span / SLICES as f32;
+                        if v.pos >= w - 1.0 && v.held {
+                            self.v[vi].held = false;
+                            self.v[vi].amp.gate_off();
+                        }
+                        (v.slice as f32 * w + v.pos.min(w - 1.0), 1.0)
+                    } else {
+                        let rev = mode == 1;
+                        let start = if rev { if c.pos0 > 0.5 { c.pos0 } else { c.span } } else { c.pos0 };
+                        let first = if rev { start } else { c.span - c.pos0 };
+                        let d = v.pos;
+                        if d < first {
+                            let x = if rev { start - d } else { c.pos0 + d };
+                            (x, ((first - d) * c.declick).min(1.0))
+                        } else if c.looping {
+                            let e = d - first;
+                            let into = e - libm::floorf(e / c.span) * c.span;
+                            let x = if rev { c.span - into } else { into };
+                            (x, ((c.span - into) * c.declick).min(1.0) * (into * c.fadein).min(1.0))
+                        } else {
+                            // played once: the tape is over (grains, if any, go on while the key is held)
+                            if c.mix_gr <= 0.001 && v.held {
                                 self.v[vi].held = false;
                                 self.v[vi].amp.gate_off();
                             }
-                            v.slice as f32 * w + v.pos.min(w - 1.0)
+                            (0.0, 0.0)
                         }
-                        _ => c.pos0 + v.pos,
                     };
-                    // Classic / Reverse loop the trimmed part: a 4 ms fade at its ends so the seam never clicks
-                    let edge = if mode == 2 { 1.0 } else {
-                        let u = wrap(x, c.span);
-                        (u.min(c.span - u) * c.seam).min(1.0)
-                    };
-                    let g = amp * c.mix_dry * edge;
-                    let (a, b) = self.read2(x);
-                    l += a * g;
-                    r += b * g;
+                    if gain > 0.0 {
+                        let g = amp * c.mix_dry * gain;
+                        let (a, b) = self.read2(x);
+                        l += a * g;
+                        r += b * g;
+                    }
                     self.v[vi].pos += rate;
                 }
                 if c.mix_gr > 0.001 {

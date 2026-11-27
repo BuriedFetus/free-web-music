@@ -29,6 +29,7 @@ export const GEODE_FORMAT: Record<string, (v: number) => string> = {
   gsize: (v) => `${Math.round(lerp(20, 300, v ** 1.3))} ms`,
   gdens: (v) => `${Math.round(lerp(4, 60, v))} /s`,
   speed: (v) => `${(0.25 * 8 ** v).toFixed(2)}×`,
+  lfade: (v) => `${Math.round(lerp(5, 250, v))} ms`,
   atk: (v) => secs(lerp(0.003, 3, v * v)),
   dec: (v) => secs(lerp(0.05, 3, v * v)),
   rel: (v) => secs(lerp(0.03, 5, v * v)),

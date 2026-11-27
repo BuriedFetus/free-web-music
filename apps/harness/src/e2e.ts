@@ -1547,7 +1547,7 @@ async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { curre
       const meta = p.tape(gid)!;
       ok(meta.frames / meta.sr > 0.8 && meta.frames / meta.sr < 4, `a tape of ${(meta.frames / meta.sr).toFixed(2)} s is on the track (${meta.name})`);
       await sleep(400);
-      const slot = Number(Object.entries(engineRef.current!.last!.devices).find(([, d]) => d.eff.length === 59)![0]);
+      const slot = Number(Object.entries(engineRef.current!.last!.devices).find(([, d]) => d.eff.length === deviceEntry('geode')!.manifest!.params.length)![0]);
       key('a', true);
       const pk = await peak(700);
       const viz = engineRef.current!.last!.devices[slot].viz;
@@ -1609,8 +1609,8 @@ async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { curre
       await until('engine', () => !!engineRef.current?.last, 4000);
       const gid = geodeId()!;
       const hash = p.tape(gid)!.hash;
-      await until('geode slot', () => Object.values(engineRef.current!.last!.devices).some((d) => d.eff.length === 59), 4000);
-      const slot = Number(Object.entries(engineRef.current!.last!.devices).find(([, d]) => d.eff.length === 59)![0]);
+      await until('geode slot', () => Object.values(engineRef.current!.last!.devices).some((d) => d.eff.length === deviceEntry('geode')!.manifest!.params.length), 4000);
+      const slot = Number(Object.entries(engineRef.current!.last!.devices).find(([, d]) => d.eff.length === deviceEntry('geode')!.manifest!.params.length)![0]);
       await sleep(1500); // the tape arrives in pieces, then loads
       engineRef.current!.noteOn(slot, 60, 0.9);
       const pk = await peak(700);
@@ -1648,8 +1648,8 @@ async function runGeodeKeep(p: Project, engineRef: { current: Engine | null }, o
     sessionStorage.removeItem('fwm.e2e.gp');
     btn('Sound')?.click();
     await until('engine', () => !!engineRef.current?.last, 4000);
-    await until('geode slot', () => Object.values(engineRef.current!.last!.devices).some((d) => d.eff.length === 59), 4000);
-    const slot = Number(Object.entries(engineRef.current!.last!.devices).find(([, d]) => d.eff.length === 59)![0]);
+    await until('geode slot', () => Object.values(engineRef.current!.last!.devices).some((d) => d.eff.length === deviceEntry('geode')!.manifest!.params.length), 4000);
+    const slot = Number(Object.entries(engineRef.current!.last!.devices).find(([, d]) => d.eff.length === deviceEntry('geode')!.manifest!.params.length)![0]);
     await sleep(1200);
     engineRef.current!.noteOn(slot, 60, 0.9);
     let pk = 0;
