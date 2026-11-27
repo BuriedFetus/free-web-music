@@ -1,6 +1,6 @@
 // The window layout: 2×2 resizable panels, each showing any view. It belongs to this user only
 // (saved in their browser), so rearranging never changes anyone else's screen.
-import { useCallback, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
+import { useCallback, useEffect, useRef, useState, type CSSProperties, type PointerEvent } from 'react';
 import type { Peer } from '../collab/presence';
 import { useStudio } from './context';
 import { DeviceView } from './views/DeviceView';
@@ -50,6 +50,33 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
   const drag = useRef<'v' | 'h' | null>(null);
   const live = useRef(L);
   live.current = L;
+  // Tab zooms: out from a full-size panel to all four, then back into the same one. With nothing to go back
+  // to, Tab brings the panel under the mouse to full size. Only while the mouse is over the panels (and not
+  // typing), so Tab still moves the keyboard focus everywhere else.
+  const over = useRef(-1);
+  const back = useRef(-1);
+  const [zoom, setZoom] = useState<'in' | 'out' | null>(null);
+  useEffect(() => {
+    const kd = (e: KeyboardEvent) => {
+      if (e.key !== 'Tab' || e.shiftKey || e.ctrlKey || e.metaKey || e.altKey || over.current < 0) return;
+      if ((e.target as HTMLElement).closest?.('input:not([type=range]), textarea, select, [contenteditable=true]')) return;
+      e.preventDefault();
+      if (e.repeat) return;
+      const cur = live.current;
+      if (cur.max >= 0) {
+        back.current = cur.max;
+        save({ ...cur, max: -1 });
+        setZoom('out');
+      } else {
+        const i = back.current >= 0 ? back.current : over.current;
+        back.current = -1;
+        save({ ...cur, max: i });
+        setZoom('in');
+      }
+    };
+    addEventListener('keydown', kd, true);
+    return () => removeEventListener('keydown', kd, true);
+  }, [save]);
 
   const splitDown = (which: 'v' | 'h') => (e: PointerEvent<HTMLDivElement>) => {
     e.currentTarget.setPointerCapture(e.pointerId);
@@ -68,9 +95,11 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
   };
 
   return (
-    <div ref={grid} className={'fwm-ws' + (L.max >= 0 ? ' is-max' : '')} style={{ '--c1': L.c1 + '%', '--r1': L.r1 + '%' } as CSSProperties}>
+    <div ref={grid} className={'fwm-ws' + (L.max >= 0 ? ' is-max' : '') + (zoom ? ' is-zoom-' + zoom : '')} onAnimationEnd={() => setZoom(null)}
+      onPointerLeave={() => (over.current = -1)} style={{ '--c1': L.c1 + '%', '--r1': L.r1 + '%' } as CSSProperties}>
       {L.views.map((v, i) => (
-        <section key={i} className={'fwm-pane' + (L.max === i ? ' is-maxed' : '')} data-i={i} aria-label={VIEWS[v]}>
+        <section key={i} className={'fwm-pane' + (L.max === i ? ' is-maxed' : '')} data-i={i} aria-label={VIEWS[v]}
+          onPointerMove={() => (over.current = i)} onPointerEnter={() => (over.current = i)}>
           <header className="fwm-ph">
             <select value={v} aria-label={`Panel ${i + 1} view`}
               onChange={(e) => {
@@ -88,7 +117,7 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
             </select>
             {v === 'roll' || v === 'device' ? <TrackTabs peers={peers} /> : <PaneContext view={v} />}
             {v === 'device' && <AddInstrument />}
-            <button type="button" className="fwm-ib" aria-pressed={L.max === i} aria-label={L.max === i ? 'Restore panels' : 'Maximise panel'}
+            <button type="button" className="fwm-ib" aria-pressed={L.max === i} aria-label={L.max === i ? 'Restore panels' : 'Maximise panel'} title={(L.max === i ? 'Show all panels' : 'Full size') + ' (Tab)'}
               onClick={() => save({ ...L, max: L.max === i ? -1 : i })}>
               {L.max === i ? '⤡' : '⤢'}
             </button>

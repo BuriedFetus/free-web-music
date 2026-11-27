@@ -22,6 +22,8 @@ export class Sequencer {
   song: { rows: { id: string; len: number; cells: Record<number, string> }[]; loop: 'track' | 'song' } | null;
   row: number;
   rowStart: number;
+  /** Steps since Play (keeps counting when a row loops): what devices move by. */
+  readonly clock: number;
   advance(frames: number, emit: (frame: number, kind: 'on' | 'off' | 'param', slot: number, a: number, b?: number) => void): void;
   flush(emit: (frame: number, kind: 'off', slot: number, a: number) => void): void;
 }

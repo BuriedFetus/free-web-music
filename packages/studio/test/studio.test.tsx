@@ -292,5 +292,23 @@ describe('<Studio>', () => {
     expect(tab(B, 'Basalt').getAttribute('aria-selected')).toBe('true'); // Bob's stay where he left them
     expect(within(B.getByRole('region', { name: 'Device' })).getByText(/Mono bass synth/)).toBeTruthy();
   });
+  it('Tab zooms: the panel under the mouse goes full size, Tab shows all panels, Tab goes back into the same one', () => {
+    mount();
+    const pane = (n: string) => screen.getByRole('region', { name: n });
+    const ws = () => pane('Device').parentElement!;
+    const tab = (shift = false) => fireEvent.keyDown(window, { key: 'Tab', shiftKey: shift });
+    tab();
+    expect(ws().classList.contains('is-max')).toBe(false); // mouse not over the panels: Tab is left alone
+    fireEvent.pointerEnter(pane('Device'));
+    tab();
+    expect(pane('Device').classList.contains('is-maxed')).toBe(true);
+    tab();
+    expect(ws().classList.contains('is-max')).toBe(false); // zoomed out: all four
+    fireEvent.pointerMove(pane('Piano roll')); // the mouse wandered, Tab still goes back where you were
+    tab();
+    expect(pane('Device').classList.contains('is-maxed')).toBe(true);
+    tab(true);
+    expect(pane('Device').classList.contains('is-maxed')).toBe(true); // Shift+Tab is focus, as usual
+  });
 });
 
