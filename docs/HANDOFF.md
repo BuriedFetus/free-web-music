@@ -1,6 +1,25 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-27, evening): Geode feedback round
+## START HERE (2026-11-27, night): the big QoL session. Everything below is pushed.
+**Waiting on the user** (ask first, build after):
+- Their listening test of Geode's rug / door / mirror (built from the approved mock-up `design/kit/geode-objects.html`).
+- Next wall objects, all approved in principle: plant (grain density + spread), hourglass (freeze), shelf of jars (shimmer / sub / chorus; jars also show shimmer that comes from TEMP or anything else, as glowing bubbles above the set level). Wall clock and metronome are benched. Do a mock-up first; next time inside the real app behind a preview switch, so it looks like Geode.
+- Rings vs grains (proposed, no answer yet): rings only for Mica's voice (real tape level), grains shown on the memory wall + sparks faded by the grains' real level.
+- Their ideas for Geode's other pop-ups.
+- `plz_fix_key` (a user screenshot) is in git history (commit 6f2cf71); deleted since. Rewriting history needs the user's OK. **Never `git add -A`**: the user drops screenshots in the repo root (`guitar-chord` is there now, untracked).
+
+**Done this session:**
+- Workspace: Tab zooms (mouse over the panels: full size ↔ all four, back into the same one); ⟷ makes a panel take its whole row; `fwm:open-view` window event brings a view forward (used by the arrangement).
+- Song arrangement cells: double-click opens the pattern in the Piano roll (an empty cell gets a new pattern), right-click or the ✕ on hover empties it.
+- Piano roll: a table (each grid line an element placed like the notes, bold bars, the ruler is the sticky first row); fat keys (Zoom = how many keys in view: 100% two octaves, 150% default ≈ 16 keys, 300% eight; the whole pattern always fits across); a real-looking keyboard with every name; note names inside notes; one toolbar row with Pattern ▾ for the rest; Lanes dropdown (Hidden / Velocity / Automation (n)), automation shows only lanes with points, + Automate a knob, Clear / Clear all automation (asks once); Shift+drag copies a note with its automation.
+- Recording keeps a length you set (the take loops inside it); only a new empty 1-bar pattern grows.
+- Knobs follow automation (Garnet GKnob, every ParamKnob without modulation).
+- Saved presets on every instrument (shared `devices/PresetBar.tsx`, `model/myPresets.ts`). **Host API, new:** `presets?: PresetLibrary` on `<Studio>` (list(device) / save(device, preset) / remove(device, id); presets are plain JSON: id, name, params, routes, updated). The friend's app should keep them with the person's account; without it they stay in the browser.
+- Garnet: no Chords / Notes switch (the neck shows notes); the chords of the key are a button row in PLAY (click / keys 1–7; with the chord guide on they guide like pressing the chord's root, applied after the strum); round notes unless the guide is on.
+- Geode: Motion 0 = nothing moves (the walk scales with depth); drag the lamp (Light) and the window (Air; the sash follows the finger); room size + / − in the dock beside Room; rug (param 61, a macro: darker shorter tail, softer slap-backs, duller echo), door (= the SEND knobs), mirror (param 62 width; click flips Classic / Reverse). Browser test `?e2e=gobj`.
+- Known: `?e2e=arrange` has 2 old drag failures (from before this session); the CPU budget test can fail when every engine test runs at once (16% alone).
+
+## Earlier (2026-11-27, evening): Geode feedback round
 - Every note sends its ring at once (short notes were missed); the Light dims only the lamp.
 - Sliders in Geode's pop-ups: the handle = your setting, a bar behind it = what you hear now, and the number too, updated every frame from the engine (macros like Breath / Temperature and Motion move them). Element hook: `data-eff="<param>"` + `--eff`.
 - Drag the room's back wall: up = bigger room, down = smaller.
