@@ -191,12 +191,16 @@
 .fwm-pname { width: 140px; min-height: 34px; }
 .fwm-lenbox { display: flex; flex-wrap: wrap; align-items: center; gap: 4px; }
 .fwm-prw { display: grid; flex: 1; min-height: 0; align-content: start; overflow-y: auto; border-radius: 6px; scrollbar-width: thin; }
-.fwm-pkr { font: calc(11px * var(--fwm-rz, 1.2)) var(--fwm-font-screen); color: var(--fwm-roll-keyink); background: var(--fwm-roll-key); border-bottom: 1px solid var(--fwm-roll-keyline); padding-left: 4px; white-space: nowrap; overflow: hidden; }
-.fwm-pkr.is-b { background: var(--fwm-roll-keyb); color: var(--fwm-roll-key); }
+.fwm-pkr { position: relative; font-family: var(--fwm-font-screen); color: var(--fwm-roll-keyink); background: var(--fwm-roll-key); border-bottom: 1px solid var(--fwm-roll-keyline); white-space: nowrap; overflow: hidden; text-align: right; padding-right: 6px; }
+/* a black key is a shorter dark key lying on the white ones, like a real keyboard; its name sits beside it */
+.fwm-pkr__b { position: absolute; left: 0; top: 0; bottom: 0; width: 60%; background: var(--fwm-roll-keyb); border-radius: 0 3px 3px 0; }
+.fwm-pkr.is-b { color: color-mix(in srgb, var(--fwm-roll-keyink) 55%, transparent); }
+.fwm-pkr__n { position: relative; }
+.fwm-pkr.is-c { font-weight: 800; border-bottom-color: color-mix(in srgb, var(--fwm-roll-keyink) 45%, transparent); }
 .fwm-pkeys { cursor: pointer; touch-action: none; user-select: none; }
 .fwm-pkr:hover { filter: brightness(.9); }
 .fwm-pkr.is-out { opacity: .45; }
-.fwm-pkr.is-root { box-shadow: inset 4px 0 0 var(--fwm-note); font-weight: 700; }
+.fwm-pkr.is-root { box-shadow: inset -4px 0 0 var(--fwm-note); font-weight: 800; }
 .fwm-grid { position: relative; touch-action: none; cursor: crosshair; outline-offset: -2px; }
 /* the grid's vertical lines (one element each, placed like the notes): step < beat < bar */
 .fwm-vl { position: absolute; top: 0; bottom: 0; width: 1px; margin-left: -0.5px; pointer-events: none; z-index: 1; background: color-mix(in srgb, var(--fwm-roll-ink) 10%, transparent); }

@@ -17,7 +17,7 @@ import { NameInput } from './TrackName';
 
 // Sizes at zoom 1 (px); the Zoom buttons scale them all, and the text with them
 const RH_MIN = 14, RH_MAX = 34; // row height: the rows grow to fill the panel, then scroll
-const KEYW0 = 44; // key column width
+const KEYW0 = 84; // key column width: a real little keyboard, a name on every key
 const SW0 = 14; // narrowest step: longer patterns scroll sideways
 const ZOOMS = [1, 1.25, 1.5, 2, 2.5, 3];
 const ZOOM0 = 1.5; // readable by default
@@ -467,10 +467,11 @@ export function RollView({ peers }: { peers: Peer[] }) {
         </div>
         <div className="fwm-pkeys" aria-label="Piano keys: press to hear a note" {...keyCol}>
           {pitches.map((m) => {
-            const cls = (isBlack(m) ? ' is-b' : '') + (keyed && !inKey(m, key) ? ' is-out' : '') + (isRoot(m, key) ? ' is-root' : '');
+            const cls = (isBlack(m) ? ' is-b' : '') + (m % 12 === 0 ? ' is-c' : '') + (keyed && !inKey(m, key) ? ' is-out' : '') + (isRoot(m, key) ? ' is-root' : '');
             return (
-              <div key={m} data-key={m} className={'fwm-pkr' + cls} style={{ height: RH, lineHeight: RH + 'px' }} title={noteName(m)}>
-                {folded || m % 12 === 0 || isRoot(m, key) ? noteName(m) : ''}
+              <div key={m} data-key={m} className={'fwm-pkr' + cls} style={{ height: RH, lineHeight: RH + 'px', fontSize: Math.max(11, Math.min(RH * 0.72, 13 * zoom)) }} title={noteName(m)}>
+                {isBlack(m) && !folded && <i className="fwm-pkr__b" />}
+                <span className="fwm-pkr__n">{noteName(m)}</span>
               </div>
             );
           })}
