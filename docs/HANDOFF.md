@@ -1,6 +1,14 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-26, evening): Geode mock-up round 2 waiting for the user's review
+## START HERE (2026-11-26, night): Geode built in the studio (all three slices); waiting for the user to play it
+The user asked me to build the rest of the Geode milestone while they work, and to put suggestions in the plan. Done and pushed:
+- slice 1 engine `31ed80a`, slice 2 tapes `3d53884`, slice 3 panel `7b788a7` (details and my suggestions: PLAN.md "Geode").
+- Try it: `npm run dev`, Library → Samplers → Geode, add an Opal too, click Mica (dock, left), REC, play the keys (they play the Opal while armed), REC again. Or DEMO when there is nothing to record. `?geode` = Geode alone (demo tape only); `?geodeback` shows the hidden back.
+- Tests: `cargo test --release --test geode` (15), `test/sampleStore.test.ts` (8), browser `?e2e=ga` + `?e2e=gb` in one room (two tabs, 16 checks), and the older roles still pass (opal, a/b, ta/tb).
+- Not checked by ear: the sound at 44.1 kHz in a real browser, the feel of the springs and of dragging Mica. That is the user's review.
+- The mock-up artifact is now older than the studio version; republish only if asked.
+
+## Earlier (2026-11-26, evening): Geode mock-up round 2 waiting for the user's review
 Geode = a sampler in a little room with Mica (plan approved, 5 rounds; see PLAN.md "Geode"). The mock-up `design/kit/geode.html` (artifact "Geode: Mica's room") has had three rounds (latest: tape PLAY, drag Mica to pan, walks); the user reviews later and said the goal now is **look / utility / feel**. They may bring images made from the prompts in `design/refs/prompt/` (git-ignored: never commit or publish anything from design/refs). Next: their feedback, then slice 1 (the Rust engine, kind 6).
 Mock-up test: serve design/kit, `geode.html?selftest` (offline render 44.1 / 48 kHz); preview options `?temp=&air=&room=&light=&crunch=&grains=&echo=&play&rec&motion&walk=<lr|boom|circle|random>&pop=<icon>`.
 

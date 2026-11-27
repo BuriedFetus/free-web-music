@@ -213,8 +213,42 @@ Full approved plan (5 rounds with the user): sample-based synth, starts empty, r
   - [x] Stuck notes fixed (a note let go before the sound was ready never got its off); Escape = all notes off; popups sit to the side so Mica stays visible
   - [x] Image prompts for the user's image generator in `design/refs/prompt/` (git-ignored): Mica's outfits, the room, the dock icons, recording in her head, the temperature sequence
   - [x] Round 3 (user: "hard to play around, no sample playback on Mica's icon"; "drag and drop Mica for PAN … automated walk"): **▶ PLAY** in Mica's menu plays the trimmed tape once (a playhead runs along the film strip, the reels spin); **drag Mica** in the room: left / right = pan, farther back = quieter with more room (front/back is my addition: easy to drop); **Mica walks** (in Motion): Stay, Left ↔ right, Boomerang, Circle, Random, 1–8 bars, around where you dropped her, with stepping legs and a lean; "Back to the room" moved to the top right
-- [ ] User review of the mock-up (later)
-- [ ] Slice 1 engine (`devices/geode.rs`, kind 6, sample bank, `macro_mix`), Slice 2 capture + sharing (`sampleStore`, `smp` chunks on the live channel), Slice 3 the panel in the studio
+- [ ] User review of the mock-up (later; the user asked me to build the rest of the milestone meanwhile, 2026-11-26: "do the rest of the milestone for the Geode app and commit")
+- [x] **Slice 1, engine** (`src/devices/geode.rs`, kind 6, manifest `devices/geode.json`, 59 params, 15 tests in `tests/geode.rs`):
+  - tape bank per slot from grown wasm memory (`fx::line::take_big`), never the shared 4 MiB pool; the room / echo / chorus lines carved from the slot's own block (`fx::line::with_arena`, also used by any future device with big effects)
+  - 8 voices: Classic (key-pitched loop of the trimmed part), Reverse, Slices (8, one per scale degree), blended with Grains (64-grain pool, Hann table, 4-point Hermite reads, level kept steady across size/density); ADSR = the dsp `Adsr`
+  - chain as in the mock-up: crunch → drive → body (new `Biquad::lowshelf`) → thin → tone → window filter (+ sway LFO, coloured wind noise that only blows while a voice sounds) → chorus → echo (fx `Delay`, tempo-synced) → room (fx `Reverb` with a new `t60` override + early reflections) → compressor + make-up + limiter → distance + place pan + motion pan → lamp → level
+  - macros in the engine: `macro_mix` (weighted average, scaled links), Temperature / Air springs (the same easing for everyone), Room, Breath; Motion LFO and Mica's walks follow the song (`Device::tempo`, fed every block by the worklet: `fwm_tempo`), Random is hashed from the beat so every computer agrees
+  - new generic hooks: `Device::viz` (`fwm_viz`: numbers for a panel's pictures, sent in `tick.devices[slot].viz`), `Device::command` (`fwm_command`: tape play / seek / clear), `fwm_sample_alloc` / `fwm_sample_set`, recording tap `fwm_capture` (`engine.capture(slot, fn)`)
+  - CPU: worst case (8 voices, 64 grains of 300 ms, everything on) 16% of one core natively
+- [x] **Slice 2, tapes** (`model/sampleStore.ts`, `studio/useTapes.ts`, 8 tests): REC arms a tap on any other track (after its fader), waits for sound, records up to 30 s, the keys meant for the Geode play the input while armed; trimmed, normalised, rounded to 16 bits, fingerprinted (FNV ×2 on the PCM: identical everywhere). Kept in IndexedDB (or a host `tapes: TapeStorage` prop), sent in paced chunks (`{t:'smp'}`, 24 KB PCM each, 4 per 40 ms) on the live channel; a newcomer asks (`{t:'smp?'}`), whoever has it answers after a random wait unless someone else already is. The song holds only `TapeMeta` (`Project.tape / setTape`, saved in song files, undoable). Peers at another sample rate resample on load.
+- [x] **Slice 3, panel** (`devices/geode/`: `Geode.tsx`, `room.ts`, `presets.ts`, `types.ts`; skin `skins/geode.css`, tokens `--dev-geode-*` in device-base.css and the My look brief): the room painter is the mock-up's drawing, reading every colour from tokens; the dock and its pop-ups; Mica's memory (REC / STOP, TRIM with a waveform, REMOVE + Undo toast, PLAY, DEMO tape, Classic / Reverse / Slices, speed, position, "getting the tape 40%" / "waiting for someone who has it"); drag Mica (pan, distance), drag the film strip (grain position); the hidden back (`?geodeback`: every knob behind the macros with its macro arc, the Temperature scales, dynamics + squash meter, modulation); 8 presets that never move Mica or the trim; Library → Samplers; harness `?geode`; browser test `?e2e=ga` + `?e2e=gb` (two tabs: record an Opal through Mica's REC, play it, thermometer eases, PLAY, REMOVE + Undo; the other tab gets the tape live and plays it; the song stays ~3 KB)
+- [ ] The user plays it (sound at 44.1 kHz in a real browser, the feel of the springs, dragging Mica on a touch screen)
+
+#### Geode: suggestions for later (mine, 2026-11-26; not started, pick any)
+Quality of life
+- **Level while armed**: show the input's meter while REC waits (not only once recording), and say so when the input track is muted ("Opal is muted: unmute it to record").
+- **Record the song**: an "arm with the song" option that starts recording on the next bar when Play starts, so a whole Opal phrase lands on the beat; and a count-in click.
+- **Tape snapping**: when recording during Play, trim the start to the nearest beat so Classic loops stay in time.
+- **Undo for a re-recording** already works (the old tape stays in the store); add a small "previous tapes" list in Mica's menu (the last 5 tapes of this browser) to swap back without undo.
+- **Drop a file**: drag a WAV / MP3 onto the room to load it (decodeAudioData, mono-mix, 30 s cap). Not asked for; cheap and very handy.
+- **Keyboard**: arrow keys move Mica when she has focus (accessibility for the pan drag); `R` in her menu = REC.
+- **Pop-up memory**: remember which pop-up was last open per person (workspace), and close pop-ups with Escape.
+- **Touch**: bigger hit area for Mica on small screens; long-press on the film strip to seek.
+Sound
+- **Shimmer** at FREEZING (an octave-up feed into the room's tail), in the plan but not built.
+- **Per-voice filter envelope** for Classic mode (pluckier tapes), and a **loop crossfade** so a Classic loop never clicks at its seam (now it wraps hard).
+- **Pitch-follow root**: detect the tape's pitch when recording and set the root note, so C plays the recorded note's pitch.
+- **Grain reverse chance** and **freeze** (hold the grain head while a key is held), from the original plan.
+- **Stereo width** knob on the back.
+Sharing
+- **Compression on the wire**: 16-bit PCM costs ~5.8 MB for 30 s of stereo at 48 kHz; mono detection already halves identical channels. Options: send at 24 kHz when the tape has little high end, or use the browser's Opus encoder (WebCodecs AudioEncoder) where it exists, keeping PCM as the fallback.
+- **IndexedDB clean-up**: forget tapes no song has used for 30 days (the store keeps a `saved` time already).
+- **Host hook**: the host may want to save tapes with the song (its server, its rules): `TapeStorage` already allows it.
+Studio
+- **Mixer strip** shows Mica's face on a Geode track; the Scope can watch a Geode like any slot already.
+- **Republish** the device kit artifacts with the Geode skin when the user wants them.
+
 
 ### Song arrangement cells (user, 2026-11-25: "double-click to remove a pattern … drag and drop (copy to this track)")
 - [x] Double-click a cell (or Delete) empties it; the pattern stays with its instrument; toast with Undo
