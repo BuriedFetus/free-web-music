@@ -166,7 +166,7 @@
 .fwm-lanenone { margin: 6px 0 0; font-size: 13px; color: var(--fwm-mute); }
 .fwm-tb.is-warn { border-color: var(--fwm-rec); color: var(--fwm-rec); }
 .fwm-ruler { display: grid; grid-template-columns: repeat(16, minmax(0, 1fr)); font: 16px var(--fwm-font-screen); height: 18px; opacity: .85; white-space: nowrap; }
-.fwm-ruler .is-bar { font-weight: 700; opacity: 1; }
+.fwm-ruler .is-bar { font-weight: 800; opacity: 1; box-shadow: inset 2px 0 0 color-mix(in srgb, var(--fwm-roll-ink) 60%, transparent); padding-left: 3px; }
 .fwm-rsc { overflow-x: auto; scrollbar-width: thin; }
 .fwm-patbar { padding-bottom: 6px; border-bottom: 1px solid color-mix(in srgb, var(--fwm-roll-ink) 20%, transparent); }
 .fwm-patbar__what { font-weight: 700; }
@@ -185,8 +185,10 @@
 .fwm-pkr.is-root { box-shadow: inset 4px 0 0 var(--fwm-note); font-weight: 700; }
 .fwm-grid { position: relative; touch-action: none; cursor: crosshair; outline-offset: -2px; }
 .fwm-grid::after { content: ""; position: absolute; inset: 0; pointer-events: none; z-index: 1;
-  background-image: linear-gradient(90deg, color-mix(in srgb, var(--fwm-roll-ink) 8%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fwm-roll-ink) 22%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fwm-roll-ink) 45%, transparent) 1px, transparent 1px);
-  background-size: var(--fwm-snapw, calc(100% / 16)) 100%, var(--fwm-beatw, 25%) 100%, var(--fwm-barw, 100%) 100%; }
+  background-image: linear-gradient(90deg, color-mix(in srgb, var(--fwm-roll-ink) 8%, transparent) 1px, transparent 1px), linear-gradient(90deg, color-mix(in srgb, var(--fwm-roll-ink) 22%, transparent) 1px, transparent 1px);
+  background-size: var(--fwm-snapw, calc(100% / 16)) 100%, var(--fwm-beatw, 25%) 100%; }
+/* bar lines (X.1) are real lines, not a repeating background: every one as crisp and bold as the others */
+.fwm-barl { position: absolute; top: 0; bottom: 0; width: 2px; margin-left: -1px; background: color-mix(in srgb, var(--fwm-roll-ink) 60%, transparent); pointer-events: none; z-index: 1; }
 .fwm-gr { background: var(--fwm-roll); border-bottom: 1px solid rgba(0,0,0,.18); }
 .fwm-gr.is-b { background: var(--fwm-roll2); }
 .fwm-gr.is-c { border-bottom-color: color-mix(in srgb, var(--fwm-roll-ink) 30%, transparent); }

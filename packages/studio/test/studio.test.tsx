@@ -240,6 +240,7 @@ describe('<Studio>', () => {
     fireEvent.pointerDown(note, { button: 0, shiftKey: true, clientX: 5, clientY: y, pointerId: 1 });
     fireEvent.pointerMove(g, { clientX: 45, clientY: y, pointerId: 1 }); // 4 steps later
     fireEvent.pointerUp(g, { clientX: 45, clientY: y, pointerId: 1 });
+    expect(g.querySelectorAll('.fwm-barl').length).toBe(Math.ceil(L / 16) - 1); // a crisp line at every X.1 after the first
     const ns = p.notes(tr, pat).map(([, n]) => n.s).sort((a, b) => a - b);
     expect(ns).toEqual([0, 4]);
     const cut = p.automation(tr, pat, 'cut');

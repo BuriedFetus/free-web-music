@@ -408,7 +408,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
             );
           })}
         </div>
-        <div ref={grid} className="fwm-grid" style={{ height: rows * RH, '--fwm-snapw': `${((q || 1) / L) * 100}%`, '--fwm-beatw': `${(4 / L) * 100}%`, '--fwm-barw': `${(BAR / L) * 100}%` } as React.CSSProperties} tabIndex={0} aria-label={`Piano roll, ${t.name}`}
+        <div ref={grid} className="fwm-grid" style={{ height: rows * RH, '--fwm-snapw': `${((q || 1) / L) * 100}%`, '--fwm-beatw': `${(4 / L) * 100}%` } as React.CSSProperties} tabIndex={0} aria-label={`Piano roll, ${t.name}`}
           onPointerDown={down} onPointerMove={move} onPointerUp={up} onPointerCancel={up} onKeyDown={onKey}
           onDoubleClick={(e) => { const el = (e.target as HTMLElement).closest<HTMLElement>('[data-note]'); if (el) remove(el.dataset.note!); }}
           onContextMenu={(e) => { const el = (e.target as HTMLElement).closest<HTMLElement>('[data-note]'); if (el) { e.preventDefault(); remove(el.dataset.note!); } }}>
@@ -431,6 +431,7 @@ export function RollView({ peers }: { peers: Peer[] }) {
                 } as React.CSSProperties} />
             );
           })}
+          {Array.from({ length: Math.ceil(L / BAR) - 1 }, (_, b) => <div key={'b' + b} className="fwm-barl" style={{ left: `${(((b + 1) * BAR) / L) * 100}%` }} />)}
           {step >= 0 && <div className="fwm-phd" style={{ left: `${(step / L) * 100}%` }} />}
         </div>
       </div>
