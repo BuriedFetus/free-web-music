@@ -324,7 +324,7 @@ export function Geode({ store, host, slot, user = { name: 'You', color: 'var(--f
       return;
     }
     // the lamp (Light) and the window (Air): drag up = brighter / more open, drag down = dimmer / closed
-    const knob = pt.hitLamp(px, py) ? { id: 'light', span: 220 } : pt.hitWindow(px, py) ? { id: 'air', span: pt.windowPx() * 1.2 } : null;
+    const knob = pt.hitLamp(px, py) ? { id: 'light', span: 220 } : pt.hitWindow(px, py) ? { id: 'air', span: pt.windowPx() /* the sash follows the finger: the window's own size */ } : null;
     if (knob) {
       ev.currentTarget.setPointerCapture(ev.pointerId);
       touch(knob.id);

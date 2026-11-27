@@ -196,10 +196,11 @@ export class RoomPainter {
     const xs = pts.map((p) => p[0]), ys = pts.map((p) => p[1]);
     return px > Math.min(...xs) - 8 && px < Math.max(...xs) + 8 && py > Math.min(...ys) - 8 && py < Math.max(...ys) + 8;
   }
-  /** The window's height on screen (px), so a drag across it opens it fully. */
+  /** How far the window's sash travels on screen (px) from closed to fully open, so a drag moves it under the finger. */
   windowPx() {
-    const p = this.P(-1, -0.62, 0.12), q = this.P(-1, 0.02, 0.12);
-    return Math.max(60, q[1] - p[1]);
+    const zm = (0.12 + Math.min(0.75, this.G.L - 0.1)) / 2; // the middle of the window
+    const shut = this.P(-1, 0.02, zm), open = this.P(-1, lerp(0.02, -0.62 + 0.08, 0.85), zm);
+    return Math.max(20, shut[1] - open[1]);
   }
   hitMica(px: number, py: number) {
     const m = this.mica;
