@@ -8,7 +8,8 @@
 // the ✕ on hover, or Delete empties it. Everything is undoable.
 import { createContext, useContext, useRef, useState, type PointerEvent as RPointerEvent } from 'react';
 import type { Peer } from '../../collab/presence';
-import { deviceEntry, LIBRARY } from '../../devices/registry';
+import { deviceEntry } from '../../devices/registry';
+import { askAddInstrument } from '../AddInstrument';
 import { BAR, PAD_NOTE, PADS, type SongRow, type TrackInfo } from '../../model/project';
 import { useStudio } from '../context';
 import { usePlayNext, usePlayRow, usePlayStep } from './common';
@@ -121,12 +122,7 @@ export function SeqView({ peers }: { peers: Peer[] }) {
     addEventListener('pointercancel', cancel);
     addEventListener('keydown', esc, true);
   };
-  const addable = LIBRARY.filter((d) => d.available && d.manifest);
-  const addInstrument = (d: (typeof addable)[number]) => {
-    const id = project.addTrack(d.manifest!, d.presets?.[0], 0, ws.row);
-    setWs({ track: id });
-    toast(`${project.track(id)?.name} added, playing P1 in this TRACK`);
-  };
+  const [help, setHelp] = useState(false);
   const cols = { '--n': tracks.length } as React.CSSProperties;
 
   return (
@@ -138,9 +134,13 @@ export function SeqView({ peers }: { peers: Peer[] }) {
             onChange={(e) => project.setSwing(Number(e.target.value) / 100)} />
         </label>
         <span>{Math.round(project.swing * 100)}%</span>
-        <span className="fwm-sqtip">Click a cell to edit its pattern in the Piano roll. Drag it to another TRACK or instrument (hold Ctrl for a separate copy), or onto + Add TRACK. Double-click a cell to open its pattern (an empty one gets a new pattern); right-click or ✕ empties it. A TRACK lasts as long as its longest pattern.</span>
+        <button type="button" className="fwm-tb fwm-tb--xs fwm-sqhelp" aria-pressed={help} aria-label="How the Song arrangement works"
+          title="How the Song arrangement works" onClick={() => setHelp((h) => !h)}>?</button>
       </div>
-      {tracks.length === 0 && <p className="fwm-empty">No instruments yet. Add Basalt from the Library, or with + Instrument.</p>}
+      {help && (
+        <p className="fwm-sqtip">Click a cell to edit its pattern in the Piano roll. Drag it to another TRACK or instrument (hold Ctrl for a separate copy), or onto + Add TRACK. Double-click a cell to open its pattern (an empty one gets a new pattern); right-click or ✕ empties it. A TRACK lasts as long as its longest pattern.</p>
+      )}
+      {tracks.length === 0 && <p className="fwm-empty">No instruments yet: press + Add instrument.</p>}
       <DragCtx.Provider value={{ drag, verdict, start, justDragged }}>
       <div className={'fwm-arrw' + (drag ? ' is-dragging' : '')}>
         <div className="fwm-arr">
@@ -148,11 +148,10 @@ export function SeqView({ peers }: { peers: Peer[] }) {
             <span />
             {tracks.map((t) => <InstrumentHead key={t.id} track={t} peers={peers.filter((p) => p.track === t.id)} />)}
             <span className="fwm-addis">
-              {addable.map((d) => (
-                <button key={d.id} type="button" className="fwm-addi" onClick={() => addInstrument(d)} title={`Add a ${d.name} (${d.kind}) to the song`}>
-                  + {d.name}
-                </button>
-              ))}
+              <button type="button" className="fwm-addi" onClick={() => askAddInstrument(ws.row)} aria-label="Add an instrument to this TRACK"
+                title="Pick one in the Device panel: it plays in the selected TRACK">
+                + Add instrument
+              </button>
             </span>
           </div>
           {rows.map((r, i) => (

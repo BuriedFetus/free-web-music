@@ -100,7 +100,7 @@
 .fwm-sq { padding: 8px 10px 10px; display: flex; flex-direction: column; gap: 8px; }
 .fwm-sqh { display: flex; flex-wrap: wrap; gap: 6px 12px; align-items: center; font-weight: 600; font-size: 14px; }
 .fwm-sqh input[type=range] { width: 110px; accent-color: var(--fwm-note); vertical-align: middle; }
-.fwm-sqtip { font-weight: 400; opacity: .8; }
+.fwm-sqtip { font-weight: 400; opacity: .8; margin: 6px 0 0; font-size: 14px; }
 /* song arrangement: instruments across, TRACK rows down */
 .fwm-arrw { overflow-x: auto; scrollbar-width: thin; }
 .fwm-arr { display: grid; gap: 6px; min-width: max-content; }

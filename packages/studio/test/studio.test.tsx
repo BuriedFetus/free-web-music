@@ -79,6 +79,25 @@ describe('<Studio>', () => {
     expect(p.tracks()).toHaveLength(1);
   });
 
+  it('song arrangement: + Add instrument opens the Device panel\'s menu, the pick plays P1 in the selected TRACK', () => {
+    const p = mount();
+    addInst(screen, 'Basalt');
+    fireEvent.click(screen.getByRole('button', { name: '+ Add TRACK' }));
+    const r2 = p.rows()[1].id;
+    expect(screen.queryByRole('menu', { name: 'Add an instrument' })).toBeNull();
+    fireEvent.click(screen.getByRole('button', { name: 'Add an instrument to this TRACK' }));
+    const menu = screen.getByRole('menu', { name: 'Add an instrument' });
+    fireEvent.click(within(menu).getByRole('menuitem', { name: 'Add Opal' }));
+    const opal = p.tracks().find((t) => t.device === 'opal')!;
+    expect(p.cell(r2, opal.id)).toBe(p.patternList(opal.id)[0].id);
+    expect(p.cell(p.rows()[0].id, opal.id)).toBeFalsy();
+    expect(screen.queryByRole('menu', { name: 'Add an instrument' })).toBeNull();
+    // the Device panel's own button still adds to TRACK 1 by default
+    addInst(screen, 'Quartz');
+    const quartz = p.tracks().find((t) => t.device === 'quartz')!;
+    expect(p.cell(p.rows()[0].id, quartz.id)).toBe(p.patternList(quartz.id)[0].id);
+  });
+
   it('arrangement: add a TRACK, give an instrument a new pattern there, name and size it in the Piano roll', () => {
     const p = mount();
     addInst(screen, 'Basalt');
