@@ -98,6 +98,17 @@ describe('<Studio>', () => {
     expect(p.cell(p.rows()[0].id, quartz.id)).toBe(p.patternList(quartz.id)[0].id);
   });
 
+  it('the Device panel removes the instrument it shows; undo brings it back', () => {
+    const p = mount();
+    addInst(screen, 'Basalt');
+    addInst(screen, 'Opal');
+    const opal = p.tracks().find((t) => t.device === 'opal')!;
+    fireEvent.click(screen.getByRole('button', { name: `Remove ${opal.name} from the song` }));
+    expect(p.tracks().map((t) => t.device)).toEqual(['basalt']);
+    fireEvent.click(screen.getByRole('button', { name: 'Undo' }));
+    expect(p.tracks().map((t) => t.device)).toEqual(['basalt', 'opal']);
+  });
+
   it('arrangement: add a TRACK, give an instrument a new pattern there, name and size it in the Piano roll', () => {
     const p = mount();
     addInst(screen, 'Basalt');

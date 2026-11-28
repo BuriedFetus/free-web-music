@@ -10,11 +10,33 @@
 import type { Plugin, PreviewServer, ViteDevServer } from 'vite';
 import { readFileSync } from 'node:fs';
 import { resolve } from 'node:path';
-import type { IncomingMessage } from 'node:http';
+import { createServer, type IncomingMessage } from 'node:http';
+import { Server as TlsServer } from 'node:tls';
+import type { Socket } from 'node:net';
 import type { Duplex } from 'node:stream';
 import { WebSocketServer, type WebSocket } from 'ws';
 
 export const RELAY_PATH = '/fwm-relay';
+
+/** On an HTTPS server, someone typing http:// gets sent to https:// on the same port (instead of a page
+ *  that never loads): the first byte of a connection says which it is (0x16 starts a TLS handshake). */
+function redirectPlainHttp(server: TlsServer) {
+  const tls = server.listeners('connection') as ((s: Socket) => void)[];
+  server.removeAllListeners('connection');
+  const plain = createServer((req, res) => {
+    res.writeHead(301, { Location: `https://${req.headers.host ?? 'localhost'}${req.url ?? '/'}`, Connection: 'close' });
+    res.end();
+  });
+  server.on('connection', (socket: Socket) => {
+    socket.once('data', (first: Buffer) => {
+      socket.pause();
+      socket.unshift(first);
+      if (first[0] === 0x16) tls.forEach((l) => l.call(server, socket));
+      else plain.emit('connection', socket);
+      process.nextTick(() => socket.resume());
+    });
+  });
+}
 
 export function lanRelay(): Plugin {
   const wss = new WebSocketServer({ noServer: true, maxPayload: 16 * 1024 * 1024 });
@@ -26,6 +48,7 @@ export function lanRelay(): Plugin {
   };
   const attach = (s: ViteDevServer | PreviewServer) => {
     server = s;
+    if (s.httpServer instanceof TlsServer) redirectPlainHttp(s.httpServer);
     s.httpServer?.on('upgrade', (req: IncomingMessage, socket: Duplex, head: Buffer) => {
       if (!req.url?.startsWith(RELAY_PATH)) return; // Vite's own hot-reload socket and others
       wss.handleUpgrade(req, socket, head, (ws) => wss.emit('connection', ws, req));

@@ -64,8 +64,8 @@ export function AddInstrument() {
   const cats = [...new Set(LIBRARY.map((d) => d.category))];
   return (
     <>
-      <button ref={btn} type="button" className="fwm-addinst" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
-        + Add instrument
+      <button ref={btn} type="button" className="fwm-addinst" aria-label="+ Add instrument" title="Add an instrument" aria-haspopup="menu" aria-expanded={open} onClick={() => setOpen((o) => !o)}>
+        + Add<span className="fwm-long"> instrument</span>
       </button>
       {open && (
         <div ref={menu} className="fwm-addmenu" role="menu" aria-label="Add an instrument" style={at}>
@@ -88,5 +88,22 @@ export function AddInstrument() {
         </div>
       )}
     </>
+  );
+}
+
+/** "Remove" beside it: takes the instrument the Device panel shows out of the song (Undo brings it back). */
+export function RemoveInstrument() {
+  const { project, ws, toast } = useStudio();
+  const t = ws.track ? project.track(ws.track) : null;
+  if (!t) return null;
+  return (
+    <button type="button" className="fwm-rminst" aria-label={`Remove ${t.name} from the song`} title={`Remove ${t.name} from the song (Undo brings it back)`}
+      onClick={() => {
+        project.removeTrack(t.id);
+        toast(`Removed ${t.name}`, { label: 'Undo', run: () => project.undo() });
+      }}>
+      <span className="fwm-long">Remove</span>
+      <span className="fwm-short" aria-hidden="true">✕</span>
+    </button>
   );
 }

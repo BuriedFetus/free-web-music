@@ -4,7 +4,7 @@ import { useCallback, useEffect, useRef, useState, type CSSProperties, type Poin
 import type { Peer } from '../collab/presence';
 import { useStudio } from './context';
 import { DeviceView } from './views/DeviceView';
-import { AddInstrument } from './AddInstrument';
+import { AddInstrument, RemoveInstrument } from './AddInstrument';
 import { LibraryView } from './views/LibraryView';
 import { FxView, MixerView } from './views/MixerView';
 import { ScopeView } from './views/ScopeView';
@@ -139,6 +139,7 @@ export function WorkspaceGrid({ userId, peers }: { userId: string; peers: Peer[]
             </select>
             {v === 'roll' || v === 'device' ? <TrackTabs peers={peers} /> : <PaneContext view={v} />}
             {v === 'device' && <AddInstrument />}
+            {v === 'device' && <RemoveInstrument />}
             <button type="button" className="fwm-ib" aria-pressed={!!L.wide?.includes(i)} aria-label={L.wide?.includes(i) ? 'Half width' : 'Whole row'}
               title={L.wide?.includes(i) ? 'Back to half the width' : `Take the whole row (hides ${VIEWS[L.views[i ^ 1]]})`}
               onClick={() => {

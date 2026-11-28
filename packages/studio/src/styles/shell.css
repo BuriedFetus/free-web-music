@@ -68,7 +68,7 @@
 }
 @keyframes fwm-zoom-in { from { transform: scale(0.94); opacity: 0.6; } }
 @keyframes fwm-zoom-out { from { transform: scale(1.04); opacity: 0.6; } }
-.fwm-ph { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--fwm-line); min-height: 48px; }
+.fwm-ph { display: flex; align-items: center; gap: 8px; padding: 6px 8px; border-bottom: 1px solid var(--fwm-line); min-height: 48px; container-type: inline-size; }
 .fwm-ph select, .fwm-rtb select, .fwm-lanehead select, .fwm-songkey select { font-weight: 600; font-size: 14px; background: var(--fwm-bg); border: 1px solid var(--fwm-line); border-radius: 8px; min-height: 34px; padding: 0 6px; }
 .fwm-ctx { font-size: 13px; color: var(--fwm-mute); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; flex: 1; }
 .fwm-ttabs { flex: 1; min-width: 0; display: flex; gap: 4px; overflow-x: auto; scrollbar-width: thin; padding: 2px; }
@@ -440,6 +440,13 @@
 .fwm-addinst { flex: none; min-height: 34px; padding: 0 12px; border-radius: calc(8px * var(--fwm-round)); border: 1px dashed var(--fwm-me); background: none;
   color: var(--fwm-me); font: 600 13px/1 var(--fwm-font-ui); cursor: pointer; white-space: nowrap; }
 .fwm-addinst:hover, .fwm-addinst[aria-expanded=true] { background: var(--fwm-me); color: var(--fwm-on-me); border-style: solid; }
+/* "Remove" beside it: quiet until you point at it */
+.fwm-rminst { flex: none; min-height: 34px; padding: 0 10px; border-radius: calc(8px * var(--fwm-round)); border: 1px solid var(--fwm-line); background: none;
+  color: var(--fwm-mute); font: 600 13px/1 var(--fwm-font-ui); cursor: pointer; white-space: nowrap; }
+.fwm-rminst:hover { background: var(--fwm-rec); color: var(--fwm-on-rec); border-color: var(--fwm-rec); }
+/* a narrow Device panel keeps room for the instrument tabs: "+ Add" and "✕" */
+.fwm-short { display: none; }
+@container (max-width: 760px) { .fwm-addinst .fwm-long, .fwm-rminst .fwm-long { display: none; } .fwm-rminst .fwm-short { display: inline; } }
 .fwm-addmenu { position: fixed; z-index: 50; width: min(360px, calc(100vw - 16px)); max-height: min(70vh, 560px); overflow: auto; padding: 8px;
   border-radius: calc(12px * var(--fwm-round)); background: var(--fwm-bg); color: var(--fwm-ink); border: 1px solid var(--fwm-line);
   box-shadow: 0 calc(12px * var(--fwm-depth)) calc(40px * var(--fwm-depth)) rgba(0,0,0,calc(.5 * var(--fwm-depth))); }
