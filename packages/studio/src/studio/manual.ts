@@ -64,10 +64,10 @@ export const MANUAL: Chapter[] = [
     pages: [
       {
         title: 'Meet Garnet',
-        body: ['Garnet is a string instrument: strum chords or pick notes on the neck, like a guitar.', 'Chords mode plays whole chords that fit the song\'s Key; Notes mode plays single notes.'],
+        body: ['Garnet is a string instrument: pick notes on the neck or strum chords, like a guitar.', 'The neck shows single notes; the chord buttons strum whole chords that fit the song\'s Key.'],
         spots: [
-          { at: '[aria-label^="Guitar neck"]', title: 'The neck', text: 'Click a string, or drag across the strings to strum. Notes you play light up where they are on the neck.' },
-          { at: '[aria-label="What the neck plays"]', title: 'Chords or Notes', text: 'Chords: each key plays a chord that fits the Key. Notes: each key plays one note.' },
+          { at: '[aria-label^="Guitar neck"]', title: 'The neck', text: 'Click a string to pick a note, or drag across the strings to strum. Notes you play light up where they are on the neck.' },
+          { at: '[aria-label^="Chords of the key"]', title: 'Chord buttons', text: 'The chords of the song\'s Key: click one to strum it, or press keys 1–7 (with Shift: strum up).' },
           SOUNDS,
         ],
       },
@@ -75,10 +75,10 @@ export const MANUAL: Chapter[] = [
         title: 'Playing',
         body: ['A few things make it feel like a real instrument.'],
         spots: [
-          { at: '[aria-label="Chord type"]', title: 'Chord type', text: 'Which kind of chord the keys play (major, minor, power chord…).' },
+          { at: '[aria-label="Only scale notes"]', title: 'Only scale notes', text: 'The neck only offers notes that fit the song\'s Key, so nothing sounds wrong.' },
+          { at: '[aria-label="Chord guide"]', title: 'Chord guide', text: 'Shows the chord your note belongs to on the neck: root light blue, 2nd light red, 3rd light green, the next chord in purple, with Roman numerals. A chord button guides like pressing its root.' },
           { at: '[aria-label="Whammy"]', title: 'Whammy ribbon', text: 'Click and drag to bend the pitch, like a whammy bar. Let go and it springs back.' },
           { at: '[aria-label="Palm mute"]', title: 'Palm mute', text: 'Damps the strings: short, chunky notes.' },
-          { at: '[aria-label="What the neck plays"]@0.75,0.5', title: 'Notes and the chord guide', text: 'Switch to Notes, then press Chord guide: it shows the chord your note belongs to on the neck: root light blue, 2nd light red, 3rd light green, the next chord in purple, with Roman numerals.' },
         ],
       },
       {

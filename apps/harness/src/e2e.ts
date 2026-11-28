@@ -309,27 +309,28 @@ async function runRoll(p: Project, engineRef: { current: Engine | null }, ok: (c
     ok(ns()[0]?.m === 38, `dragging moves it up (pitch ${ns()[0]?.m})`);
     // From an empty spot, draw a note across an existing one on the same pitch: no stacked notes.
     p.addNote(id, p.patternList(id)[0].id, { s: 8, l: 1, m: 41, v: 0.8 });
+    rowOf(41).scrollIntoView({ block: 'center' }); // a short window can leave it under the sticky ruler
     await sleep(100);
     [x, y] = at(2.5, 41);
-    ptr('pointerdown', x, y);
+    const across = ptr('pointerdown', x, y);
     [x, y] = at(11.9, 41);
     ptr('pointermove', x, y);
     ptr('pointerup', x, y, 0);
     await sleep(100);
     const same = ns().filter((n) => n.m === 41);
-    ok(same.length === 1 && same[0].s === 2 && same[0].l === 10, `drawing across a note replaces it, no overlap (${JSON.stringify(same)})`);
+    ok(same.length === 1 && same[0].s === 2 && same[0].l === 10, `drawing across a note replaces it, no overlap (${JSON.stringify(same)}; pressed ${across.className}, y ${Math.round(y)} of ${innerHeight})`);
     // Grid lines follow Snap.
     const snapSel = $<HTMLSelectElement>('[aria-label="Snap when editing"]')!;
     const setSnap = async (v: string) => {
       snapSel.value = v;
       snapSel.dispatchEvent(new Event('change', { bubbles: true }));
       await sleep(80);
-      return getComputedStyle(grid, '::after').backgroundSize.split(',')[0].trim();
+      return grid.querySelectorAll('.fwm-vl').length;
     };
     const g8 = await setSnap('1/8');
     const g32 = await setSnap('1/32');
     await setSnap('1/16');
-    ok(g8 !== g32 && parseFloat(g8) > parseFloat(g32), `grid cell size follows Snap (1/8: ${g8}, 1/32: ${g32})`);
+    ok(g8 > 0 && g32 > g8, `grid lines follow Snap (lines at 1/8: ${g8}, at 1/32: ${g32})`);
     // Piano keys sound when pressed.
     btn('Sound')!.click();
     await until('engine', () => !!engineRef.current?.last);
@@ -1542,7 +1543,7 @@ async function runGeode(role: string, p: Project, doc: Y.Doc, engineRef: { curre
       await addInst('Geode');
       await sleep(400);
       ok(!!$('.fwm-geode canvas') && !!geodeId(), 'Geode shows in the Device panel with its room');
-      ok(document.querySelectorAll('.fwm-devwrap .fwm-geode__dock button').length === 10, 'the dock has its ten icons');
+      ok(document.querySelectorAll('.fwm-devwrap .fwm-geode__dock button[data-id]').length === 10, 'the dock has its ten icons');
       btn('Sound')?.click();
       await until('engine', () => !!engineRef.current?.last, 4000);
       const gid = geodeId()!;
