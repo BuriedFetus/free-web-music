@@ -13,7 +13,7 @@ import type { DeviceManifest, Engine } from '@fwm/engine';
 import { Basalt, BASALT_PRESETS, Geode, GEODE_PRESETS, Opal, OPAL_PRESETS, Quartz, QUARTZ_PRESETS, FLINT_KITS, EngineProvider, Project, Studio, ThemeRoot, createDeviceStore, useEngine } from '@fwm/studio';
 import '@fwm/studio/skins/host-examples.css';
 import { localSongs } from './songStore';
-import { connectTabs, tabUser } from './tabSync';
+import { connectTabs, relayInfo, tabUser } from './tabSync';
 import './harness.css';
 
 const SKINS = [
@@ -93,6 +93,15 @@ function seed() {
 
 if (params.has('seednow')) seed(); // screenshots: start with the demo track already there
 
+/** How a second person joins: another tab, or (dev:lan) another computer on the network. */
+function JoinHint() {
+  const relay = relayInfo();
+  const room = params.get('room');
+  const q = room ? `?room=${encodeURIComponent(room)}` : '';
+  if (!relay?.network.length) return <>Open this page in another tab to be a second person.</>;
+  return <>Another computer joins at <b className="h-join">{relay.network[0]}{q}</b></>;
+}
+
 function StudioPage() {
   const [skin, setSkin] = useState('');
   useEffect(() => {
@@ -115,7 +124,7 @@ function StudioPage() {
     <div className="h-studio" data-fwm-theme={skin || undefined}>
       <div className="h-strip">
         <b>free-web-music · harness</b>
-        <span>You are <i style={{ color: me.color }}>{me.name}</i>. Open this page in another tab to be a second person.</span>
+        <span>You are <i style={{ color: me.color }}>{me.name}</i>. <JoinHint /></span>
         <span className="h-grow" />
         <SkinButtons skin={skin} setSkin={setSkin} />
       </div>

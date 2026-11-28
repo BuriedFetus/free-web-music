@@ -9,6 +9,8 @@
   ],
   "scripts": {
     "dev": "npm run dev -w apps/harness",
+    "dev:lan": "npm run dev:lan -w apps/harness",
+    "lan": "npm run lan -w apps/harness",
     "build": "npm run build:engine && npm run build -w apps/harness",
     "build:engine": "packages/engine/build.sh",
     "test": "npm run test:engine && vitest run",

@@ -6,6 +6,7 @@ import basaltManifest from '@fwm/engine/devices/basalt.json';
 import flintManifest from '@fwm/engine/devices/flint.json';
 import type { DeviceManifest, Engine } from '@fwm/engine';
 import { Project } from '@fwm/studio';
+import { sidePipe } from './tabSync';
 import type * as Y from 'yjs';
 import type { Awareness } from 'y-protocols/awareness';
 
@@ -599,7 +600,7 @@ async function runTogether(
 ) {
   const errs: string[] = [];
   window.addEventListener('error', (e) => errs.push(String(e.message)));
-  const bc = new BroadcastChannel('fwm-e2e-together' + (new URLSearchParams(location.search).get('room') ?? ''));
+  const bc = sidePipe('fwm-e2e-together' + (new URLSearchParams(location.search).get('room') ?? '')); // tabs, or two browsers via the relay
   const got = new Map<string, unknown>();
   const wall = () => performance.timeOrigin + performance.now();
   const where = (W: number) => engineRef.current?.where(W - performance.timeOrigin) ?? null;

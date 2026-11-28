@@ -1,6 +1,12 @@
 # Handoff: Phases 1–3 (engine, collaboration, sequencer)
 
-## START HERE (2026-11-27, night): the big QoL session. Everything below is pushed.
+## START HERE (2026-11-28): new machine (Raspberry Pi 5), playing across computers
+- The user moved to a Raspberry Pi 5 (1024×768 screen). Tests and perf in Chromium there: all unit tests pass; the full engine (6 instruments, 48 voices, all effects) uses ~26% of one core; e2e: only the known arrange drag failures and the flaky Garnet strum check fail. Headless Chromium on the Pi needs `--disable-gpu` (else http pages never load).
+- **Playing across computers** (`apps/harness/lanRelay.ts`, `tabSync.ts`): `npm run lan` (build + preview) or `npm run dev:lan` serve over HTTPS on the network (self-signed: accept it once per computer; browsers only run the audio engine on a secure page) with a WebSocket relay at `/fwm-relay`. The page finds it by a `<meta name="fwm-relay">` tag (dev / preview only, never in `dist/`), so the e2e runs on `dist/` still use tabs. `?tabs` forces tabs. The harness strip shows the address another computer opens. Tested with two separate Chromium processes on the Pi (BroadcastChannel can't cross them): roles a/b all pass; ta/tb 20 of 21, one timing check lands 7–11 ms apart (limit 5), others 1–5 ms. The same check also fails about 1 run in 3 in plain tabs mode on the Pi (7–9 ms), so that is the Pi's load, not the relay. Real two-machine timing over Wi-Fi is not measured yet.
+- **Layout for small screens / the hardware synth** is parked for the FUTURE RELEASE milestone: GitHub issue #1, Layout Lab `design/kit/layout.html` (branch `layout-lab`).
+- The Library manual's cards nest a button in a button (React warns in dev). Not fixed yet.
+
+## Earlier (2026-11-27, night): the big QoL session. Everything below is pushed.
 **Waiting on the user** (ask first, build after):
 - Their listening test of Geode's rug / door / mirror (built from the approved mock-up `design/kit/geode-objects.html`).
 - Next wall objects, all approved in principle: plant (grain density + spread), hourglass (freeze), shelf of jars (shimmer / sub / chorus; jars also show shimmer that comes from TEMP or anything else, as glowing bubbles above the set level). Wall clock and metronome are benched. Do a mock-up first; next time inside the real app behind a preview switch, so it looks like Geode.

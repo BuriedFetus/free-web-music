@@ -13,6 +13,7 @@ A collaborative, device-based music studio for the browser. This repo is the **c
 ## Commands
 Node comes from nvm: run `. ~/.nvm/nvm.sh` first in a fresh shell if `node` is missing.
 - `npm run dev`: harness at http://localhost:5173: the full studio, synced between tabs (open two tabs = two people). `?basalt` = Basalt alone, `?room=x` = a separate session, `?seednow` = demo track before first paint, `?ghost` = a hidden second person in the room
+- `npm run lan` (build + preview) or `npm run dev:lan`: the same, served over HTTPS on the local network with a relay, so other computers join the session (open the address shown in the harness strip, accept the self-signed certificate once). `?tabs` = tabs only
 - `npm test`: Rust engine tests + Vitest (studio model and components)
 - `npm run typecheck`, `npm run build`
 - `packages/engine/build.sh`: rebuild `packages/engine/web/fwm_engine.wasm` after any Rust change (it is committed, the kit and the studio load it)
