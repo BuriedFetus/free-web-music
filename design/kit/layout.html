@@ -1,0 +1,479 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Layout Lab</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Figtree:wght@400;600;800&family=VT323&family=Big+Shoulders+Display:wght@800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="skins/app.css">
+<style>
+/* VOICE  a workbench: calm side bar, the pretend screen is the star
+   IDEA   the studio's pieces as blocks on a pretend screen at its true pixel size: drag, resize, hide;
+          each block draws a sketch of its real contents and says when it is cut off or too small
+   LAYOUT side bar (screen, layouts, hidden pieces, warnings) | stage with the screen scaled to fit */
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%;margin:0}
+body{background:var(--fwm-bg);color:var(--fwm-ink);font:14px/1.4 var(--fwm-font-ui);overflow:hidden}
+button,select,input,textarea{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fwm-me);outline-offset:2px}
+.lab{display:grid;grid-template-columns:290px minmax(0,1fr);height:100%}
+.side{background:var(--fwm-panel);border-right:1px solid var(--fwm-line);overflow:auto;padding:12px;display:flex;flex-direction:column;gap:14px}
+.side h1{font:900 26px/1 var(--fwm-font-display);margin:0;letter-spacing:.02em}
+.side h2{font:600 11px/1 var(--fwm-font-label);text-transform:uppercase;letter-spacing:.12em;color:var(--fwm-mute);margin:0 0 6px}
+.side p{margin:0;color:var(--fwm-mute);font-size:13px}
+.row{display:flex;gap:6px;flex-wrap:wrap;align-items:center}
+.btn{min-height:32px;padding:0 10px;border-radius:calc(8px*var(--fwm-round));border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;font-weight:600;white-space:nowrap}
+.btn:hover{border-color:var(--fwm-me)}
+.btn[aria-pressed=true]{background:var(--fwm-me);color:var(--fwm-on-me);border-color:var(--fwm-me)}
+select,input[type=number],textarea{background:var(--fwm-bg);border:1px solid var(--fwm-line);border-radius:calc(8px*var(--fwm-round));min-height:32px;padding:0 6px}
+input[type=number]{width:72px}
+select{width:100%}
+textarea{width:100%;min-height:90px;padding:6px;font:12px/1.3 var(--fwm-font-screen)}
+label.chk{display:flex;gap:6px;align-items:center;font-size:13px;cursor:pointer}
+.tray{display:flex;flex-direction:column;gap:4px}
+.tray button{text-align:left}
+.tray:empty::after{content:'Nothing hidden.';color:var(--fwm-mute);font-size:13px}
+.warns{margin:0;padding:0;list-style:none;display:flex;flex-direction:column;gap:4px;font-size:13px}
+.warns li{padding:6px 8px;border-radius:6px;background:var(--fwm-bg);border-left:3px solid var(--fwm-rec)}
+.warns li.ok{border-left-color:var(--fwm-ok)}
+.warns li.soft{border-left-color:var(--fwm-mod)}
+
+.stage{position:relative;overflow:hidden;display:grid;place-items:center;background:var(--fwm-bg)}
+.stage__info{position:absolute;left:12px;top:8px;font-size:12px;color:var(--fwm-mute)}
+.scaler{transform-origin:center center}
+.screen{position:relative;background:var(--fwm-bg);border:3px solid var(--fwm-line);border-radius:calc(10px*var(--fwm-round));box-shadow:0 0 0 10px var(--fwm-panel),0 0 0 11px var(--fwm-line);overflow:hidden;display:flex;flex-direction:column}
+.chrome{flex:none;height:var(--chrome);background:var(--fwm-panel);border-bottom:1px solid var(--fwm-line);display:flex;flex-direction:column;justify-content:flex-end;gap:6px;padding:0 10px 8px;color:var(--fwm-mute);font-size:13px}
+.chrome .url{background:var(--fwm-bg);border-radius:999px;padding:6px 14px}
+.app{position:relative;flex:1}
+.gridlines{position:absolute;inset:0;pointer-events:none;opacity:0;transition:opacity .15s}
+.app.dragging .gridlines,.app.showgrid .gridlines{opacity:1}
+.gridlines i{position:absolute;border:1px dashed var(--fwm-line);border-radius:3px}
+
+/* blocks: the real contents are drawn underneath, the edit layer on top */
+.blk{position:absolute;display:flex;flex-direction:column;border-radius:calc(10px*var(--fwm-round));background:var(--fwm-panel);border:1px solid var(--fwm-line);overflow:hidden;touch-action:none}
+.blk.is-bar{border-radius:calc(8px*var(--fwm-round));background:transparent;border-color:transparent}
+.blk .in{flex:1;min-height:0;overflow:hidden;pointer-events:none;position:relative}
+.blk .edit{position:absolute;inset:0;cursor:grab;border:2px solid transparent;border-radius:inherit}
+.blk:hover .edit,.blk.sel .edit{border-color:var(--fwm-me)}
+.blk.is-cut .edit{border-color:var(--fwm-rec);border-style:dashed}
+.blk.is-overlap .edit{background:repeating-linear-gradient(45deg,transparent 0 10px,color-mix(in srgb,var(--fwm-rec) 25%,transparent) 10px 20px)}
+.tag{position:absolute;right:4px;top:4px;display:flex;gap:4px;align-items:center;font:600 11px/1 var(--fwm-font-ui);background:var(--fwm-bg);border:1px solid var(--fwm-line);border-radius:999px;padding:3px 3px 3px 8px;opacity:0;transition:opacity .12s;pointer-events:auto;z-index:3}
+.blk:hover .tag,.blk.sel .tag{opacity:1}
+.blk.is-cut .tag{border-color:var(--fwm-rec)}
+.tag b{color:var(--fwm-rec)}
+.tag button{width:20px;height:20px;border-radius:50%;border:0;background:var(--fwm-panel);cursor:pointer;padding:0;line-height:20px}
+.grip{position:absolute;right:0;bottom:0;width:22px;height:22px;cursor:nwse-resize;z-index:3;background:linear-gradient(135deg,transparent 50%,var(--fwm-me) 50% 58%,transparent 58% 70%,var(--fwm-me) 70% 78%,transparent 78%);opacity:0}
+.blk:hover .grip,.blk.sel .grip{opacity:1}
+.hidechrome .tag,.hidechrome .grip{display:none}
+.hidechrome .blk .edit{border-color:transparent!important;background:none!important}
+
+/* sketches of the real pieces (sizes as in the studio: 15px text, 40px buttons) */
+.sk{font-size:15px;display:flex;flex-wrap:wrap;gap:6px;align-items:center;align-content:center;height:100%;padding:0 2px}
+.sk .b{min-height:40px;padding:0 12px;display:inline-flex;align-items:center;border-radius:calc(8px*var(--fwm-round));background:var(--fwm-bg);border:1px solid var(--fwm-line);white-space:nowrap;font-weight:600}
+.sk .b.me{background:var(--fwm-me);color:var(--fwm-on-me);border-color:var(--fwm-me)}
+.sk .b.rec{background:var(--fwm-roll-btn);color:var(--fwm-roll-ink)}
+.sk .lcd{min-height:40px;padding:0 12px;display:inline-flex;align-items:center;border-radius:6px;background:var(--fwm-roll-deep);color:var(--fwm-me);font:22px/1 var(--fwm-font-screen);white-space:nowrap}
+.sk .t{white-space:nowrap;color:var(--fwm-mute);font-size:13px}
+.sk .title{font:900 22px/1 var(--fwm-font-display);white-space:nowrap}
+.sk .av{width:28px;height:28px;border-radius:50%;display:inline-grid;place-items:center;background:var(--fwm-ok);color:var(--fwm-on-ok);font-weight:800;font-size:13px;flex:none}
+.sk .chip{display:inline-flex;gap:6px;align-items:center;padding:4px 12px 4px 4px;border-radius:999px;border:1px solid var(--fwm-line);white-space:nowrap}
+.ph{flex:none;display:flex;gap:6px;align-items:center;padding:6px 8px;border-bottom:1px solid var(--fwm-line);height:46px;font-size:14px;font-weight:600;overflow:hidden}
+.ph .sel{border:1px solid var(--fwm-line);border-radius:8px;padding:6px 10px;background:var(--fwm-bg);white-space:nowrap}
+.ph .tab{border:1px solid var(--fwm-line);border-radius:8px;padding:6px 10px;white-space:nowrap;border-bottom:3px solid var(--fwm-rec)}
+.ph .sp{flex:1}
+.ph .ic{width:34px;height:34px;flex:none;border:1px solid var(--fwm-line);border-radius:8px;display:grid;place-items:center}
+.pb{position:absolute;inset:46px 0 0 0;overflow:hidden}
+.pb.blue{background:var(--fwm-roll2);color:var(--fwm-roll-ink)}
+.need{position:absolute;left:8px;bottom:6px;font:600 11px/1.2 var(--fwm-font-ui);color:var(--fwm-mute);background:var(--fwm-bg);padding:3px 6px;border-radius:6px;z-index:2}
+.need.bad{color:var(--fwm-on-rec);background:var(--fwm-rec)}
+/* instrument: a box of its natural size, scaled to fit */
+.inst{position:absolute;left:50%;top:50%;transform-origin:center;border-radius:12px;background:var(--fwm-bg);border:1px solid var(--fwm-line);display:grid;grid-template-rows:56px 1fr 70px;gap:10px;padding:14px}
+.inst__hd{display:flex;gap:10px;align-items:center}
+.inst__hd b{font:900 34px/1 var(--fwm-font-display)}
+.inst__lcd{flex:1;height:44px;border-radius:6px;background:var(--fwm-roll-deep)}
+.inst__mid{display:grid;grid-template-columns:repeat(4,1fr);gap:10px}
+.inst__sec{border:1px solid var(--fwm-line);border-radius:8px;display:grid;grid-template-columns:repeat(2,1fr);place-items:center;padding:10px}
+.knob{width:58px;height:58px;border-radius:50%;border:3px solid var(--fwm-line);background:var(--fwm-panel);position:relative}
+.knob::after{content:'';position:absolute;left:50%;top:6px;width:3px;height:16px;margin-left:-1.5px;background:var(--fwm-me);border-radius:2px}
+.inst__keys{display:grid;grid-template-columns:repeat(21,1fr);gap:2px}
+.inst__keys i{background:var(--fwm-ink);border-radius:0 0 4px 4px;opacity:.85}
+/* hardware strip: the knobs you would really turn */
+.hw{display:flex;justify-content:space-around;align-items:center;height:100%;padding:6px 10px;gap:6px}
+.hw div{display:flex;flex-direction:column;align-items:center;gap:4px;font:600 11px/1 var(--fwm-font-label);text-transform:uppercase;letter-spacing:.08em;color:var(--fwm-mute)}
+.hw .knob{width:min(54px,var(--kh));height:min(54px,var(--kh))}
+</style>
+</head>
+<body>
+<div class="lab">
+  <aside class="side">
+    <div>
+      <h1>Layout Lab</h1>
+      <p>Drag pieces to move them, drag the corner to resize, ✕ hides one. Red dashes = something inside is cut off or shrunk too far.</p>
+    </div>
+    <section>
+      <h2>Screen</h2>
+      <select id="scr" aria-label="Screen size"></select>
+      <div class="row" style="margin-top:6px">
+        <input type="number" id="sw" aria-label="Width" min="320" max="3840"> ×
+        <input type="number" id="sh" aria-label="Height" min="240" max="2160"> px
+      </div>
+      <div class="row" style="margin-top:6px">
+        <label class="chk"><input type="checkbox" id="chrome"> Browser bars (tabs, address)</label>
+      </div>
+      <h2 style="margin-top:10px">Instrument in the Device panel</h2>
+      <select id="inst" aria-label="Instrument"></select>
+    </section>
+    <section>
+      <h2>Layout</h2>
+      <select id="lay" aria-label="Layout"></select>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" id="save">Save as…</button>
+        <button class="btn" id="del">Delete</button>
+        <button class="btn" id="reset">Reset</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        Grid <input type="number" id="gc" aria-label="Columns" min="4" max="48"> ×
+        <input type="number" id="gr" aria-label="Rows" min="4" max="48">
+        <button class="btn" id="showgrid" aria-pressed="false">Show</button>
+      </div>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" id="clean" aria-pressed="false">Hide edit marks</button>
+      </div>
+    </section>
+    <section>
+      <h2>Hidden pieces (click to add)</h2>
+      <div class="tray" id="tray"></div>
+    </section>
+    <section>
+      <h2>What doesn't fit</h2>
+      <ul class="warns" id="warns"></ul>
+    </section>
+    <section>
+      <h2>Share a layout</h2>
+      <p>Copy this and paste it to Claude (or paste one in and press Load).</p>
+      <textarea id="json" aria-label="Layout as text" spellcheck="false"></textarea>
+      <div class="row" style="margin-top:6px">
+        <button class="btn" id="copy">Copy</button>
+        <button class="btn" id="load">Load</button>
+      </div>
+    </section>
+  </aside>
+  <main class="stage" id="stage">
+    <div class="stage__info" id="info"></div>
+    <div class="scaler" id="scaler">
+      <div class="screen" id="screen">
+        <div class="chrome" id="chromebar"><div>⟵ ⟶ ⟳ &nbsp; Tabs · bookmarks</div><div class="url">localhost:5173</div></div>
+        <div class="app" id="app"><div class="gridlines" id="gl"></div></div>
+      </div>
+    </div>
+  </main>
+</div>
+
+<script>
+// ---------- the pieces ----------
+// min: the smallest comfortable size in px (from the studio's real sizes: 40px buttons, 46px panel headers).
+// Instruments, measured in Chromium: 1240 px wide at most, they reflow down to about 720 px wide, then
+// they can only be scaled. Their height follows their width (h = ratio × w).
+const INSTS = { basalt: ['Basalt', 0.56], opal: ['Opal', 0.66], quartz: ['Quartz', 0.70], geode: ['Geode', 0.79] };
+const INST_MAX = 1240, INST_MIN = 720;
+const PANELS = { arrange: 'Song arrangement', device: 'Device', roll: 'Piano roll', mixer: 'Mixer', library: 'Library', scope: 'Scope' };
+const KINDS = {
+  title:     { name: 'Harness title + skins', bar: true, min: [560, 40], draw: () => `<span class="title">free-web-music</span><span class="t">You are Juno</span><span style="flex:1"></span><span class="b me">Default</span><span class="b">Flat</span><span class="b">Brand</span>` },
+  song:      { name: 'Song name + Save', bar: true, min: [190, 40], draw: () => `<span class="chip"><span class="t">Song</span><b>Demo</b><span class="t">▾</span></span><span class="b me">Save</span>` },
+  transport: { name: 'Transport', bar: true, min: [640, 40], draw: () => `<span class="b me">▶ Play</span><span class="b me">● Rec</span><span class="lcd">TRACK 1 1.1.1</span><span class="b me">⟲ Loop TRACK</span><span class="b">⟲ Loop SONG</span><span class="b">⧗ Wait</span><span class="b me">−</span><span class="lcd">120 BPM</span><span class="b me">+</span>` },
+  transportS:{ name: 'Transport (compact)', bar: true, min: [330, 40], draw: () => `<span class="b me">▶</span><span class="b me">●</span><span class="lcd">1.1.1</span><span class="b">⟲</span><span class="lcd">120</span>` },
+  key:       { name: 'Key', bar: true, min: [250, 40], draw: () => `<span class="t">Key</span><span class="b">C ▾</span><span class="b">No key (chromatic) ▾</span>` },
+  undo:      { name: 'Undo / Redo', bar: true, min: [90, 40], draw: () => `<span class="b">↶</span><span class="b">↷</span>` },
+  people:    { name: 'People', bar: true, min: [170, 40], draw: () => `<span class="chip"><span class="av">J</span>Juno (you) · Geode</span>` },
+  hint:      { name: 'Keyboard hint', bar: true, min: [330, 24], draw: () => `<span class="t">Keys A–; · Z/X octave +0 · Space play · Shift+Space rec</span>` },
+  look:      { name: 'My look + Sound', bar: true, min: [200, 40], draw: () => `<span class="b">My look</span><span class="b me">Sound: on</span>` },
+  knobs:     { name: 'Hardware knob strip', min: [360, 70], draw: (w, h) => `<div class="hw" style="--kh:${Math.max(20, h - 30)}px">${['Cutoff', 'Reso', 'Env', 'Drive', 'Attack', 'Release', 'Send A', 'Send B'].map((l) => `<div><span class="knob"></span>${l}</div>`).join('')}</div>` },
+  panel:     { name: 'Panel', min: [340, 220] },
+};
+// what each panel needs to be usable (px, including its 46px header)
+const PMIN = { arrange: [420, 200], device: [480, 330], roll: [360, 260], mixer: [420, 260], library: [320, 220], scope: [240, 170] };
+
+function drawPanel(p, w, h) {
+  const tabs = p === 'device' || p === 'roll' ? '<span class="tab">Basalt</span><span class="tab">Drums</span><span class="tab">Geode</span>' : '';
+  const head = `<div class="ph"><span class="sel">${PANELS[p]} ▾</span>${tabs}<span class="sp"></span>${p === 'device' ? '<span class="sel" style="border-style:dashed">+ Add instrument</span>' : ''}<span class="ic">⟷</span><span class="ic">⤢</span></div>`;
+  const bw = w, bh = h - 46;
+  let body = '';
+  if (p === 'device') {
+    const [iname, ratio] = INSTS[S.inst] || INSTS.geode;
+    const nw = Math.max(INST_MIN, Math.min(INST_MAX, bw - 16)), nh = Math.round(nw * ratio);
+    const s = Math.min(1, (bw - 16) / nw, (bh - 16) / nh);
+    const sec = '<div class="inst__sec"><span class="knob"></span><span class="knob"></span><span class="knob"></span><span class="knob"></span></div>';
+    body = `<div class="pb"><div class="inst" style="width:${nw}px;height:${nh}px;transform:translate(-50%,-50%) scale(${s})"><div class="inst__hd"><b>${iname.toUpperCase()}</b><div class="inst__lcd"></div></div><div class="inst__mid">${sec.repeat(4)}</div><div class="inst__keys">${'<i></i>'.repeat(21)}</div></div></div>`;
+    body += `<span class="need ${s < 0.6 ? 'bad' : ''}" data-scale="${s.toFixed(2)}">${iname} needs ${nw}×${nh}: shown at ${Math.round(s * 100)}%${s < 0.6 ? ', too small to touch' : ''}</span>`;
+  } else if (p === 'roll') {
+    const rows = Array.from({ length: 30 }, (_, i) => `<div style="height:24px;border-bottom:1px solid var(--fwm-roll-keyline);display:flex"><span style="width:56px;background:var(--fwm-roll-key${[1, 3, 6, 8, 10].includes(i % 12) ? 'b' : ''})"></span>${i % 5 === 1 ? `<span style="margin-left:${40 + (i * 37) % 200}px;width:${60 + (i * 13) % 90}px;background:var(--fwm-note);border-radius:4px"></span>` : ''}</div>`).join('');
+    body = `<div class="pb blue"><div style="height:44px;display:flex;gap:6px;align-items:center;padding:0 8px;font-size:14px"><span class="sk"><span class="b">Snap 1/16</span><span class="b">Pattern ▾</span></span></div>${rows}</div>`;
+  } else if (p === 'arrange') {
+    const cell = (c) => `<span style="height:58px;border-radius:6px;background:${c};flex:0 0 132px"></span>`;
+    const line = (n) => `<div style="display:flex;gap:6px;margin:6px 8px"><span style="flex:0 0 120px;font-weight:600;padding-top:18px">TRACK ${n}</span>${cell('var(--fwm-roll)')}${cell('var(--fwm-roll-btn)')}${cell('var(--fwm-roll)')}</div>`;
+    body = `<div class="pb blue"><div style="display:flex;gap:6px;margin:8px"><span style="flex:0 0 120px"></span><b style="flex:0 0 132px">BASALT</b><b style="flex:0 0 132px">DRUMS</b><b style="flex:0 0 132px">GEODE</b></div>${line(1)}${line(2)}${line(3)}</div>`;
+  } else if (p === 'mixer') {
+    const strip = (n) => `<div style="flex:0 0 84px;border:1px solid var(--fwm-line);border-radius:8px;display:flex;flex-direction:column;align-items:center;gap:8px;padding:8px"><b style="font-size:13px">${n}</b><span class="knob" style="width:36px;height:36px"></span><span class="knob" style="width:36px;height:36px"></span><span style="width:10px;height:120px;border-radius:5px;background:var(--fwm-bg);border:1px solid var(--fwm-line)"></span></div>`;
+    body = `<div class="pb"><div style="display:flex;gap:8px;padding:8px">${['Basalt', 'Drums', 'Geode', 'Garnet', 'Reverb', 'Delay', 'Master'].map(strip).join('')}</div></div>`;
+  } else if (p === 'library') {
+    body = `<div class="pb" style="padding:10px 12px"><div style="font:900 30px/1 var(--fwm-font-display)">The manual</div><p style="color:var(--fwm-mute)">Click an instrument to see how it works. To put one in your song, use + Add instrument.</p><div style="display:grid;grid-template-columns:repeat(auto-fill,minmax(160px,1fr));gap:8px">${'<span style="height:100px;border-radius:8px;background:var(--fwm-bg);border:1px solid var(--fwm-line)"></span>'.repeat(4)}</div></div>`;
+  } else if (p === 'scope') {
+    body = `<div class="pb"><svg viewBox="0 0 200 80" preserveAspectRatio="none" style="width:calc(100% - 20px);height:calc(100% - 20px);margin:10px;background:var(--fwm-roll-deep);border-radius:8px"><path d="M0 40 ${Array.from({ length: 40 }, (_, i) => `L${i * 5 + 5} ${40 + Math.sin(i * 0.9) * 25 * Math.cos(i * 0.13)}`).join(' ')}" fill="none" stroke="var(--fwm-ok)" stroke-width="1.5" vector-effect="non-scaling-stroke"/></svg></div>`;
+  }
+  return head + body;
+}
+
+// ---------- screens and layouts ----------
+const SCREENS = [
+  ['7" hardware 800×480', 800, 480], ['7" hardware 1024×600', 1024, 600], ['Your screen 1024×768', 1024, 768],
+  ['10" 1280×800', 1280, 800], ['Laptop 1366×768', 1366, 768], ['Desktop 1920×1080', 1920, 1080], ['Phone 390×844', 390, 844],
+];
+const P = (panel, x, y, w, h) => ({ kind: 'panel', panel, x, y, w, h });
+const B = (kind, x, y, w, h) => ({ kind, x, y, w, h });
+const PRESETS = {
+  'As built today': { cols: 24, rows: 16, blocks: [
+    B('title', 0, 0, 24, 1), B('song', 0, 1, 6, 1), B('transport', 0, 2, 17, 1), B('key', 17, 2, 7, 1),
+    B('undo', 0, 3, 3, 1), B('people', 3, 3, 6, 1), B('hint', 9, 3, 9, 1), B('look', 18, 3, 6, 1),
+    P('arrange', 0, 4, 12, 6), P('device', 12, 4, 12, 6), P('roll', 0, 10, 12, 6), P('library', 12, 10, 12, 6)] },
+  'One top bar, 3 panels': { cols: 24, rows: 16, blocks: [
+    B('transport', 0, 0, 15, 1), B('song', 15, 0, 4, 1), B('look', 19, 0, 5, 1),
+    P('device', 0, 1, 15, 15), P('roll', 15, 1, 9, 8), P('arrange', 15, 9, 9, 7)] },
+  'Hardware: focus + knobs': { cols: 24, rows: 16, blocks: [
+    B('transportS', 0, 0, 9, 2), B('song', 9, 0, 6, 2), B('people', 15, 0, 5, 2), B('look', 20, 0, 4, 2),
+    P('device', 0, 2, 24, 11), B('knobs', 0, 13, 24, 3)] },
+  'Hardware: split + knobs': { cols: 24, rows: 16, blocks: [
+    B('transportS', 0, 0, 10, 2), B('song', 10, 0, 7, 2), B('look', 17, 0, 7, 2),
+    P('device', 0, 2, 15, 11), P('roll', 15, 2, 9, 11), B('knobs', 0, 13, 24, 3)] },
+};
+const ALL = [...Object.keys(KINDS).filter((k) => k !== 'panel').map((k) => ({ kind: k })), ...Object.keys(PANELS).map((p) => ({ kind: 'panel', panel: p }))];
+const keyOf = (b) => b.kind === 'panel' ? 'panel:' + b.panel : b.kind;
+const nameOf = (b) => b.kind === 'panel' ? PANELS[b.panel] : KINDS[b.kind].name;
+
+const store = {
+  get() { try { return JSON.parse(localStorage.getItem('fwm.layoutlab') || 'null'); } catch { return null; } },
+  set(v) { localStorage.setItem('fwm.layoutlab', JSON.stringify(v)); },
+};
+const saved = store.get() || {};
+const S = {
+  screen: saved.screen || { w: 1024, h: 768, chrome: true },
+  mine: saved.mine || {},
+  current: saved.current || 'As built today',
+  layout: saved.layout || structuredClone(PRESETS['As built today']),
+  inst: saved.inst || 'geode',
+  showgrid: false, clean: false, sel: null,
+};
+const persist = () => store.set({ screen: S.screen, mine: S.mine, current: S.current, layout: S.layout, inst: S.inst });
+
+// ---------- drawing ----------
+const $ = (id) => document.getElementById(id);
+const app = $('app');
+const GAP = 6, PAD = 6;
+function metrics() {
+  const W = S.screen.w, H = S.screen.h - (S.screen.chrome ? 150 : 0);
+  const { cols, rows } = S.layout;
+  return { W, H, cw: (W - PAD * 2 - GAP * (cols - 1)) / cols, rh: (H - PAD * 2 - GAP * (rows - 1)) / rows };
+}
+const rectOf = (b, m) => ({ left: PAD + b.x * (m.cw + GAP), top: PAD + b.y * (m.rh + GAP), width: b.w * m.cw + (b.w - 1) * GAP, height: b.h * m.rh + (b.h - 1) * GAP });
+
+function render() {
+  const { w, h, chrome } = S.screen;
+  const screen = $('screen');
+  screen.style.width = w + 'px'; screen.style.height = h + 'px';
+  $('chromebar').style.display = chrome ? '' : 'none';
+  screen.style.setProperty('--chrome', '150px');
+  app.classList.toggle('showgrid', S.showgrid);
+  screen.classList.toggle('hidechrome', S.clean);
+  const m = metrics();
+  // grid guide
+  const gl = $('gl'); gl.innerHTML = '';
+  for (let y = 0; y < S.layout.rows; y++) for (let x = 0; x < S.layout.cols; x++) {
+    const r = rectOf({ x, y, w: 1, h: 1 }, m); const i = document.createElement('i');
+    Object.assign(i.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' }); gl.appendChild(i);
+  }
+  app.querySelectorAll('.blk').forEach((e) => e.remove());
+  S.layout.blocks.forEach((b, i) => {
+    const r = rectOf(b, m);
+    const el = document.createElement('div');
+    el.className = 'blk' + (b.kind !== 'panel' && KINDS[b.kind].bar ? ' is-bar' : '') + (S.sel === i ? ' sel' : '');
+    Object.assign(el.style, { left: r.left + 'px', top: r.top + 'px', width: r.width + 'px', height: r.height + 'px' });
+    el.dataset.i = i;
+    const inner = b.kind === 'panel' ? drawPanel(b.panel, r.width, r.height) : `<div class="sk">${KINDS[b.kind].draw(r.width, r.height)}</div>`;
+    el.innerHTML = `<div class="in">${inner}</div><div class="edit"></div><div class="tag"><span class="nm">${nameOf(b)}</span> <span class="px">${Math.round(r.width)}×${Math.round(r.height)}</span>${b.kind === 'panel' ? `<select class="psel" aria-label="Which panel">${Object.entries(PANELS).map(([k, v]) => `<option value="${k}" ${k === b.panel ? 'selected' : ''}>${v}</option>`).join('')}</select>` : ''}<button type="button" class="x" aria-label="Hide ${nameOf(b)}">✕</button></div><div class="grip" aria-hidden="true"></div>`;
+    app.appendChild(el);
+  });
+  check();
+  fit();
+  sidebar();
+}
+
+// what is cut off, too small or on top of something
+function check() {
+  const warns = [];
+  const els = [...app.querySelectorAll('.blk')];
+  const m = metrics();
+  els.forEach((el) => {
+    const b = S.layout.blocks[+el.dataset.i];
+    const r = rectOf(b, m);
+    const min = b.kind === 'panel' ? PMIN[b.panel] : KINDS[b.kind].min;
+    const sk = el.querySelector('.sk');
+    const cut = sk ? sk.scrollHeight > sk.clientHeight + 2 || [...sk.children].some((c) => c.offsetTop + c.offsetHeight > sk.clientHeight + 2) : false;
+    const small = r.width < min[0] - 1 || r.height < min[1] - 1;
+    const need = el.querySelector('.need.bad');
+    let msg = '';
+    if (cut) msg = `${nameOf(b)}: doesn't fit in ${Math.round(r.width)}×${Math.round(r.height)} (wraps or is cut off)`;
+    else if (need) msg = `${nameOf(b)}: ${INSTS[S.inst][0]} shows at ${Math.round(need.dataset.scale * 100)}%, knobs too small to touch`;
+    else if (small) msg = `${nameOf(b)}: ${Math.round(r.width)}×${Math.round(r.height)}, needs about ${min[0]}×${min[1]}`;
+    el.classList.toggle('is-cut', !!msg);
+    if (msg) { warns.push(['', msg]); const t = el.querySelector('.tag .px'); t.innerHTML = `<b>${t.textContent}</b>`; }
+  });
+  // overlaps
+  const bl = S.layout.blocks;
+  for (let i = 0; i < bl.length; i++) for (let j = i + 1; j < bl.length; j++) {
+    const a = bl[i], c = bl[j];
+    if (a.x < c.x + c.w && c.x < a.x + a.w && a.y < c.y + c.h && c.y < a.y + a.h) {
+      els[i].classList.add('is-overlap'); els[j].classList.add('is-overlap');
+      warns.push(['', `${nameOf(a)} and ${nameOf(c)} overlap`]);
+    }
+  }
+  const dev = bl.find((b) => b.kind === 'panel' && b.panel === 'device');
+  if (dev) { const s = el2scale(); if (s != null && s >= 0.6) warns.push([s >= 0.9 ? 'ok' : 'soft', `${INSTS[S.inst][0]} shows at ${Math.round(s * 100)}% of its size`]); }
+  else warns.push(['soft', 'No Device panel: there is nowhere to play an instrument']);
+  if (!warns.some(([c]) => c === '')) warns.unshift(['ok', 'Everything fits.']);
+  $('warns').innerHTML = warns.map(([c, t]) => `<li class="${c}">${t}</li>`).join('');
+}
+const el2scale = () => { const n = app.querySelector('.need'); return n ? +n.dataset.scale : null; };
+
+function fit() {
+  const st = $('stage');
+  const s = Math.min(1, (st.clientWidth - 60) / S.screen.w, (st.clientHeight - 60) / S.screen.h);
+  $('scaler').style.transform = `scale(${s})`;
+  $('scaler').dataset.s = s;
+  $('info').textContent = `${S.screen.w}×${S.screen.h}${S.screen.chrome ? ' (150 px of browser bars)' : ''} · shown at ${Math.round(s * 100)}%`;
+}
+
+function sidebar() {
+  const on = new Set(S.layout.blocks.map(keyOf));
+  $('tray').innerHTML = '';
+  ALL.filter((b) => !on.has(keyOf(b))).forEach((b) => {
+    const bt = document.createElement('button'); bt.className = 'btn'; bt.textContent = '+ ' + nameOf(b);
+    bt.onclick = () => add(b); $('tray').appendChild(bt);
+  });
+  $('inst').value = S.inst;
+  $('sw').value = S.screen.w; $('sh').value = S.screen.h; $('chrome').checked = S.screen.chrome;
+  $('gc').value = S.layout.cols; $('gr').value = S.layout.rows;
+  const sv = SCREENS.findIndex(([, w, h]) => w === S.screen.w && h === S.screen.h);
+  $('scr').value = sv < 0 ? 'custom' : String(sv);
+  $('lay').innerHTML = [...Object.keys(PRESETS).map((n) => [n, n]), ...Object.keys(S.mine).map((n) => ['mine:' + n, '★ ' + n])].map(([v, t]) => `<option value="${v}">${t}</option>`).join('');
+  $('lay').value = S.current;
+  $('del').disabled = !S.current.startsWith('mine:');
+  $('showgrid').setAttribute('aria-pressed', S.showgrid); $('clean').setAttribute('aria-pressed', S.clean);
+  $('json').value = JSON.stringify({ screen: S.screen, layout: S.layout });
+}
+
+// a hidden piece goes into the first free spot that is big enough
+function add(b) {
+  const isBar = b.kind !== 'panel' && KINDS[b.kind].bar;
+  const m = metrics();
+  const min = b.kind === 'panel' ? PMIN[b.panel] : KINDS[b.kind].min;
+  const w = Math.min(S.layout.cols, Math.max(1, Math.ceil((min[0] + GAP) / (m.cw + GAP))));
+  const h = Math.min(S.layout.rows, Math.max(1, Math.ceil((min[1] + GAP) / (m.rh + GAP))));
+  const free = (x, y) => !S.layout.blocks.some((c) => x < c.x + c.w && c.x < x + w && y < c.y + c.h && c.y < y + h);
+  let spot = null;
+  for (let y = 0; y + h <= S.layout.rows && !spot; y++) for (let x = 0; x + w <= S.layout.cols && !spot; x++) if (free(x, y)) spot = { x, y };
+  spot = spot || { x: 0, y: 0 };
+  S.layout.blocks.push({ ...b, ...spot, w, h: isBar ? Math.max(1, h) : h });
+  S.sel = S.layout.blocks.length - 1;
+  changed();
+}
+function changed() { persist(); render(); }
+
+// ---------- dragging ----------
+let drag = null;
+app.addEventListener('pointerdown', (e) => {
+  const el = e.target.closest('.blk'); if (!el) { S.sel = null; render(); return; }
+  if (e.target.closest('button, select')) return;
+  const i = +el.dataset.i; const b = S.layout.blocks[i];
+  drag = { i, mode: e.target.classList.contains('grip') ? 'size' : 'move', sx: e.clientX, sy: e.clientY, o: { ...b }, el };
+  S.sel = i; el.classList.add('sel'); app.classList.add('dragging');
+  el.setPointerCapture(e.pointerId); e.preventDefault();
+});
+app.addEventListener('pointermove', (e) => {
+  if (!drag) return;
+  const s = +$('scaler').dataset.s || 1, m = metrics();
+  const dx = Math.round((e.clientX - drag.sx) / s / (m.cw + GAP)), dy = Math.round((e.clientY - drag.sy) / s / (m.rh + GAP));
+  const b = S.layout.blocks[drag.i], o = drag.o, { cols, rows } = S.layout;
+  if (drag.mode === 'move') { b.x = Math.max(0, Math.min(cols - o.w, o.x + dx)); b.y = Math.max(0, Math.min(rows - o.h, o.y + dy)); }
+  else { b.w = Math.max(1, Math.min(cols - o.x, o.w + dx)); b.h = Math.max(1, Math.min(rows - o.y, o.h + dy)); }
+  if (b.x !== drag.lx || b.y !== drag.ly || b.w !== drag.lw || b.h !== drag.lh) {
+    Object.assign(drag, { lx: b.x, ly: b.y, lw: b.w, lh: b.h });
+    render();
+    app.classList.add('dragging');
+  }
+});
+const end = () => { if (!drag) return; drag = null; app.classList.remove('dragging'); persist(); render(); };
+app.addEventListener('pointerup', end); app.addEventListener('pointercancel', end);
+app.addEventListener('click', (e) => {
+  const x = e.target.closest('.x'); if (!x) return;
+  S.layout.blocks.splice(+x.closest('.blk').dataset.i, 1); S.sel = null; changed();
+});
+app.addEventListener('change', (e) => {
+  if (!e.target.classList.contains('psel')) return;
+  const i = +e.target.closest('.blk').dataset.i, p = e.target.value;
+  const other = S.layout.blocks.findIndex((b, j) => j !== i && b.kind === 'panel' && b.panel === p);
+  if (other >= 0) S.layout.blocks[other].panel = S.layout.blocks[i].panel; // swap, like the studio's panel picker
+  S.layout.blocks[i].panel = p; changed();
+});
+
+// ---------- side bar ----------
+$('inst').innerHTML = Object.entries(INSTS).map(([k, [n, r]]) => `<option value="${k}">${n}</option>`).join('');
+$('inst').onchange = () => { S.inst = $('inst').value; persist(); render(); };
+$('scr').innerHTML = SCREENS.map(([n], i) => `<option value="${i}">${n}</option>`).join('') + '<option value="custom">Custom</option>';
+$('scr').onchange = () => { const s = SCREENS[+$('scr').value]; if (s) { S.screen.w = s[1]; S.screen.h = s[2]; S.screen.chrome = false; } persist(); render(); };
+$('sw').onchange = () => { S.screen.w = Math.max(320, +$('sw').value || 1024); persist(); render(); };
+$('sh').onchange = () => { S.screen.h = Math.max(240, +$('sh').value || 768); persist(); render(); };
+$('chrome').onchange = () => { S.screen.chrome = $('chrome').checked; persist(); render(); };
+$('lay').onchange = () => {
+  const v = $('lay').value; S.current = v;
+  S.layout = structuredClone(v.startsWith('mine:') ? S.mine[v.slice(5)] : PRESETS[v]); S.sel = null; persist(); render();
+};
+$('save').onclick = () => {
+  const n = prompt('Name this layout', S.current.startsWith('mine:') ? S.current.slice(5) : 'My layout'); if (!n) return;
+  S.mine[n] = structuredClone(S.layout); S.current = 'mine:' + n; persist(); render();
+};
+$('del').onclick = () => { if (!S.current.startsWith('mine:')) return; delete S.mine[S.current.slice(5)]; S.current = 'As built today'; S.layout = structuredClone(PRESETS[S.current]); persist(); render(); };
+$('reset').onclick = () => { S.layout = structuredClone(S.current.startsWith('mine:') ? S.mine[S.current.slice(5)] : PRESETS[S.current]); persist(); render(); };
+const regrid = (cols, rows) => {
+  const fx = cols / S.layout.cols, fy = rows / S.layout.rows;
+  S.layout.blocks.forEach((b) => { b.x = Math.round(b.x * fx); b.y = Math.round(b.y * fy); b.w = Math.max(1, Math.round(b.w * fx)); b.h = Math.max(1, Math.round(b.h * fy)); });
+  S.layout.cols = cols; S.layout.rows = rows; persist(); render();
+};
+$('gc').onchange = () => regrid(Math.max(4, Math.min(48, +$('gc').value || 24)), S.layout.rows);
+$('gr').onchange = () => regrid(S.layout.cols, Math.max(4, Math.min(48, +$('gr').value || 16)));
+$('showgrid').onclick = () => { S.showgrid = !S.showgrid; render(); };
+$('clean').onclick = () => { S.clean = !S.clean; render(); };
+$('copy').onclick = () => { $('json').select(); navigator.clipboard?.writeText($('json').value).catch(() => document.execCommand('copy')); };
+$('load').onclick = () => {
+  try { const v = JSON.parse($('json').value); if (v.screen) S.screen = v.screen; if (v.layout?.blocks) S.layout = v.layout; persist(); render(); }
+  catch { alert('That is not a layout (it should start with {"screen":…).'); }
+};
+addEventListener('resize', fit);
+document.fonts?.ready.then(render);
+render();
+
+// ?selftest: every preset on every screen renders and finds its warnings without errors
+if (new URLSearchParams(location.search).has('selftest')) {
+  const out = [];
+  try {
+    for (const [n] of Object.entries(PRESETS)) for (const [sn, w, h] of SCREENS) {
+      S.layout = structuredClone(PRESETS[n]); S.screen = { w, h, chrome: false }; render();
+      out.push(`${n} @ ${sn}: ${[...document.querySelectorAll('#warns li')].map((l) => l.textContent).join(' | ')}`);
+    }
+    out.push('PASS layout lab renders every preset on every screen');
+  } catch (e) { out.push('FAIL ' + e); }
+  fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+  document.title = out.at(-1).startsWith('PASS') ? 'PASS' : 'FAIL';
+}
+</script>
+</body>
+</html>
