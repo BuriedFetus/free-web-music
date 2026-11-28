@@ -1,0 +1,491 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width,initial-scale=1">
+<title>Navigation + compact top bar</title>
+<link rel="preconnect" href="https://fonts.googleapis.com">
+<link href="https://fonts.googleapis.com/css2?family=Michroma&family=Figtree:wght@400;600;800&family=VT323&family=Big+Shoulders+Display:wght@800;900&display=swap" rel="stylesheet">
+<link rel="stylesheet" href="skins/app.css">
+<style>
+/* VOICE  the studio, calmer: one top row, icons that explain themselves on hover, views that open each other
+   IDEA   double-click (or the small ↗) goes to the right view at full size; Back / Esc returns; the top bar
+          never moves when people join (their avatars stack in a fixed slot); settings live behind ☰
+   LAYOUT top bar | 2×2 panels (the studio's own) | a floating Review card to compare and simulate */
+*{box-sizing:border-box;min-width:0}
+html,body{height:100%;margin:0}
+body{background:var(--fwm-bg);color:var(--fwm-ink);font:15px/1.4 var(--fwm-font-ui);overflow:hidden}
+button,select,input{font:inherit;color:inherit}
+:focus-visible{outline:2px solid var(--fwm-me);outline-offset:2px}
+.app{display:grid;grid-template-rows:auto minmax(0,1fr);height:100%}
+svg.i{width:18px;height:18px;fill:none;stroke:currentColor;stroke-width:2;stroke-linecap:round;stroke-linejoin:round;flex:none}
+
+/* ---------- top bar (proposed): one row, fixed slots ---------- */
+.top{display:flex;align-items:center;gap:6px;padding:6px 8px;background:var(--fwm-panel);border-bottom:1px solid var(--fwm-line);height:52px}
+.ib{height:38px;min-width:38px;padding:0 9px;display:inline-flex;align-items:center;justify-content:center;gap:6px;border-radius:calc(8px*var(--fwm-round));border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;font-weight:600;white-space:nowrap}
+.ib:hover{border-color:var(--fwm-me)}
+.ib[aria-pressed=true]{background:var(--fwm-me);color:var(--fwm-on-me);border-color:var(--fwm-me)}
+.ib.play[aria-pressed=true]{background:var(--fwm-ok);color:var(--fwm-on-ok);border-color:var(--fwm-ok)}
+.ib.rec[aria-pressed=true]{background:var(--fwm-rec);color:var(--fwm-on-rec);border-color:var(--fwm-rec)}
+.ib small{font:600 11px/1 var(--fwm-font-label);letter-spacing:.06em;text-transform:uppercase}
+.sep{width:1px;height:26px;background:var(--fwm-line);margin:0 2px;flex:none}
+.lcd{height:38px;display:inline-flex;align-items:center;padding:0 10px;border-radius:6px;background:var(--fwm-roll-deep);color:var(--fwm-me);font:22px/1 var(--fwm-font-screen);white-space:nowrap}
+.lcd.sm{font-size:20px;padding:0 8px}
+.song{display:inline-flex;align-items:center;gap:6px;height:38px;padding:0 10px;border-radius:999px;border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;white-space:nowrap}
+.song b{font:900 20px/1 var(--fwm-font-display)}
+.song .dot{width:8px;height:8px;border-radius:50%;background:var(--fwm-rec)}
+.grow{flex:1}
+.key{height:38px;border-radius:8px;border:1px solid var(--fwm-line);background:var(--fwm-bg);padding:0 6px;font-weight:600}
+/* people: a fixed slot, avatars overlap; joining never moves anything else */
+.people{position:relative;width:132px;height:38px;display:flex;align-items:center;flex:none;border-radius:999px;border:1px solid var(--fwm-line);background:var(--fwm-bg);cursor:pointer;padding:0 6px}
+.people .av{width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:800 13px var(--fwm-font-ui);color:var(--fwm-bg);border:2px solid var(--fwm-bg);margin-left:-9px;flex:none}
+.people .av:first-child{margin-left:0;box-shadow:0 0 0 2px var(--fwm-me)}
+.people .more{margin-left:-9px;width:28px;height:28px;border-radius:50%;display:grid;place-items:center;font:700 12px var(--fwm-font-ui);background:var(--fwm-panel);border:2px solid var(--fwm-bg)}
+.people .lbl{margin-left:6px;font-size:12px;color:var(--fwm-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.people .alone{position:absolute;right:-4px;top:-4px;width:16px;height:16px;border-radius:50%;background:var(--fwm-mod);display:none}
+.people.is-alone .alone{display:block}
+@keyframes join{from{transform:scale(.3);opacity:0}to{transform:none;opacity:1}}
+.people .av.new{animation:join .25s ease-out}
+
+/* pop-overs (people, ☰ menu) */
+.pop{position:fixed;z-index:40;min-width:260px;max-width:340px;background:var(--fwm-bg);border:1px solid var(--fwm-line);border-radius:calc(12px*var(--fwm-round));padding:8px;box-shadow:0 10px 30px color-mix(in srgb,var(--fwm-bg) 60%,transparent)}
+.pop h3{margin:4px 6px 8px;font:600 11px/1 var(--fwm-font-label);text-transform:uppercase;letter-spacing:.12em;color:var(--fwm-mute)}
+.pop .row{display:flex;align-items:center;gap:8px;padding:6px;border-radius:8px}
+.pop button.row{width:100%;border:0;background:none;cursor:pointer;text-align:left}
+.pop button.row:hover{background:var(--fwm-panel)}
+.pop .av{width:26px;height:26px;border-radius:50%;display:grid;place-items:center;font:800 12px var(--fwm-font-ui);color:var(--fwm-bg);flex:none}
+.pop .who{flex:1}.pop .who small{display:block;color:var(--fwm-mute);font-size:12px}
+.pop hr{border:0;border-top:1px solid var(--fwm-line);margin:6px 0}
+.seg{display:inline-flex;border:1px solid var(--fwm-line);border-radius:8px;overflow:hidden}
+.seg button{border:0;background:none;padding:6px 10px;cursor:pointer;font-weight:600;font-size:13px}
+.seg button[aria-pressed=true]{background:var(--fwm-me);color:var(--fwm-on-me)}
+.kbd{font:12px/1 var(--fwm-font-screen);padding:2px 5px;border:1px solid var(--fwm-line);border-radius:4px;color:var(--fwm-mute)}
+
+/* tooltip: after a short wait on hover, at once on keyboard focus or when sliding along the bar */
+.tip{position:fixed;z-index:60;pointer-events:none;max-width:280px;padding:6px 9px;border-radius:8px;background:var(--fwm-ink);color:var(--fwm-bg);font-size:13px;line-height:1.35;opacity:0;transform:translateY(-3px);transition:opacity .12s,transform .12s}
+.tip.on{opacity:1;transform:none}
+.tip b{display:block}
+.tip .kbd{color:var(--fwm-bg);border-color:color-mix(in srgb,var(--fwm-bg) 40%,transparent)}
+
+/* ---------- top bar (today), for comparison ---------- */
+.today{display:flex;flex-wrap:wrap;gap:6px 10px;align-items:center;padding:8px;background:var(--fwm-panel);border-bottom:1px solid var(--fwm-line)}
+.today .b{height:40px;padding:0 12px;display:inline-flex;align-items:center;border-radius:8px;border:1px solid var(--fwm-line);background:var(--fwm-bg);font-weight:600;white-space:nowrap}
+.today .b.me{background:var(--fwm-me);color:var(--fwm-on-me);border-color:var(--fwm-me)}
+.today .chip{display:inline-flex;gap:6px;align-items:center;padding:4px 12px 4px 4px;border-radius:999px;border:1px solid var(--fwm-line);white-space:nowrap;font-size:14px}
+.today .chip i{width:28px;height:28px;border-radius:50%;display:inline-block}
+.today .t{color:var(--fwm-mute);font-size:13px;white-space:nowrap}
+
+/* ---------- workspace ---------- */
+.ws{position:relative;display:grid;grid-template-columns:1fr 1fr;grid-template-rows:1fr 1fr;gap:8px;padding:8px;min-height:0}
+.pane{display:flex;flex-direction:column;min-height:0;border-radius:calc(12px*var(--fwm-round));background:var(--fwm-panel);border:1px solid var(--fwm-line);overflow:hidden;transition:box-shadow .3s}
+.ws.max .pane{display:none}
+.ws.max .pane.maxed{display:flex;grid-area:1/1/3/3}
+@keyframes zin{from{transform:scale(.55);opacity:.4}to{transform:none;opacity:1}}
+.ws.max .pane.maxed.zoom{animation:zin .2s ease-out}
+.pane.flash{box-shadow:0 0 0 3px var(--fwm-me)}
+.ph{display:flex;align-items:center;gap:6px;padding:6px 8px;border-bottom:1px solid var(--fwm-line);min-height:48px}
+.ph select{font-weight:600;font-size:14px;background:var(--fwm-bg);border:1px solid var(--fwm-line);border-radius:8px;height:34px;padding:0 6px}
+.ph .ctx{flex:1;font-size:13px;color:var(--fwm-mute);white-space:nowrap;overflow:hidden;text-overflow:ellipsis}
+.ph .ib{height:34px;min-width:34px}
+.crumbs{display:none;align-items:center;gap:6px;flex:1;font-size:14px;white-space:nowrap;overflow:hidden}
+.ws.max .maxed .crumbs{display:flex}
+.ws.max .maxed .ctx,.ws.max .maxed .vsel{display:none}
+.crumbs button{border:0;background:none;padding:4px 6px;border-radius:6px;cursor:pointer;color:var(--fwm-me);font-weight:600}
+.crumbs button:hover{background:var(--fwm-bg)}
+.crumbs span{color:var(--fwm-mute)}
+.crumbs b{font-weight:700}
+.back{display:none}
+.ws.max .maxed .back{display:inline-flex}
+.pb{flex:1;min-height:0;overflow:auto;position:relative}
+.pb.blue{background:var(--fwm-roll2);color:var(--fwm-roll-ink)}
+
+/* arrangement */
+.arr{padding:8px;display:grid;gap:6px;grid-template-columns:96px repeat(var(--n),minmax(118px,1fr));align-content:start}
+.ihead{height:54px;border-radius:8px;border:2px solid transparent;display:flex;flex-direction:column;justify-content:center;align-items:center;cursor:pointer;position:relative;user-select:none;background:var(--fwm-roll-deep)}
+.ihead b{font:600 14px/1 var(--fwm-font-label);letter-spacing:.1em}
+.ihead small{font-size:11px;opacity:.75}
+.ihead.sel{border-color:var(--fwm-me)}
+.ihead::after{content:'';position:absolute;left:10%;right:10%;bottom:4px;height:3px;border-radius:2px;background:var(--c)}
+.tl{height:62px;border-radius:8px;display:flex;flex-direction:column;justify-content:center;padding:0 10px;background:var(--fwm-roll-deep);border:2px solid transparent;cursor:pointer}
+.tl b{font:900 18px/1 var(--fwm-font-display)}
+.tl small{font-size:11px;opacity:.75}
+.tl.sel{border-color:var(--fwm-me)}
+.cell{height:62px;border-radius:8px;background:var(--fwm-roll);border:2px solid transparent;position:relative;cursor:pointer;padding:6px 8px;user-select:none}
+.cell b{font:900 18px/1 var(--fwm-font-display)}
+.cell.empty{background:color-mix(in srgb,var(--fwm-roll-ink) 6%,transparent)}
+.cell.sel{border-color:var(--fwm-me)}
+.cell .bars{position:absolute;left:8px;right:8px;bottom:8px;height:16px;background:repeating-linear-gradient(90deg,var(--fwm-roll-ink) 0 10px,transparent 10px 22px);opacity:.35;border-radius:2px}
+.go{position:absolute;right:4px;top:4px;width:26px;height:26px;border-radius:6px;border:0;background:var(--fwm-me);color:var(--fwm-on-me);display:none;place-items:center;cursor:pointer;padding:0}
+.go svg.i{width:15px;height:15px}
+.cell:hover .go,.cell.sel .go,.ihead:hover .go,.ihead.sel .go{display:grid}
+.ihead .go{width:20px;height:20px;right:2px;top:2px;border-radius:5px}.ihead .go svg.i{width:12px;height:12px}
+@media (hover:none){.cell.sel .go,.ihead.sel .go{display:grid}}
+.hint{margin:4px 8px 8px;font-size:12px;opacity:.75}
+
+/* piano roll sketch */
+.roll{position:relative;margin:8px;height:calc(100% - 16px);min-height:200px;border-radius:8px;background:var(--fwm-roll-deep);overflow:hidden}
+.roll .ln{position:absolute;left:0;right:0;height:1px;background:var(--fwm-roll-keyline)}
+.roll .nt{position:absolute;height:14px;border-radius:4px;background:var(--fwm-note)}
+.roll .lbl{position:absolute;left:10px;top:8px;font:900 22px/1 var(--fwm-font-display)}
+/* device sketch */
+.dev{margin:10px;border-radius:12px;background:var(--fwm-bg);border:1px solid var(--fwm-line);padding:14px;display:grid;gap:12px}
+.dev h2{margin:0;font:900 36px/1 var(--fwm-font-display);letter-spacing:.02em}
+.dev .rowk{display:flex;gap:14px;flex-wrap:wrap}
+.knob{width:50px;height:50px;border-radius:50%;border:3px solid var(--fwm-line);background:var(--fwm-panel);position:relative}
+.knob::after{content:'';position:absolute;left:50%;top:5px;width:3px;height:14px;margin-left:-1.5px;background:var(--c,var(--fwm-me));border-radius:2px}
+.lib{padding:12px}
+.lib h2{margin:0 0 6px;font:900 28px/1 var(--fwm-font-display)}
+
+/* review card */
+.review{position:fixed;right:12px;bottom:12px;z-index:50;width:320px;max-height:calc(100% - 90px);overflow:auto;background:var(--fwm-bg);border:1px solid var(--fwm-me);border-radius:12px;padding:10px 12px;font-size:13px;box-shadow:0 10px 30px color-mix(in srgb,var(--fwm-bg) 60%,transparent)}
+.review h2{margin:0 0 6px;font:600 11px/1 var(--fwm-font-label);text-transform:uppercase;letter-spacing:.12em;color:var(--fwm-me);display:flex;justify-content:space-between;align-items:center}
+.review.mini>:not(h2){display:none}
+.review p{margin:6px 0;color:var(--fwm-mute)}
+.review ol{margin:6px 0;padding-left:18px}
+.review li{margin:3px 0}
+.review .r{display:flex;gap:6px;align-items:center;flex-wrap:wrap;margin:6px 0}
+.review button.s{height:30px;padding:0 9px;border-radius:7px;border:1px solid var(--fwm-line);background:var(--fwm-panel);cursor:pointer;font-weight:600;font-size:12px}
+.review button.s[aria-pressed=true]{background:var(--fwm-me);color:var(--fwm-on-me)}
+.toast{position:fixed;left:50%;bottom:16px;transform:translateX(-50%);background:var(--fwm-ink);color:var(--fwm-bg);padding:8px 14px;border-radius:999px;font-size:14px;z-index:70;opacity:0;transition:opacity .2s}
+.toast.on{opacity:1}
+</style>
+</head>
+<body>
+<svg width="0" height="0" style="position:absolute" aria-hidden="true">
+  <symbol id="i-play" viewBox="0 0 24 24"><path d="M7 5l12 7-12 7z" fill="currentColor"/></symbol>
+  <symbol id="i-stop" viewBox="0 0 24 24"><rect x="6" y="6" width="12" height="12" rx="1.5" fill="currentColor"/></symbol>
+  <symbol id="i-rec" viewBox="0 0 24 24"><circle cx="12" cy="12" r="6.5" fill="currentColor"/></symbol>
+  <symbol id="i-loop1" viewBox="0 0 24 24"><path d="M4 12a7 7 0 0 1 12-5l2 2M20 12a7 7 0 0 1-12 5l-2-2M18 4v5h-5M6 20v-5h5"/></symbol>
+  <symbol id="i-wait" viewBox="0 0 24 24"><path d="M7 3h10M7 21h10M8 3c0 5 8 5 8 9s-8 4-8 9M16 3c0 5-8 5-8 9s8 4 8 9"/></symbol>
+  <symbol id="i-undo" viewBox="0 0 24 24"><path d="M9 14L4 9l5-5"/><path d="M4 9h10a6 6 0 0 1 0 12h-3"/></symbol>
+  <symbol id="i-redo" viewBox="0 0 24 24"><path d="M15 14l5-5-5-5"/><path d="M20 9H10a6 6 0 0 0 0 12h3"/></symbol>
+  <symbol id="i-sound" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M16 9a4 4 0 0 1 0 6M19 6a8 8 0 0 1 0 12"/></symbol>
+  <symbol id="i-mute" viewBox="0 0 24 24"><path d="M4 9v6h4l5 4V5L8 9z"/><path d="M17 9l5 6M22 9l-5 6"/></symbol>
+  <symbol id="i-menu" viewBox="0 0 24 24"><path d="M4 7h16M4 12h16M4 17h16"/></symbol>
+  <symbol id="i-back" viewBox="0 0 24 24"><path d="M15 18l-6-6 6-6"/></symbol>
+  <symbol id="i-go" viewBox="0 0 24 24"><path d="M7 17L17 7M9 7h8v8"/></symbol>
+  <symbol id="i-full" viewBox="0 0 24 24"><path d="M4 9V4h5M20 9V4h-5M4 15v5h5M20 15v5h-5"/></symbol>
+  <symbol id="i-wide" viewBox="0 0 24 24"><path d="M3 12h18M7 8l-4 4 4 4M17 8l4 4-4 4"/></symbol>
+</svg>
+
+<div class="app">
+  <div id="topbar"></div>
+  <div class="ws" id="ws"></div>
+</div>
+
+<aside class="review" id="review">
+  <h2>Review <button class="s" id="mini" aria-label="Fold the review card">–</button></h2>
+  <p>A mock-up: nothing here plays sound. Try:</p>
+  <ol>
+    <li><b>Double-click a pattern</b> (Groove, Beat…): the Piano roll comes up full size with it. <b>Esc</b> or ← goes back.</li>
+    <li><b>Double-click an instrument</b> (BASALT…): its Device, full size.</li>
+    <li>Or the small <b>↗</b> on the hovered / selected one (one tap: for touch screens and the hardware).</li>
+    <li>Hover the top bar icons: tips after a moment, then at once while you slide along.</li>
+    <li>Make people join and leave: the bar doesn't move.</li>
+  </ol>
+  <div class="r">Top bar
+    <button class="s" id="v-new" aria-pressed="true">Proposed</button>
+    <button class="s" id="v-old" aria-pressed="false">Today</button>
+  </div>
+  <div class="r">Double-click
+    <button class="s" id="d-go" aria-pressed="true">Go to (full size)</button>
+    <button class="s" id="d-side" aria-pressed="false">Show beside</button>
+  </div>
+  <div class="r">People
+    <button class="s" id="p-join">+ someone joins</button>
+    <button class="s" id="p-leave">− leaves</button>
+  </div>
+  <p>Rename moves off the double-click: ✎, F2, or the name field in the Device panel.</p>
+</aside>
+<div class="tip" id="tip" role="tooltip"></div>
+<div class="toast" id="toast"></div>
+
+<script>
+// ---------------- state ----------------
+const ICON = (id) => `<svg class="i" aria-hidden="true"><use href="#i-${id}"/></svg>`;
+const INST = [
+  { id: 'b', name: 'BASALT', kind: 'Mono bass', c: 'var(--fwm-rec)' },
+  { id: 'd', name: 'DRUMS', kind: 'Flint', c: 'var(--fwm-ok)' },
+  { id: 'g', name: 'GARNET', kind: 'Strings', c: 'var(--fwm-mod)' },
+];
+const ROWS = [
+  { b: 'Groove', d: 'Beat', g: null },
+  { b: 'Drift', d: 'Fill', g: 'Strum' },
+];
+const PEOPLE_POOL = [['Mira', 'var(--fwm-peer)', 'Drums', 'TRACK 2'], ['Theo', 'var(--fwm-mod)', 'Garnet', 'TRACK 1'], ['Kai', 'var(--fwm-ok)', 'Basalt', 'TRACK 2'], ['Nova', 'var(--fwm-rec)', 'Drums', 'TRACK 1'], ['Ada', 'var(--fwm-note)', 'Garnet', 'TRACK 2']];
+const S = {
+  bar: 'new', dbl: 'go',
+  views: ['seq', 'device', 'roll', 'library'], max: -1, zoom: false,
+  inst: 'b', row: 0, pat: 'Groove',
+  history: [], // where Back returns to
+  playing: false, rec: false, loop: 'song', wait: true, sound: false, alone: false, live: 'even',
+  people: [], pop: null,
+};
+const VIEWS = { seq: 'Song arrangement', roll: 'Piano roll', device: 'Device', mixer: 'Mixer', library: 'Library' };
+const $ = (id) => document.getElementById(id);
+const instOf = (id) => INST.find((i) => i.id === id);
+
+// ---------------- top bar ----------------
+function topbar() {
+  const t = $('topbar');
+  if (S.bar === 'old') {
+    t.className = 'today';
+    t.innerHTML = `<span class="b">Song <b style="font:900 20px var(--fwm-font-display);margin-left:6px">Demo</b></span><span class="b me">Save</span>
+      <span class="b me">▶ Play</span><span class="b me">● Rec</span><span class="lcd">TRACK 1 1.1.1</span><span class="b ${S.loop === 'track' ? 'me' : ''}">⟲ Loop TRACK</span><span class="b ${S.loop === 'song' ? 'me' : ''}">⟲ Loop SONG</span><span class="b">⏳ Wait</span>
+      ${S.people.length ? '<span class="b">🎧 Play alone</span><span class="t">Live keys</span><span class="b me">Even</span><span class="b">Tight</span>' : ''}
+      <span class="b me">−</span><span class="lcd">120 BPM</span><span class="b me">+</span><span class="t">Key</span><span class="b">C ▾</span><span class="b">No key (chromatic) ▾</span>
+      <span class="b">↶</span><span class="b">↷</span>
+      <span class="chip"><i style="background:var(--fwm-ok)"></i>Juno (you) · Basalt</span>
+      ${S.people.map((p) => `<span class="chip"><i style="background:${p[1]}"></i>${p[0]} · ${p[2]} ${p[3]} <span class="t">Even: 38 ms</span></span>`).join('')}
+      <span class="t">Keys A–; · Z/X octave +0 · Space play · Shift+Space rec</span><span class="b">My look</span><span class="b">Sound: off</span>`;
+    return;
+  }
+  t.className = 'top';
+  const max = 3, shown = [['Juno', 'var(--fwm-ok)'], ...S.people].slice(0, max), extra = 1 + S.people.length - shown.length;
+  t.innerHTML = `
+    <button class="ib" id="menu" data-tip="<b>Menu</b>My look, sound output, keyboard help, studio skin" aria-label="Menu" aria-haspopup="menu">${ICON('menu')}</button>
+    <button class="song" data-tip="<b>Song</b>Open, save, start a new one. The dot: not saved yet" aria-label="Song Demo, not saved"><span class="dot"></span><b>Demo</b>▾</button>
+    <span class="sep"></span>
+    <button class="ib play" aria-pressed="${S.playing}" id="play" aria-label="${S.playing ? 'Stop' : 'Play'}" data-tip="<b>${S.playing ? 'Stop' : 'Play'}</b><span class='kbd'>Space</span>">${ICON(S.playing ? 'stop' : 'play')}</button>
+    <button class="ib rec" aria-pressed="${S.rec}" id="rec" aria-label="Record" data-tip="<b>Record</b>Click: overdub · right-click: replace<br><span class='kbd'>Shift+Space</span> waits for your first note">${ICON('rec')}</button>
+    <span class="lcd" aria-label="Position">T${S.row + 1} 1.1.1</span>
+    <button class="ib" id="loop" aria-label="Loop: ${S.loop === 'track' ? 'this TRACK' : 'the whole song'}" data-tip="<b>Loop ${S.loop === 'track' ? 'TRACK' : 'SONG'}</b>${S.loop === 'track' ? 'Repeats the TRACK that is playing' : 'Plays the TRACKs in order, then starts again'}. Click to switch">${ICON('loop1')}<small>${S.loop === 'track' ? 'TRACK' : 'SONG'}</small></button>
+    <button class="ib" id="wait" aria-pressed="${S.wait}" aria-label="Wait for the end of the TRACK" data-tip="<b>Wait ${S.wait ? 'on' : 'off'}</b>${S.wait ? 'A TRACK you click while playing starts when the playing one ends' : 'A TRACK you click while playing starts at once'}">${ICON('wait')}</button>
+    <span class="sep"></span>
+    <span class="lcd sm" data-tip="<b>Tempo</b>Click to type 40–240 · drag up / down" tabindex="0" aria-label="Tempo 120 BPM">120</span>
+    <span class="lcd sm" data-tip="<b>Swing</b>Moved here from the Song arrangement's own row" tabindex="0" aria-label="Swing 0%">SW 0%</span>
+    <select class="key" aria-label="Song key" data-tip="<b>Key</b>For every instrument: the Piano roll lights it, Garnet's chord buttons follow it"><option>C minor</option><option>No key</option></select>
+    <span class="grow"></span>
+    <button class="ib" aria-label="Undo" data-tip="<b>Undo</b>your own last change <span class='kbd'>Ctrl+Z</span>">${ICON('undo')}</button>
+    <button class="ib" aria-label="Redo" data-tip="<b>Redo</b><span class='kbd'>Ctrl+Shift+Z</span>">${ICON('redo')}</button>
+    <button class="people ${S.alone ? 'is-alone' : ''}" id="people" aria-label="People in this session: ${1 + S.people.length}" aria-haspopup="dialog"
+      data-tip="<b>${1 + S.people.length === 1 ? 'Just you' : 1 + S.people.length + ' people'}</b>Click: who is where, Play alone, live key timing">
+      ${shown.map((p, i) => `<span class="av ${p.fresh ? 'new' : ''}" style="background:${p[1]}">${p[0][0]}</span>`).join('')}
+      ${extra > 0 ? `<span class="more">+${extra}</span>` : ''}
+      <span class="lbl">${S.people.length ? (S.alone ? 'alone' : 'together') : 'just you'}</span><span class="alone"></span>
+    </button>
+    <button class="ib" id="sound" aria-pressed="${S.sound}" aria-label="Sound ${S.sound ? 'on' : 'off'}" data-tip="<b>Sound ${S.sound ? 'on' : 'off'}</b>Browsers start silent until you click here">${ICON(S.sound ? 'sound' : 'mute')}</button>`;
+  S.people.forEach((p) => delete p.fresh);
+  $('play').onclick = () => { S.playing = !S.playing; topbar(); };
+  $('rec').onclick = () => { S.rec = !S.rec; if (S.rec) S.playing = true; topbar(); };
+  $('loop').onclick = () => { S.loop = S.loop === 'track' ? 'song' : 'track'; topbar(); tipFor($('loop')); };
+  $('wait').onclick = () => { S.wait = !S.wait; topbar(); tipFor($('wait')); };
+  $('sound').onclick = () => { S.sound = !S.sound; topbar(); };
+  $('people').onclick = (e) => openPop('people', e.currentTarget);
+  $('menu').onclick = (e) => openPop('menu', e.currentTarget);
+}
+
+function openPop(kind, anchor, again = false) {
+  closePop();
+  if (S.pop === kind && !again) { S.pop = null; return; }
+  S.pop = kind;
+  const p = document.createElement('div');
+  p.className = 'pop'; p.id = 'pop';
+  if (kind === 'people') {
+    p.setAttribute('role', 'dialog'); p.setAttribute('aria-label', 'People');
+    p.innerHTML = `<h3>In this session</h3>
+      <div class="row"><span class="av" style="background:var(--fwm-ok)">J</span><span class="who">Juno (you)<small>${instOf(S.inst).name.toLowerCase()} · TRACK ${S.row + 1}</small></span></div>
+      ${S.people.map((q) => `<button class="row" data-goto="${q[2]}"><span class="av" style="background:${q[1]}">${q[0][0]}</span><span class="who">${q[0]}<small>${q[2]} · ${q[3]} · hears you 38 ms late</small></span>${ICON('go')}</button>`).join('') || '<p style="margin:6px;color:var(--fwm-mute)">Nobody else yet. Share the link to play together.</p>'}
+      <hr><div class="row"><span class="who">Play alone<small>Your Play / Stop / TRACK clicks stay yours</small></span><span class="seg"><button aria-pressed="${!S.alone}" data-alone="0">Together</button><button aria-pressed="${S.alone}" data-alone="1">Alone</button></span></div>
+      <div class="row"><span class="who">Others' live keys<small>Even: steady, slightly late · Tight: sooner</small></span><span class="seg"><button aria-pressed="${S.live === 'even'}" data-live="even">Even</button><button aria-pressed="${S.live === 'tight'}" data-live="tight">Tight</button></span></div>`;
+  } else {
+    p.setAttribute('role', 'menu'); p.setAttribute('aria-label', 'Menu');
+    p.innerHTML = `<h3>Studio</h3>
+      <button class="row" role="menuitem">My look <small style="margin-left:auto;color:var(--fwm-mute)">your own style</small></button>
+      <button class="row" role="menuitem">Sound output… <small style="margin-left:auto;color:var(--fwm-mute)">speakers, latency</small></button>
+      <button class="row" role="menuitem">Keyboard and shortcuts <span class="kbd" style="margin-left:auto">?</span></button>
+      <button class="row" role="menuitem">Panels: reset layout</button>
+      <hr><h3>Help</h3>
+      <button class="row" role="menuitem">Library (the manual)</button>
+      <button class="row" role="menuitem">Show tips on hover <span class="seg" style="margin-left:auto"><button aria-pressed="true">On</button><button aria-pressed="false">Off</button></span></button>`;
+  }
+  document.body.appendChild(p);
+  const r = anchor.getBoundingClientRect();
+  p.style.top = r.bottom + 6 + 'px';
+  if (kind === 'menu') p.style.left = r.left + 'px'; else p.style.right = Math.max(8, innerWidth - r.right) + 'px';
+  p.onclick = (e) => {
+    const a = e.target.closest('[data-alone]'), l = e.target.closest('[data-live]'), g = e.target.closest('[data-goto]');
+    if (a) { S.alone = a.dataset.alone === '1'; topbar(); openPop('people', $('people'), true); }
+    if (l) { S.live = l.dataset.live; openPop('people', $('people'), true); }
+    if (g) { closePop(); const inst = INST.find((i) => i.kind === g.dataset.goto || i.name.toLowerCase() === g.dataset.goto.toLowerCase()) || INST[1]; goTo('device', { inst: inst.id }, `Following ${g.querySelector('.who').firstChild.textContent}`); }
+    if (e.target.closest('[role=menuitem]')) { closePop(); toast('A menu item (mock-up)'); }
+  };
+}
+function closePop() { $('pop')?.remove(); }
+addEventListener('pointerdown', (e) => { if (!e.target.closest('#pop, #people, #menu')) { closePop(); S.pop = null; } });
+
+// ---------------- tooltips ----------------
+// Hover: 450 ms. Sliding to a neighbour within 700 ms of the last tip: at once ("warm"). Keyboard focus: at
+// once. Touch: press and hold 500 ms. The tip never replaces the button's aria-label.
+let tipTimer = 0, lastTipAt = 0, tipEl = null;
+function tipFor(el) {
+  const tip = $('tip');
+  if (!el || !el.dataset.tip) return;
+  tipEl = el;
+  tip.innerHTML = el.dataset.tip;
+  const r = el.getBoundingClientRect();
+  tip.style.left = Math.min(innerWidth - 290, Math.max(6, r.left + r.width / 2 - 70)) + 'px';
+  tip.style.top = r.bottom + 8 + 'px';
+  tip.classList.add('on');
+}
+function tipOff() { clearTimeout(tipTimer); if ($('tip').classList.contains('on')) lastTipAt = performance.now(); $('tip').classList.remove('on'); tipEl = null; }
+document.addEventListener('pointerover', (e) => {
+  const el = e.target.closest('[data-tip]');
+  if (el === tipEl) return;
+  tipOff();
+  if (!el || e.pointerType === 'touch' || S.pop) return;
+  const warm = performance.now() - lastTipAt < 700;
+  tipTimer = setTimeout(() => tipFor(el), warm ? 0 : 450);
+});
+document.addEventListener('focusin', (e) => { const el = e.target.closest('[data-tip]'); if (el && e.target.matches(':focus-visible')) tipFor(el); });
+document.addEventListener('focusout', tipOff);
+document.addEventListener('pointerdown', (e) => {
+  tipOff();
+  const el = e.target.closest('[data-tip]');
+  if (el && e.pointerType === 'touch') tipTimer = setTimeout(() => tipFor(el), 500);
+});
+
+// ---------------- workspace + navigation ----------------
+// goTo(view): the view comes up in a panel (the one already showing it, else the bottom-right one) and, with
+// "Go to", at full size with a Back path. Back / Esc returns to exactly where you were.
+function goTo(view, sel, why) {
+  S.history.push({ views: S.views.slice(), max: S.max, inst: S.inst, row: S.row, pat: S.pat });
+  Object.assign(S, sel);
+  let i = S.views.indexOf(view);
+  if (i < 0) { i = [3, 2, 1, 0].find((k) => S.views[k] !== 'seq') ?? 3; S.views[i] = view; }
+  if (S.dbl === 'go') { S.max = i; S.zoom = true; }
+  else { S.max = -1; flash(i); }
+  ws();
+  if (why) toast(why);
+}
+function back() {
+  const h = S.history.pop();
+  if (!h) { if (S.max >= 0) { S.max = -1; ws(); } return; }
+  Object.assign(S, h); S.zoom = false; ws();
+}
+function flash(i) { setTimeout(() => { const p = document.querySelector(`.pane[data-i="${i}"]`); p?.classList.add('flash'); setTimeout(() => p?.classList.remove('flash'), 700); }, 0); }
+addEventListener('keydown', (e) => {
+  if (e.key === 'Escape') { if (S.pop) { closePop(); S.pop = null; return; } back(); }
+  if (e.key === 'F2') toast(`Rename ${instOf(S.inst).name} (mock-up)`);
+});
+
+function crumbs(view) {
+  const inst = instOf(S.inst);
+  const path = view === 'roll' ? `<span>›</span><b>${inst.name}</b><span>›</span><b>${S.pat ?? 'empty'}</b><span>in TRACK ${S.row + 1}</span>`
+    : view === 'device' ? `<span>›</span><b>${inst.name}</b>` : '';
+  return `<button class="ib back" data-back aria-label="Back" data-tip="<b>Back</b><span class='kbd'>Esc</span>">${ICON('back')}</button>
+    <span class="crumbs"><button data-back>Song</button>${path}<span style="margin-left:6px">· ${VIEWS[view]}</span></span>`;
+}
+
+function body(view) {
+  const inst = instOf(S.inst);
+  if (view === 'seq') {
+    return `<div class="pb blue"><div class="arr" style="--n:${INST.length}">
+      <span></span>
+      ${INST.map((i) => `<div class="ihead ${i.id === S.inst ? 'sel' : ''}" data-inst="${i.id}" style="--c:${i.c}" title="Double-click: open ${i.name} in the Device panel">
+        <b>${i.name}</b><small>${i.kind}</small><button class="go" data-go-inst="${i.id}" aria-label="Open ${i.name}" data-tip="<b>Open ${i.name}</b>in the Device panel · or double-click">${ICON('go')}</button></div>`).join('')}
+      ${ROWS.map((r, ri) => `<div class="tl ${ri === S.row ? 'sel' : ''}" data-row="${ri}"><b>TRACK ${ri + 1}</b><small>1 bar</small></div>
+        ${INST.map((i) => r[i.id]
+          ? `<div class="cell ${ri === S.row && i.id === S.inst ? 'sel' : ''}" data-cell="${ri}:${i.id}"><b>${r[i.id]}</b><span class="bars"></span><button class="go" data-go-cell="${ri}:${i.id}" aria-label="Open ${r[i.id]} in the Piano roll" data-tip="<b>Open ${r[i.id]}</b>in the Piano roll · or double-click">${ICON('go')}</button></div>`
+          : `<div class="cell empty ${ri === S.row && i.id === S.inst ? 'sel' : ''}" data-cell="${ri}:${i.id}"><button class="go" data-go-cell="${ri}:${i.id}" aria-label="New pattern here" data-tip="<b>New pattern</b>for ${i.name} in TRACK ${ri + 1} · or double-click">${ICON('go')}</button></div>`).join('')}`).join('')}
+    </div><p class="hint">Click selects (the other panels follow). Double-click goes there.</p></div>`;
+  }
+  if (view === 'roll') {
+    const seed = (S.pat ?? '').length + S.inst.charCodeAt(0);
+    const notes = Array.from({ length: 9 }, (_, k) => `<span class="nt" style="left:${8 + ((k * 37 + seed * 11) % 80)}%;top:${30 + ((k * 53 + seed * 7) % 150)}px;width:${6 + (k * 7 + seed) % 12}%"></span>`).join('');
+    return `<div class="pb blue"><div class="roll">${Array.from({ length: 14 }, (_, k) => `<span class="ln" style="top:${k * 22}px"></span>`).join('')}${notes}<span class="lbl">${inst.name} · ${S.pat ?? 'new pattern'}</span></div></div>`;
+  }
+  if (view === 'device') {
+    return `<div class="pb"><div class="dev" style="--c:${inst.c}"><h2>${inst.name}</h2><span style="color:var(--fwm-mute)">${inst.kind} · double-click the name above to rename</span>
+      <div class="rowk">${'<span class="knob"></span>'.repeat(8)}</div><div class="rowk">${'<span class="knob"></span>'.repeat(6)}</div></div></div>`;
+  }
+  return `<div class="pb lib"><h2>The manual</h2><p style="color:var(--fwm-mute)">Click an instrument to see how it works.</p></div>`;
+}
+
+function ws() {
+  const w = $('ws');
+  w.className = 'ws' + (S.max >= 0 ? ' max' : '');
+  w.innerHTML = S.views.map((v, i) => `<section class="pane ${S.max === i ? 'maxed' + (S.zoom ? ' zoom' : '') : ''}" data-i="${i}" aria-label="${VIEWS[v]}">
+    <header class="ph">${crumbs(v)}
+      <select class="vsel" aria-label="View">${Object.entries(VIEWS).map(([k, n]) => `<option value="${k}" ${k === v ? 'selected' : ''}>${n}</option>`).join('')}</select>
+      <span class="ctx">${v === 'roll' || v === 'device' ? instOf(S.inst).name + (v === 'roll' ? ' · ' + (S.pat ?? 'empty') : '') : v === 'seq' ? '3 instruments · 2 TRACKs' : ''}</span>
+      <button class="ib" aria-label="Whole row" data-tip="<b>Whole row</b>">${ICON('wide')}</button>
+      <button class="ib" data-max="${i}" aria-label="${S.max === i ? 'Show all panels' : 'Full size'}" data-tip="<b>${S.max === i ? 'All panels' : 'Full size'}</b><span class='kbd'>Tab</span>">${ICON('full')}</button>
+    </header>${body(v)}</section>`).join('');
+  S.zoom = false;
+}
+
+// panel clicks: select, double-click = go, ↗ = go
+const wsEl = $('ws');
+wsEl.addEventListener('click', (e) => {
+  const t = e.target;
+  if (t.closest('[data-back]')) return back();
+  const m = t.closest('[data-max]');
+  if (m) { const i = +m.dataset.max; S.history.push({ views: S.views.slice(), max: S.max, inst: S.inst, row: S.row, pat: S.pat }); S.max = S.max === i ? -1 : i; S.zoom = S.max >= 0; return ws(); }
+  const gc = t.closest('[data-go-cell]');
+  if (gc) return openCell(gc.dataset.goCell);
+  const gi = t.closest('[data-go-inst]');
+  if (gi) return goTo('device', { inst: gi.dataset.goInst });
+  const c = t.closest('[data-cell]');
+  if (c) { const [r, i] = c.dataset.cell.split(':'); Object.assign(S, { row: +r, inst: i, pat: ROWS[+r][i] }); return ws(); }
+  const h = t.closest('[data-inst]');
+  if (h) { S.inst = h.dataset.inst; return ws(); }
+  const tl = t.closest('[data-row]');
+  if (tl) { S.row = +tl.dataset.row; return ws(); }
+});
+wsEl.addEventListener('dblclick', (e) => {
+  const c = e.target.closest('[data-cell]');
+  if (c) return openCell(c.dataset.cell);
+  const h = e.target.closest('[data-inst]');
+  if (h) return goTo('device', { inst: h.dataset.inst });
+});
+wsEl.addEventListener('change', (e) => { if (e.target.matches('.vsel')) { const i = +e.target.closest('.pane').dataset.i; S.views[i] = e.target.value; ws(); } });
+function openCell(key) {
+  const [r, i] = key.split(':');
+  const had = ROWS[+r][i];
+  if (!had) ROWS[+r][i] = 'P' + (1 + ROWS.filter((x) => x[i]).length);
+  goTo('roll', { row: +r, inst: i, pat: ROWS[+r][i] }, had ? null : `New pattern ${ROWS[+r][i]} for ${instOf(i).name} in TRACK ${+r + 1}`);
+}
+
+function toast(msg) { const t = $('toast'); t.textContent = msg; t.classList.add('on'); clearTimeout(t._t); t._t = setTimeout(() => t.classList.remove('on'), 1800); }
+
+// ---------------- review card ----------------
+const pick = (a, b, on) => { $(a).setAttribute('aria-pressed', on); $(b).setAttribute('aria-pressed', !on); };
+$('v-new').onclick = () => { S.bar = 'new'; pick('v-new', 'v-old', true); topbar(); };
+$('v-old').onclick = () => { S.bar = 'old'; pick('v-new', 'v-old', false); topbar(); };
+$('d-go').onclick = () => { S.dbl = 'go'; pick('d-go', 'd-side', true); };
+$('d-side').onclick = () => { S.dbl = 'side'; pick('d-go', 'd-side', false); if (S.max >= 0) { S.max = -1; ws(); } };
+$('p-join').onclick = () => { const n = PEOPLE_POOL[S.people.length % PEOPLE_POOL.length]; const p = [...n]; p.fresh = true; S.people.push(p); topbar(); toast(`${n[0]} joined`); };
+$('p-leave').onclick = () => { const p = S.people.pop(); topbar(); if (p) toast(`${p[0]} left`); };
+$('mini').onclick = () => { $('review').classList.toggle('mini'); $('mini').textContent = $('review').classList.contains('mini') ? '+' : '–'; };
+
+topbar(); ws();
+
+// ?selftest: double-click a pattern → full-size Piano roll with it; Esc → back; double-click an instrument →
+// Device; people joining keep the top bar's height and the Sound button's place.
+if (new URLSearchParams(location.search).has('selftest')) {
+  const out = [], ok = (c, l) => out.push(`${c ? 'PASS' : 'FAIL'} nav: ${l}`);
+  const dbl = (el) => el.dispatchEvent(new MouseEvent('dblclick', { bubbles: true }));
+  try {
+    dbl(document.querySelector('[data-cell="1:d"]'));
+    const m = document.querySelector('.pane.maxed');
+    ok(m && m.getAttribute('aria-label') === 'Piano roll' && /DRUMS · Fill/.test(m.textContent), 'double-click a pattern: Piano roll, full size, with it');
+    dispatchEvent(new KeyboardEvent('keydown', { key: 'Escape' }));
+    ok(!document.querySelector('.pane.maxed'), 'Esc goes back to all four panels');
+    dbl(document.querySelector('[data-inst="g"]'));
+    const d = document.querySelector('.pane.maxed');
+    ok(d && d.getAttribute('aria-label') === 'Device' && /GARNET/.test(d.textContent), 'double-click an instrument: its Device, full size');
+    back();
+    const h0 = $('topbar').offsetHeight, x0 = $('sound').getBoundingClientRect().left;
+    for (let k = 0; k < 5; k++) $('p-join').click();
+    ok($('topbar').offsetHeight === h0 && $('sound').getBoundingClientRect().left === x0, `5 people join: the top bar keeps its height (${h0}px) and the Sound button its place`);
+    ok(document.querySelectorAll('#people .av').length === 3 && /\+3/.test($('people').textContent), 'avatars: 3 shown, +3 for the rest');
+    $('v-old').click();
+    out.push(`INFO today's top bar with 6 people at ${innerWidth}px: ${$('topbar').offsetHeight}px tall, proposed: ${h0}px`);
+  } catch (e) { out.push('FAIL nav: ' + e); }
+  fetch('./log', { method: 'POST', body: out.join('\n') }).catch(() => {});
+  document.title = out.some((l) => l.startsWith('FAIL')) ? 'FAIL' : 'PASS';
+}
+</script>
+</body>
+</html>
